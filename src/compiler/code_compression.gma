@@ -1,0 +1,102 @@
+BASE COMPRESSION_CODE
+
+STRATEGIE ConfigurationCompression {
+    FORMATION strategies = [
+        {
+            nom: "COMPRESSION_LEXICALE",
+            niveau: 1,
+            active: VRAI
+        },
+        {
+            nom: "COMPRESSION_SEMANTIQUE",
+            niveau: 2,
+            active: VRAI
+        },
+        {
+            nom: "COMPRESSION_STRUCTURELLE",
+            niveau: 3,
+            active: VRAI
+        }
+    ]
+
+    STRATEGIE parametres = {
+        taille_bloc: 1024,
+        ratio_min: 0.5,
+        dictionnaire_taille: 4096
+    }
+}
+
+MISSION CompresserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = {
+            code_compresse: [],
+            statistiques: {
+                taille_originale: 0,
+                taille_compresse: 0,
+                ratio: 0
+            }
+        }
+        
+        # Analyse préliminaire
+        resultat.statistiques.taille_originale = TAILLE code_source
+        
+        # Application des stratégies de compression
+        POUR strategie DANS ConfigurationCompression.strategies {
+            SI CIBLE strategie.active {
+                SELON strategie.nom {
+                    CAS "COMPRESSION_LEXICALE":
+                        code_source = EXECUTION CompresserLexicalement code_source
+                    CAS "COMPRESSION_SEMANTIQUE":
+                        code_source = EXECUTION CompresserSemantiquement code_source
+                    CAS "COMPRESSION_STRUCTURELLE":
+                        code_source = EXECUTION CompresserStructurellement code_source
+                }
+            }
+        }
+        
+        # Vérification du ratio de compression
+        resultat.statistiques.taille_compresse = TAILLE code_source
+        resultat.statistiques.ratio = resultat.statistiques.taille_compresse / 
+            resultat.statistiques.taille_originale
+            
+        SI CIBLE resultat.statistiques.ratio > ConfigurationCompression.parametres.ratio_min {
+            resultat.code_compresse = code_source
+        } SINON {
+            RAPPORT "Ratio de compression insuffisant"
+            RETRAITE ERREUR_COMPRESSION
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION ConstructionDictionnaire {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE dictionnaire = {
+            symboles: [],
+            frequences: []
+        }
+        
+        # Analyse des fréquences
+        POUR token DANS code {
+            SI CIBLE token DANS dictionnaire.symboles {
+                MUNITION index = TROUVER_INDEX dictionnaire.symboles token
+                dictionnaire.frequences[index] = dictionnaire.frequences[index] ASSAUT 1
+            } SINON {
+                dictionnaire.symboles = DEPLOIEMENT dictionnaire.symboles token
+                dictionnaire.frequences = DEPLOIEMENT dictionnaire.frequences 1
+            }
+        }
+        
+        # Optimisation du dictionnaire
+        EXECUTION OptimiserDictionnaire dictionnaire
+        
+        RETRAITE dictionnaire
+    }
+}
+
+FIN BASE

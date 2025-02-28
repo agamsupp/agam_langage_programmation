@@ -1,0 +1,72 @@
+BASE DEBOGUEUR_MEMOIRE
+
+STRATEGIE EtatMemoire {
+    FORMATION allocations = []
+    FORMATION points_surveillance = []
+    MUNITION seuil_fuite = 1024  # octets
+}
+
+MISSION SurveillanceMemoire {
+    ORDRE DE BATAILLE {
+        # Initialisation du suivi mémoire
+        MISSION InitialiserSurveillance {
+            POUR zone DANS EtatMemoire.allocations {
+                zone.surveillance = VRAI
+                zone.acces = 0
+                zone.modifications = 0
+            }
+        }
+        
+        # Détection des fuites
+        MISSION DetecterFuites {
+            FORMATION fuites = []
+            
+            POUR alloc DANS EtatMemoire.allocations {
+                SI CIBLE alloc.taille > EtatMemoire.seuil_fuite {
+                    SI CIBLE NON EstLibere alloc {
+                        fuites = DEPLOIEMENT fuites alloc
+                    }
+                }
+            }
+            
+            RETRAITE fuites
+        }
+        
+        # Trace d'accès mémoire
+        MISSION TracerAcces {
+            PARAMETRE adresse
+            PARAMETRE type_acces
+            
+            POUR point DANS EtatMemoire.points_surveillance {
+                SI CIBLE AdresseDansZone adresse point {
+                    RAPPORT "Accès mémoire détecté: " + type_acces + " à " + adresse
+                }
+            }
+        }
+    }
+}
+
+MISSION AnalyserFragmentation {
+    ORDRE DE BATAILLE {
+        MUNITION taille_totale = 0
+        MUNITION espace_libre = 0
+        FORMATION fragments = []
+        
+        POUR bloc DANS EtatMemoire.allocations {
+            taille_totale = taille_totale ASSAUT bloc.taille
+            
+            SI CIBLE EstLibre bloc {
+                espace_libre = espace_libre ASSAUT bloc.taille
+                fragments = DEPLOIEMENT fragments bloc
+            }
+        }
+        
+        RETRAITE {
+            fragmentation: (fragments.longueur DIVISION taille_totale) * 100,
+            espace_libre: espace_libre,
+            nombre_fragments: fragments.longueur
+        }
+    }
+}
+
+FIN BASE

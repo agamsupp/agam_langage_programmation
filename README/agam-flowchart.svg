@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+  <!-- Styles -->
+  <defs>
+    <style>
+      .title { font-family: Arial; font-size: 24px; font-weight: bold; fill: #333; }
+      .box { stroke: #333; stroke-width: 2px; rx: 5px; ry: 5px; }
+      .process { fill: #e6f2ff; }
+      .decision { fill: #ffe6cc; }
+      .io { fill: #e6ffe6; }
+      .terminal { fill: #ffe6e6; }
+      .arrow { stroke: #666; stroke-width: 2px; fill: none; marker-end: url(#arrowhead); }
+      .text { font-family: Arial; font-size: 14px; fill: #333; }
+      .code { font-family: Courier; font-size: 12px; fill: #333; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="1000" fill="#f9f9f9" />
+
+  <!-- Title -->
+  <text x="400" y="40" class="title" text-anchor="middle">Fonctionnement du Code AGAM - Calculatrice AGAM 2025</text>
+
+  <!-- Starting point -->
+  <rect x="350" y="70" width="100" height="60" class="box terminal" />
+  <text x="400" y="105" class="text" text-anchor="middle">DÉBUT</text>
+
+  <!-- Main Process -->
+  <rect x="260" y="160" width="280" height="60" class="box process" />
+  <text x="400" y="195" class="text" text-anchor="middle">RAPPORT "QG opérationnel : Calculatrice AGAM 2025"</text>
+
+  <!-- Input - Operation choice -->
+  <rect x="200" y="250" width="400" height="60" class="box io" />
+  <text x="400" y="285" class="text" text-anchor="middle">SURVEILLANCE choix "Opération (1=Add, 2=Sous, 3=Puissance, 0=Quitter)"</text>
+
+  <!-- Decision - Quit? -->
+  <polygon points="400,340 480,400 400,460 320,400" class="box decision" />
+  <text x="400" y="405" class="text" text-anchor="middle">SI CIBLE choix = 0</text>
+
+  <!-- Save history and exit -->
+  <rect x="550" y="370" width="200" height="60" class="box process" />
+  <text x="650" y="395" class="text" text-anchor="middle">RAVITAILLEMENT "historique.txt"</text>
+  <text x="650" y="415" class="text" text-anchor="middle">RAPPORT "Rapport sauvegardé. Fin."</text>
+
+  <!-- Quit application -->
+  <rect x="600" y="460" width="100" height="60" class="box terminal" />
+  <text x="650" y="495" class="text" text-anchor="middle">RETRAITE</text>
+
+  <!-- Get Inputs -->
+  <rect x="250" y="490" width="300" height="60" class="box io" />
+  <text x="400" y="515" class="text" text-anchor="middle">SURVEILLANCE x "Nombre 1 : "</text>
+  <text x="400" y="535" class="text" text-anchor="middle">SURVEILLANCE y "Nombre 2 : "</text>
+
+  <!-- Operation selection -->
+  <polygon points="400,580 500,630 400,680 300,630" class="box decision" />
+  <text x="400" y="635" class="text" text-anchor="middle">CHAIN DE COMMANDE choix</text>
+
+  <!-- Addition -->
+  <rect x="100" y="650" width="200" height="60" class="box process" />
+  <text x="200" y="675" class="text" text-anchor="middle">CAS 1: resultat = ASSAUT x y</text>
+  <text x="200" y="695" class="text" text-anchor="middle">RAPPORT "Addition : " FUSION resultat</text>
+
+  <!-- Subtraction -->
+  <rect x="320" y="720" width="200" height="60" class="box process" />
+  <text x="420" y="745" class="text" text-anchor="middle">CAS 2: resultat = REPLI x y</text>
+  <text x="420" y="765" class="text" text-anchor="middle">RAPPORT "Soustraction : " FUSION resultat</text>
+
+  <!-- Power -->
+  <rect x="540" y="650" width="200" height="60" class="box process" />
+  <text x="640" y="675" class="text" text-anchor="middle">CAS 3: resultat = PUISSANCE DE FEU x y</text>
+  <text x="640" y="695" class="text" text-anchor="middle">RAPPORT "Puissance : " FUSION resultat</text>
+
+  <!-- Update history -->
+  <rect x="250" y="820" width="300" height="60" class="box process" />
+  <text x="400" y="845" class="text" text-anchor="middle">DEPLOIEMENT historique</text>
+  <text x="400" y="865" class="text" text-anchor="middle">FUSION "Opération " choix " = " resultat</text>
+
+  <!-- Loop back -->
+  <rect x="300" y="910" width="200" height="60" class="box process" />
+  <text x="400" y="945" class="text" text-anchor="middle">RAPPORT "-------------"</text>
+
+  <!-- Arrows -->
+  <path d="M400 130 L400 160" class="arrow" />
+  <path d="M400 220 L400 250" class="arrow" />
+  <path d="M400 310 L400 340" class="arrow" />
+  <path d="M480 400 L550 400" class="arrow" />
+  <text x="515" y="390" class="text">Oui</text>
+  <path d="M650 430 L650 460" class="arrow" />
+  <path d="M400 460 L400 490" class="arrow" />
+  <text x="385" y="475" class="text">Non</text>
+  <path d="M400 550 L400 580" class="arrow" />
+
+  <path d="M300 630 L200 650" class="arrow" />
+  <text x="240" y="630" class="text">Cas 1</text>
+  <path d="M400 680 L400 720" class="arrow" />
+  <text x="410" y="700" class="text">Cas 2</text>
+  <path d="M500 630 L600 650" class="arrow" />
+  <text x="540" y="630" class="text">Cas 3</text>
+
+  <path d="M200 710 L200 780 L400 780 L400 820" class="arrow" />
+  <path d="M420 780 L420 820" class="arrow" />
+  <path d="M640 710 L640 780 L420 780" class="arrow" />
+  
+  <path d="M400 880 L400 910" class="arrow" />
+  <path d="M300 940 L150 940 L150 300 L200 300" class="arrow" />
+
+  <!-- Explanation Box -->
+  <rect x="50" y="50" width="200" height="180" rx="10" ry="10" fill="#fff" stroke="#999" stroke-width="1" />
+  <text x="150" y="75" class="text" text-anchor="middle" font-weight="bold">Légende AGAM</text>
+  <text x="60" y="100" class="text" font-size="12px">BASE/FIN BASE: Programme</text>
+  <text x="60" y="120" class="text" font-size="12px">RAPPORT: Affichage</text>
+  <text x="60" y="140" class="text" font-size="12px">SURVEILLANCE: Saisie</text>
+  <text x="60" y="160" class="text" font-size="12px">ASSAUT: Addition</text>
+  <text x="60" y="180" class="text" font-size="12px">REPLI: Soustraction</text>
+  <text x="60" y="200" class="text" font-size="12px">PUISSANCE DE FEU: Exposant</text>
+  <text x="60" y="220" class="text" font-size="12px">DEPLOIEMENT: Ajout</text>
+</svg>

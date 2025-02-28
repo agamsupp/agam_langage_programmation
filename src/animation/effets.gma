@@ -1,0 +1,699 @@
+BASE EFFETS_ANIMATION_TACTIQUES
+    // Module d'effets d'animation prédéfinis
+    // Fournit des animations couramment utilisées
+
+    INCORPORATION "animation/animation_core.gma"
+    INCORPORATION "animation/sprites.gma"
+    
+    //----------------------------------------------
+    // TYPES D'ANIMATIONS
+    //----------------------------------------------
+    
+    MUNITION ANIM_DEPLACE = 0
+    MUNITION ANIM_ECHELLE = 1
+    MUNITION ANIM_ROTATION = 2
+    MUNITION ANIM_COULEUR = 3
+    MUNITION ANIM_OPACITE = 4
+    MUNITION ANIM_SEQUENCE = 5
+    MUNITION ANIM_PARALLELE = 6
+    MUNITION ANIM_OSCILLATION = 7
+    MUNITION ANIM_TRAJECTOIRE = 8
+    
+    //----------------------------------------------
+    // STRUCTURES D'ANIMATIONS
+    //----------------------------------------------
+    
+    STRATEGIE ANIMATION_DEPLACE
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION debut_x, debut_y FLOTTANT
+        MUNITION fin_x, fin_y FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_ECHELLE
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION debut_echelle_x, debut_echelle_y FLOTTANT
+        MUNITION fin_echelle_x, fin_echelle_y FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_ROTATION
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION angle_debut FLOTTANT
+        MUNITION angle_fin FLOTTANT
+        MUNITION sens_horaire BOOLEEN
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_COULEUR
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION couleur_debut COULEUR_TACTIQUE
+        MUNITION couleur_fin COULEUR_TACTIQUE
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_OPACITE
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION opacite_debut FLOTTANT
+        MUNITION opacite_fin FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_OSCILLATION
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION propriete ENTIER  // 0=x, 1=y, 2=rotation, 3=echelle, 4=opacite
+        MUNITION amplitude FLOTTANT
+        MUNITION frequence FLOTTANT
+        MUNITION valeur_base FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE POINT_TRAJECTOIRE
+        MUNITION x, y FLOTTANT
+        MUNITION proportion_temps FLOTTANT  // 0.0 à 1.0, temps pour atteindre ce point
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_TRAJECTOIRE
+        INCORPORATION ANIMATION_BASE
+        MUNITION sprite POINTEUR
+        MUNITION points FORMATION[20]
+        MUNITION nb_points ENTIER
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_SEQUENCE
+        INCORPORATION ANIMATION_BASE
+        MUNITION animations FORMATION[10]
+        MUNITION nb_animations ENTIER
+        MUNITION index_courant ENTIER
+    FIN STRATEGIE
+    
+    STRATEGIE ANIMATION_PARALLELE
+        INCORPORATION ANIMATION_BASE
+        MUNITION animations FORMATION[10]
+        MUNITION nb_animations ENTIER
+        MUNITION animations_terminees FORMATION[10]
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // CREATION D'ANIMATIONS
+    //----------------------------------------------
+    
+    MISSION CREER_ANIM_DEPLACE
+        PARAMETRE sprite POINTEUR
+        PARAMETRE x_final FLOTTANT
+        PARAMETRE y_final FLOTTANT
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_DEPLACE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.debut_x = sprite.position.x
+            animation.debut_y = sprite.position.y
+            animation.fin_x = x_final
+            animation.fin_y = y_final
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_ECHELLE
+        PARAMETRE sprite POINTEUR
+        PARAMETRE echelle_finale_x FLOTTANT
+        PARAMETRE echelle_finale_y FLOTTANT
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_ECHELLE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.debut_echelle_x = sprite.transformation.echelle.x
+            animation.debut_echelle_y = sprite.transformation.echelle.y
+            animation.fin_echelle_x = echelle_finale_x
+            animation.fin_echelle_y = echelle_finale_y
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_ROTATION
+        PARAMETRE sprite POINTEUR
+        PARAMETRE angle_final FLOTTANT
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_ROTATION
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.angle_debut = sprite.transformation.rotation
+            animation.angle_fin = angle_final
+            
+            // Déterminer le sens de rotation (le plus court)
+            MUNITION diff = angle_final - animation.angle_debut
+            
+            TANT QUE diff > 180
+                diff = diff - 360
+            FIN TANT QUE
+            
+            TANT QUE diff < -180
+                diff = diff + 360
+            FIN TANT QUE
+            
+            animation.sens_horaire = (diff >= 0)
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_COULEUR
+        PARAMETRE sprite POINTEUR
+        PARAMETRE couleur_finale COULEUR_TACTIQUE
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_COULEUR
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.couleur_debut = sprite.couleur
+            animation.couleur_fin = couleur_finale
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_OPACITE
+        PARAMETRE sprite POINTEUR
+        PARAMETRE opacite_finale FLOTTANT
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_OPACITE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.opacite_debut = sprite.opacite
+            animation.opacite_fin = opacite_finale
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_OSCILLATION
+        PARAMETRE sprite POINTEUR
+        PARAMETRE propriete ENTIER
+        PARAMETRE amplitude FLOTTANT
+        PARAMETRE frequence FLOTTANT
+        PARAMETRE duree FLOTTANT
+        PARAMETRE repetition ENTIER = 0  // 0 = infini
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_OSCILLATION
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, INTERPOLATION_LINEAIRE, repetition
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.propriete = propriete
+            animation.amplitude = amplitude
+            animation.frequence = frequence
+            
+            // Valeur de base selon la propriété
+            SELON propriete
+                CAS 0:  // x
+                    animation.valeur_base = sprite.position.x
+                    PAUSE
+                CAS 1:  // y
+                    animation.valeur_base = sprite.position.y
+                    PAUSE
+                CAS 2:  // rotation
+                    animation.valeur_base = sprite.transformation.rotation
+                    PAUSE
+                CAS 3:  // échelle (uniforme)
+                    animation.valeur_base = sprite.transformation.echelle.x
+                    PAUSE
+                CAS 4:  // opacité
+                    animation.valeur_base = sprite.opacite
+                    PAUSE
+                DEFAUT:
+                    animation.valeur_base = 0
+            FIN SELON
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_TRAJECTOIRE
+        PARAMETRE sprite POINTEUR
+        PARAMETRE points FORMATION
+        PARAMETRE nb_points ENTIER
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_TRAJECTOIRE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree, type_interpolation, 1
+            
+            // Propriétés spécifiques
+            animation.sprite = sprite
+            animation.nb_points = nb_points < 20 ? nb_points : 20
+            
+            // Copier les points
+            MANOEUVRE POUR i DE 0 A animation.nb_points - 1
+                animation.points[i] = points[i]
+            FIN MANOEUVRE
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_SEQUENCE
+        PARAMETRE animations FORMATION
+        PARAMETRE nb_animations ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_SEQUENCE
+            
+            // Calculer la durée totale
+            MUNITION duree_totale = 0
+            MANOEUVRE POUR i DE 0 A nb_animations - 1
+                duree_totale = duree_totale + animations[i].duree
+            FIN MANOEUVRE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree_totale, INTERPOLATION_LINEAIRE, 1
+            
+            // Propriétés spécifiques
+            animation.nb_animations = nb_animations < 10 ? nb_animations : 10
+            animation.index_courant = 0
+            
+            // Copier les animations
+            MANOEUVRE POUR i DE 0 A animation.nb_animations - 1
+                animation.animations[i] = animations[i]
+                
+                // Désactiver les animations pour qu'elles soient contrôlées par la séquence
+                animation.animations[i].est_active = FAUX
+            FIN MANOEUVRE
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_ANIM_PARALLELE
+        PARAMETRE animations FORMATION
+        PARAMETRE nb_animations ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION animation ANIMATION_PARALLELE
+            
+            // Trouver la durée la plus longue
+            MUNITION duree_max = 0
+            MANOEUVRE POUR i DE 0 A nb_animations - 1
+                SI CIBLE animations[i].duree > duree_max
+                    duree_max = animations[i].duree
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Initialiser l'animation de base
+            EXECUTION ANIMATION_INITIALISER animation, duree_max, INTERPOLATION_LINEAIRE, 1
+            
+            // Propriétés spécifiques
+            animation.nb_animations = nb_animations < 10 ? nb_animations : 10
+            
+            // Copier les animations et initialiser le tableau des terminaisons
+            MANOEUVRE POUR i DE 0 A animation.nb_animations - 1
+                animation.animations[i] = animations[i]
+                animation.animations_terminees[i] = FAUX
+                
+                // Désactiver les animations pour qu'elles soient contrôlées par le groupe
+                animation.animations[i].est_active = FAUX
+            FIN MANOEUVRE
+            
+            RETRAITE animation
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // MISE À JOUR D'ANIMATIONS
+    //----------------------------------------------
+    
+    MISSION METTRE_A_JOUR_ANIM_DEPLACE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer la nouvelle position
+            MUNITION x = EXECUTION INTERPOLER animation.debut_x, 
+                                          animation.fin_x, 
+                                          animation.progression, 
+                                          animation.type_interpolation
+            
+            MUNITION y = EXECUTION INTERPOLER animation.debut_y, 
+                                          animation.fin_y, a
+                                          nimation.progression, 
+                                          animation.type_interpolation
+            
+            // Appliquer au sprite
+            EXECUTION SPRITE_DEPLACER animation.sprite, x, y
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_ECHELLE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer la nouvelle échelle
+            MUNITION echelle_x = EXECUTION INTERPOLER animation.debut_echelle_x, 
+                                                animation.fin_echelle_x, 
+                                                animation.progression, 
+                                                animation.type_interpolation
+            
+            MUNITION echelle_y = EXECUTION INTERPOLER animation.debut_echelle_y, 
+                                                animation.fin_echelle_y, 
+                                                animation.progression, 
+                                                animation.type_interpolation
+            
+            // Appliquer au sprite
+            animation.sprite.transformation.echelle.x = echelle_x
+            animation.sprite.transformation.echelle.y = echelle_y
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_ROTATION
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer le nouvel angle
+            MUNITION angle = EXECUTION INTERPOLER animation.angle_debut, 
+                                            animation.angle_fin, 
+                                            animation.progression, 
+                                            animation.type_interpolation
+            
+            // Appliquer au sprite
+            EXECUTION SPRITE_ROTATION animation.sprite, angle
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_COULEUR
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer la nouvelle couleur
+            MUNITION couleur COULEUR_TACTIQUE
+            
+            couleur.rouge = EXECUTION INTERPOLER animation.couleur_debut.rouge, 
+                                          animation.couleur_fin.rouge, 
+                                          animation.progression, 
+                                          animation.type_interpolation
+            
+            couleur.vert = EXECUTION INTERPOLER animation.couleur_debut.vert, 
+                                          animation.couleur_fin.vert, 
+                                          animation.progression, 
+                                          animation.type_interpolation
+            
+            couleur.bleu = EXECUTION INTERPOLER animation.couleur_debut.bleu, 
+                                         animation.couleur_fin.bleu, 
+                                         animation.progression, 
+                                         animation.type_interpolation
+            
+            couleur.alpha = EXECUTION INTERPOLER animation.couleur_debut.alpha, 
+                                          animation.couleur_fin.alpha, 
+                                          animation.progression, 
+                                          animation.type_interpolation
+            
+            // Appliquer au sprite
+            EXECUTION SPRITE_CHANGER_COULEUR animation.sprite, couleur
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_OPACITE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer la nouvelle opacité
+            MUNITION opacite = EXECUTION INTERPOLER animation.opacite_debut, 
+                                              animation.opacite_fin, 
+                                              animation.progression, 
+                                              animation.type_interpolation
+            
+            // Appliquer au sprite
+            animation.sprite.opacite = opacite
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_OSCILLATION
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            // Calculer la valeur oscillante (onde sinusoïdale)
+            MUNITION temps_total = animation.temps_ecoule
+            MUNITION valeur = animation.valeur_base + animation.amplitude * 
+                        sin(2 * 3.14159 * animation.frequence * temps_total)
+            
+            // Appliquer selon la propriété
+            SELON animation.propriete
+                CAS 0:  // x
+                    animation.sprite.position.x = valeur
+                    PAUSE
+                CAS 1:  // y
+                    animation.sprite.position.y = valeur
+                    PAUSE
+                CAS 2:  // rotation
+                    animation.sprite.transformation.rotation = valeur
+                    PAUSE
+                CAS 3:  // échelle (uniforme)
+                    animation.sprite.transformation.echelle.x = valeur
+                    animation.sprite.transformation.echelle.y = valeur
+                    PAUSE
+                CAS 4:  // opacité
+                    animation.sprite.opacite = valeur
+                    PAUSE
+            FIN SELON
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_TRAJECTOIRE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'animation de base
+            EXECUTION ANIMATION_METTRE_A_JOUR animation, delta_temps
+            
+            SI CIBLE !animation.est_active || animation.nb_points < 2
+                RETRAITE
+            FIN SI
+            
+            // Trouver les deux points entre lesquels nous nous trouvons
+            MUNITION progression = animation.progression
+            MUNITION index_actuel = 0
+            
+            MANOEUVRE POUR i DE 0 A animation.nb_points - 2
+                SI CIBLE progression >= animation.points[i].proportion_temps && 
+                   progression <= animation.points[i+1].proportion_temps
+                    index_actuel = i
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Calculer la progression entre ces deux points
+            MUNITION point_debut = animation.points[index_actuel]
+            MUNITION point_fin = animation.points[index_actuel + 1]
+            
+            MUNITION progression_segment = 0
+            SI CIBLE point_fin.proportion_temps > point_debut.proportion_temps
+                progression_segment = (progression - point_debut.proportion_temps) / 
+                                      (point_fin.proportion_temps - point_debut.proportion_temps)
+            FIN SI
+            
+            // Interpoler la position
+            MUNITION x = EXECUTION INTERPOLER point_debut.x, 
+                                          point_fin.x, 
+                                          progression_segment, 
+                                          animation.type_interpolation
+            
+            MUNITION y = EXECUTION INTERPOLER point_debut.y, 
+                                          point_fin.y, 
+                                          progression_segment, 
+                                          animation.type_interpolation
+            
+            // Appliquer au sprite
+            EXECUTION SPRITE_DEPLACER animation.sprite, x, y
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_SEQUENCE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            SI CIBLE !animation.est_active || animation.nb_animations <= 0
+                RETRAITE
+            FIN SI
+            
+            // Mettre à jour l'animation active dans la séquence
+            MUNITION anim_courante = animation.animations[animation.index_courant]
+            
+            SI CIBLE !anim_courante.est_active
+                // Démarrer l'animation
+                EXECUTION ANIMATION_DEMARRER anim_courante, animation.temps_debut + animation.temps_ecoule
+            FIN SI
+            
+            // Mettre à jour selon son type
+            [MISE À JOUR SELON TYPE...]
+            
+            // Vérifier si l'animation courante est terminée
+            SI CIBLE !anim_courante.est_active
+                // Passer à l'animation suivante
+                animation.index_courant = animation.index_courant + 1
+                
+                SI CIBLE animation.index_courant >= animation.nb_animations
+                    // La séquence est terminée
+                    animation.est_active = FAUX
+                    
+                    // Appeler le callback si défini
+                    SI CIBLE animation.callback_fin != 0
+                        EXECUTION animation.callback_fin animation
+                    FIN SI
+                FIN SI
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_ANIM_PARALLELE
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            SI CIBLE !animation.est_active || animation.nb_animations <= 0
+                RETRAITE
+            FIN SI
+            
+            // Mettre à jour toutes les animations du groupe
+            MUNITION toutes_terminees = VRAI
+            
+            MANOEUVRE POUR i DE 0 A animation.nb_animations - 1
+                SI CIBLE !animation.animations_terminees[i]
+                    MUNITION anim = animation.animations[i]
+                    
+                    SI CIBLE !anim.est_active
+                        // Démarrer l'animation
+                        EXECUTION ANIMATION_DEMARRER anim, animation.temps_debut + animation.temps_ecoule
+                    FIN SI
+                    
+                    // Mettre à jour selon son type
+                    [MISE À JOUR SELON TYPE...]
+                    
+                    // Vérifier si l'animation est terminée
+                    SI CIBLE !anim.est_active
+                        animation.animations_terminees[i] = VRAI
+                    SINON
+                        toutes_terminees = FAUX
+                    FIN SI
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Vérifier si toutes les animations sont terminées
+            SI CIBLE toutes_terminees
+                animation.est_active = FAUX
+                
+                // Appeler le callback si défini
+                SI CIBLE animation.callback_fin != 0
+                    EXECUTION animation.callback_fin animation
+                FIN SI
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

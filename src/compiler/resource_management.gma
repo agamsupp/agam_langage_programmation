@@ -1,0 +1,80 @@
+BASE GESTIONNAIRE_RESSOURCES
+
+STRATEGIE ConfigurationRessources {
+    FORMATION types_ressources = [
+        {
+            type: "MEMOIRE",
+            limite: 1024 * 1024 * 1024,  # 1GB
+            priorite: "HAUTE"
+        },
+        {
+            type: "PROCESSEUR",
+            limite: 8,  # threads
+            priorite: "HAUTE"
+        },
+        {
+            type: "FICHIER",
+            limite: 1000,
+            priorite: "MOYENNE"
+        }
+    ]
+
+    FORMATION politiques = [
+        {
+            nom: "ALLOCATION_DYNAMIQUE",
+            active: VRAI
+        },
+        {
+            nom: "PARTAGE_RESSOURCES",
+            active: VRAI
+        }
+    ]
+}
+
+MISSION AllouerRessource {
+    PARAMETRE type
+    PARAMETRE quantite
+    
+    ORDRE DE BATAILLE {
+        # Vérification des limites
+        STRATEGIE ressource = TROUVER_RESSOURCE type
+        
+        SI CIBLE (ressource.utilisation ASSAUT quantite) > ressource.limite {
+            SI CIBLE EstPolitiqueActive "ALLOCATION_DYNAMIQUE" {
+                EXECUTION EtendreRessource ressource quantite
+            } SINON {
+                RETRAITE ERREUR_LIMITE_ATTEINTE
+            }
+        }
+        
+        # Allocation
+        STRATEGIE allocation = {
+            id: GENERER_ID,
+            type: type,
+            quantite: quantite,
+            timestamp: TEMPS_ACTUEL
+        }
+        
+        ressource.utilisation = ressource.utilisation ASSAUT quantite
+        
+        RETRAITE allocation
+    }
+}
+
+MISSION SurveillanceRessources {
+    ORDRE DE BATAILLE {
+        POUR ressource DANS ConfigurationRessources.types_ressources {
+            # Vérification des seuils
+            SI CIBLE ressource.utilisation > (ressource.limite * 0.8) {
+                EXECUTION AlerteSurUtilisation ressource
+            }
+            
+            # Nettoyage des ressources non utilisées
+            SI CIBLE ressource.utilisation < (ressource.limite * 0.2) {
+                EXECUTION OptimiserRessource ressource
+            }
+        }
+    }
+}
+
+FIN BASE

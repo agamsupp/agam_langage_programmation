@@ -1,0 +1,92 @@
+BASE GESTIONNAIRE_INTERRUPTIONS
+
+STRATEGIE TableInterruptions {
+    FORMATION vecteurs = [
+        {
+            id: 0x00,
+            type: "DIVISION_ZERO",
+            priorite: "HAUTE",
+            gestionnaire: "GestionDivisionZero"
+        },
+        {
+            id: 0x01,
+            type: "DEPASSEMENT_PILE",
+            priorite: "HAUTE",
+            gestionnaire: "GestionDepassementPile"
+        },
+        {
+            id: 0x02,
+            type: "VIOLATION_MEMOIRE",
+            priorite: "HAUTE",
+            gestionnaire: "GestionViolationMemoire"
+        }
+    ]
+    
+    MUNITION interruption_courante = VIDE
+    FORMATION interruptions_en_attente = []
+}
+
+MISSION InitialiserGestionnaireInterruptions {
+    ORDRE DE BATAILLE {
+        # Configuration des vecteurs d'interruption
+        POUR vecteur DANS TableInterruptions.vecteurs {
+            EXECUTION ConfigurerVecteur vecteur
+        }
+        
+        # Initialisation des gestionnaires
+        EXECUTION InitialiserGestionnaires
+        
+        # Configuration des priorités
+        EXECUTION ConfigurerPriorites
+    }
+}
+
+MISSION TraiterInterruption {
+    PARAMETRE interruption
+    
+    ORDRE DE BATAILLE {
+        # Sauvegarde du contexte
+        EXECUTION SauvegarderContexte
+        
+        # Recherche du gestionnaire approprié
+        POUR vecteur DANS TableInterruptions.vecteurs {
+            SI CIBLE vecteur.id VERIFICATION interruption.id {
+                # Exécution du gestionnaire
+                EXECUTION OBTENIR_GESTIONNAIRE vecteur.gestionnaire interruption
+                PAUSE
+            }
+        }
+        
+        # Restauration du contexte
+        EXECUTION RestaurerContexte
+    }
+}
+
+MISSION GererInterruptionsPendantes {
+    ORDRE DE BATAILLE {
+        TANT_QUE RECONNAISSANCE TableInterruptions.interruptions_en_attente > 0 {
+            MUNITION prochaine = TableInterruptions.interruptions_en_attente[0]
+            
+            SI CIBLE PrioriteValide prochaine {
+                EXECUTION TraiterInterruption prochaine
+                TableInterruptions.interruptions_en_attente = RETRAIT 
+                    TableInterruptions.interruptions_en_attente 
+                    0
+            }
+        }
+    }
+}
+
+MISSION MasquerInterruptions {
+    PARAMETRE type_interruption
+    
+    ORDRE DE BATAILLE {
+        POUR vecteur DANS TableInterruptions.vecteurs {
+            SI CIBLE vecteur.type VERIFICATION type_interruption {
+                vecteur.masque = VRAI
+            }
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,62 @@
+BASE STRUCTURES_DONNEES
+
+# Implémentation d'une Liste Chaînée
+STRATEGIE NoeudListe {
+    MUNITION valeur
+    STRATEGIE suivant = VIDE
+}
+
+MISSION CreerListe {
+    ORDRE DE BATAILLE {
+        RETRAITE NOUVELLE NoeudListe
+    }
+}
+
+MISSION AjouterElement {
+    PARAMETRE liste
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE liste.valeur EST VIDE {
+            liste.valeur = valeur
+            RETRAITE
+        }
+        
+        MANOEUVRE RECHERCHE {
+            TANT_QUE liste.suivant NON VIDE {
+                liste = liste.suivant
+            }
+        }
+        
+        liste.suivant = NOUVELLE NoeudListe
+        liste.suivant.valeur = valeur
+    }
+}
+
+# Implémentation d'un Arbre Binaire
+STRATEGIE NoeudArbre {
+    MUNITION valeur
+    STRATEGIE gauche = VIDE
+    STRATEGIE droite = VIDE
+}
+
+MISSION InsererDansArbre {
+    PARAMETRE racine
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE racine EST VIDE {
+            RETRAITE NOUVELLE NoeudArbre {valeur: valeur}
+        }
+        
+        SI CIBLE valeur < racine.valeur {
+            racine.gauche = EXECUTION InsererDansArbre racine.gauche valeur
+        } SINON {
+            racine.droite = EXECUTION InsererDansArbre racine.droite valeur
+        }
+        
+        RETRAITE racine
+    }
+}
+
+FIN BASE

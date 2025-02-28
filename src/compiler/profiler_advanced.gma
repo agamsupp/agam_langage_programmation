@@ -1,0 +1,78 @@
+BASE PROFILEUR_AVANCE
+
+STRATEGIE ConfigurationProfileur {
+    FORMATION points_profil = [
+        {
+            type: "CODE",
+            elements: ["FONCTIONS", "BOUCLES", "BRANCHES"],
+            niveau: "INSTRUCTION"
+        },
+        {
+            type: "MEMOIRE",
+            elements: ["ALLOCATION", "ACCES", "PATTERN"],
+            niveau: "DETAIL"
+        },
+        {
+            type: "FLUX",
+            elements: ["APPELS", "RETOURS", "EXCEPTIONS"],
+            niveau: "COMPLET"
+        }
+    ]
+
+    STRATEGIE options = {
+        echantillonnage: 10,     # ms
+        aggregation: "DYNAMIC",
+        stockage: "COMPRESSE"
+    }
+}
+
+MISSION DemarrerProfilage {
+    PARAMETRE cible
+    
+    ORDRE DE BATAILLE {
+        # Installation des points de profilage
+        POUR point DANS ConfigurationProfileur.points_profil {
+            EXECUTION InstallerPointProfilage point cible
+        }
+        
+        # Démarrage de la collecte
+        MANOEUVRE PROFILAGE {
+            TANT_QUE PROFILAGE_ACTIF {
+                # Collecte des données
+                POUR point DANS POINTS_ACTIFS {
+                    EXECUTION CollecterDonneesPoint point
+                }
+                
+                # Analyse en temps réel
+                EXECUTION AnalyserDonneesProfil
+                
+                # Stockage des données
+                SI CIBLE BufferPlein {
+                    EXECUTION SauvegarderDonnees
+                }
+                
+                ATTENDRE ConfigurationProfileur.options.echantillonnage
+            }
+        }
+    }
+}
+
+MISSION GenererRapportProfil {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            sommaire: GENERER_SOMMAIRE donnees,
+            points_chauds: IDENTIFIER_POINTS_CHAUDS donnees,
+            graphiques: GENERER_VISUALISATIONS donnees,
+            recommandations: ANALYSER_OPTIMISATIONS donnees
+        }
+        
+        # Analyse détaillée des sections critiques
+        EXECUTION AnalyserSectionsCritiques rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

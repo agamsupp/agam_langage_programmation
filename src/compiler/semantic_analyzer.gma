@@ -1,0 +1,94 @@
+BASE ANALYSEUR_SEMANTIQUE
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION types_valides = [
+        "MUNITION",
+        "FORMATION",
+        "STRATEGIE",
+        "ORDRE"
+    ]
+    
+    FORMATION regles_semantiques = [
+        {
+            type: "DECLARATION",
+            validations: [
+                "VERIFICATION_TYPE",
+                "VERIFICATION_PORTEE",
+                "VERIFICATION_INITIALISATION"
+            ]
+        },
+        {
+            type: "OPERATION",
+            validations: [
+                "VERIFICATION_OPERANDES",
+                "VERIFICATION_COMPATIBILITE",
+                "VERIFICATION_RESULTAT"
+            ]
+        }
+    ]
+}
+
+MISSION AnalyserProgramme {
+    PARAMETRE arbre_syntaxique
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            arbre: arbre_syntaxique,
+            portee_courante: VIDE,
+            erreurs: [],
+            table_symboles: []
+        }
+        
+        # Construction de la table des symboles
+        EXECUTION ConstruireTableSymboles contexte
+        
+        # Analyse des déclarations
+        EXECUTION AnalyserDeclarations contexte
+        
+        # Analyse des opérations
+        EXECUTION AnalyserOperations contexte
+        
+        # Vérification des références
+        EXECUTION VerifierReferences contexte
+        
+        RETRAITE contexte
+    }
+}
+
+MISSION VerifierType {
+    PARAMETRE type
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE type DANS ConfigurationAnalyse.types_valides {
+            RETRAITE VRAI
+        }
+        
+        contexte.erreurs = DEPLOIEMENT contexte.erreurs {
+            type: "ERREUR_TYPE",
+            message: "Type invalide: " + type
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION VerifierPortee {
+    PARAMETRE symbole
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE portee = contexte.portee_courante
+        
+        TANT_QUE portee NON VIDE {
+            SI CIBLE ExisteSymbole symbole portee {
+                RETRAITE FAUX
+            }
+            portee = portee.parent
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

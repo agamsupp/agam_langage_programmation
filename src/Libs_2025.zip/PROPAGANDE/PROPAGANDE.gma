@@ -1,0 +1,19 @@
+// Bibliothèque PROPAGANDE - Interfaces utilisateur
+// Inclusion : INCLURE "PROPAGANDE"
+
+MISSION AFFICHE message style
+    [logique d’affichage stylisé]
+FIN MISSION
+
+MISSION ECOUTE invite type
+    RAPPORT invite
+    RETRAITE [entrée convertie selon 'type']
+FIN MISSION
+
+MISSION TABLEAU DE BORD donnees
+    [logique d’affichage tabulaire]
+FIN MISSION
+
+MISSION ALERTE niveau message
+    RAPPORT FUSION niveau ": " message
+FIN MISSION

@@ -1,0 +1,80 @@
+BASE TESTEUR_CHARGE
+
+STRATEGIE ConfigurationTests {
+    FORMATION scenarios = [
+        {
+            type: "MONTEE_CHARGE",
+            duree: 300,          # secondes
+            paliers: [
+                {niveau: 10, duree: 60},
+                {niveau: 50, duree: 120},
+                {niveau: 100, duree: 120}
+            ]
+        },
+        {
+            type: "STRESS",
+            duree: 600,
+            charge: 200,        # processus simultanés
+            variations: VRAI
+        }
+    ]
+
+    STRATEGIE metriques = {
+        intervalle: 1000,      # ms
+        agregation: "MOYENNE",
+        stockage: "COMPRESSE"
+    }
+}
+
+MISSION ExecuterTestCharge {
+    PARAMETRE scenario
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            debut: TEMPS_ACTUEL,
+            metriques: [],
+            erreurs: [],
+            processus: []
+        }
+        
+        # Configuration du test
+        EXECUTION PreparerEnvironnement scenario
+        
+        # Exécution des paliers
+        POUR palier DANS scenario.paliers {
+            EXECUTION ExecuterPalier palier contexte
+            
+            # Analyse des résultats intermédiaires
+            SI CIBLE DetecterAnomalie contexte {
+                EXECUTION AlerterAnomalie contexte
+            }
+        }
+        
+        # Génération du rapport
+        EXECUTION GenererRapportCharge contexte
+    }
+}
+
+MISSION ExecuterPalier {
+    PARAMETRE palier
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Mise en place de la charge
+        POUR i DANS SEQUENCE 1 À palier.niveau {
+            EXECUTION DemarrerProcessusTest
+        }
+        
+        # Surveillance du palier
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE TEMPS_ECOULE < palier.duree {
+                EXECUTION CollecterMetriques contexte
+                EXECUTION VerifierSante contexte
+                
+                ATTENDRE ConfigurationTests.metriques.intervalle
+            }
+        }
+    }
+}
+
+FIN BASE

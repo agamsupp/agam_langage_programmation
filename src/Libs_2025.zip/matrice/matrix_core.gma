@@ -1,0 +1,527 @@
+BASE MATRIX_TACTIQUE
+    // Module core pour les effets d'animation style Matrix
+    // Fournit les structures et fonctions de base pour simuler le célèbre "code digital cascadant"
+
+    INCORPORATION "animation/animation_core.gma"  // Utilise notre bibliothèque d'animation
+
+    //----------------------------------------------
+    // CONSTANTES ET TYPES
+    //----------------------------------------------
+    
+    MUNITION VERT_MATRIX = [0, 255, 0, 255]    // Couleur verte iconique de Matrix
+    MUNITION VERT_BRILLANT = [160, 255, 160, 255]  // Pour les caractères plus lumineux
+    MUNITION BLANC = [255, 255, 255, 255]      // Pour les caractères en surbrillance
+    
+    MUNITION MODE_CARACTERES_LATIN = 0
+    MUNITION MODE_CARACTERES_JAPONAIS = 1
+    MUNITION MODE_CARACTERES_SYMBOLES = 2
+    MUNITION MODE_CARACTERES_MIXTE = 3
+    
+    STRATEGIE COLONNE_MATRIX
+        MUNITION position_x FLOTTANT         // Position horizontale de la colonne
+        MUNITION position_y FLOTTANT         // Position verticale (tête de la colonne)
+        MUNITION longueur ENTIER             // Nombre de caractères dans la colonne
+        MUNITION caracteres FORMATION[100]    // Les caractères affichés
+        MUNITION opacites FORMATION[100]     // Opacité de chaque caractère (0.0-1.0)
+        MUNITION vitesse FLOTTANT            // Vitesse de chute (pixels/seconde)
+        MUNITION delai_changement FLOTTANT   // Délai entre changements de caractères (secondes)
+        MUNITION temps_dernier_changement FLOTTANT  // Timestamp du dernier changement
+        MUNITION est_active BOOLEEN          // Si la colonne est actuellement visible
+        MUNITION index_tete ENTIER           // Index du caractère en tête (surbrillance)
+        MUNITION probabilite_changement FLOTTANT  // Probabilité de changer chaque caractère
+        MUNITION mode_caracteres ENTIER      // Type de caractères à afficher
+    FIN STRATEGIE
+    
+    STRATEGIE EFFET_MATRIX
+        MUNITION colonnes FORMATION[300]     // Colonnes de caractères
+        MUNITION nb_colonnes ENTIER          // Nombre actuel de colonnes
+        MUNITION max_colonnes ENTIER         // Nombre maximum de colonnes autorisé
+        MUNITION largeur_ecran ENTIER        // Largeur de la zone d'affichage
+        MUNITION hauteur_ecran ENTIER        // Hauteur de la zone d'affichage
+        MUNITION taille_caractere ENTIER     // Taille de la police (pixels)
+        MUNITION espacement_x ENTIER         // Espacement horizontal entre colonnes
+        MUNITION espacement_y ENTIER         // Espacement vertical entre caractères
+        MUNITION couleur_principale COULEUR_TACTIQUE // Couleur principale des caractères
+        MUNITION couleur_surbrillance COULEUR_TACTIQUE // Couleur de surbrillance
+        MUNITION temps_ecoule FLOTTANT       // Temps total écoulé
+        MUNITION probabilite_nouvelle_colonne FLOTTANT // Probabilité qu'une nouvelle colonne apparaisse
+        MUNITION mode_caracteres ENTIER      // Type de caractères par défaut
+        MUNITION raindrops_actifs BOOLEEN    // Effet de "gouttes de pluie" (surbrillance)
+        MUNITION ondulation_active BOOLEEN   // Effet d'ondulation
+        MUNITION ondulation_amplitude FLOTTANT // Amplitude de l'ondulation
+        MUNITION ondulation_frequence FLOTTANT // Fréquence de l'ondulation
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // TABLEAUX DE CARACTÈRES
+    //----------------------------------------------
+    
+    MUNITION CARACTERES_LATIN FORMATION[36] = [
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+        'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+        'U', 'V', 'W', 'X', 'Y', 'Z'
+    ]
+    
+    MUNITION CARACTERES_JAPONAIS FORMATION[20] = [
+        'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ',
+        'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ', 'ﾀ', 'ﾁ', 'ﾂ', 'ﾃ', 'ﾄ'
+    ]
+    
+    MUNITION CARACTERES_SYMBOLES FORMATION[20] = [
+        '$', '%', '#', '@', '&', '*', '(', ')', '[', ']',
+        '{', '}', '<', '>', '=', '+', '-', '/', '\\', '|'
+    ]
+    
+    //----------------------------------------------
+    // INITIALISATION
+    //----------------------------------------------
+    
+    MISSION INITIALISER_EFFET_MATRIX
+        PARAMETRE largeur ENTIER
+        PARAMETRE hauteur ENTIER
+        PARAMETRE taille_caractere ENTIER = 16
+        
+        ORDRE DE BATAILLE
+            MUNITION effet EFFET_MATRIX
+            
+            // Initialiser les propriétés de base
+            effet.largeur_ecran = largeur
+            effet.hauteur_ecran = hauteur
+            effet.taille_caractere = taille_caractere
+            effet.espacement_x = taille_caractere
+            effet.espacement_y = taille_caractere
+            effet.couleur_principale = VERT_MATRIX
+            effet.couleur_surbrillance = BLANC
+            effet.temps_ecoule = 0
+            effet.nb_colonnes = 0
+            effet.max_colonnes = 300
+            effet.probabilite_nouvelle_colonne = 0.02  // 2% de chance par frame
+            effet.mode_caracteres = MODE_CARACTERES_JAPONAIS
+            effet.raindrops_actifs = VRAI
+            effet.ondulation_active = FAUX
+            effet.ondulation_amplitude = 10
+            effet.ondulation_frequence = 0.5
+            
+            // Nombre maximal de colonnes basé sur la largeur de l'écran
+            MUNITION max_possible = largeur / effet.espacement_x
+            effet.max_colonnes = max_possible < 300 ? max_possible : 300
+            
+            RETRAITE effet
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // GESTION DES COLONNES
+    //----------------------------------------------
+    
+    MISSION CREER_COLONNE_MATRIX
+        PARAMETRE effet POINTEUR
+        PARAMETRE position_x FLOTTANT = -1  // -1 pour position aléatoire
+        
+        ORDRE DE BATAILLE
+            SI CIBLE effet.nb_colonnes >= effet.max_colonnes
+                RETRAITE 0  // Limite atteinte
+            FIN SI
+            
+            MUNITION colonne COLONNE_MATRIX
+            
+            // Position X (aléatoire si non spécifiée)
+            SI CIBLE position_x < 0
+                colonne.position_x = EXECUTION NOMBRE_ALEATOIRE 0, effet.largeur_ecran
+                // Aligner sur la grille d'espacement
+                colonne.position_x = (colonne.position_x / effet.espacement_x) * effet.espacement_x
+            SINON
+                colonne.position_x = position_x
+            FIN SI
+            
+            // Position Y (commence au-dessus de l'écran)
+            colonne.position_y = -EXECUTION NOMBRE_ALEATOIRE 50, 500
+            
+            // Longueur (aléatoire entre 5 et 30 caractères)
+            colonne.longueur = EXECUTION NOMBRE_ALEATOIRE 5, 30
+            
+            // Vitesse (entre 30 et 200 pixels par seconde)
+            colonne.vitesse = EXECUTION NOMBRE_ALEATOIRE 30, 200
+            
+            // Caractères initiaux
+            EXECUTION INITIALISER_CARACTERES_COLONNE colonne, effet.mode_caracteres
+            
+            // Autres propriétés
+            colonne.delai_changement = EXECUTION NOMBRE_ALEATOIRE 0.05, 0.2
+            colonne.temps_dernier_changement = 0
+            colonne.est_active = VRAI
+            colonne.index_tete = 0  // Premier caractère est en surbrillance
+            colonne.probabilite_changement = 0.3  // 30% de chance de changer un caractère
+            colonne.mode_caracteres = effet.mode_caracteres
+            
+            // Stocker dans le tableau des colonnes de l'effet
+            effet.colonnes[effet.nb_colonnes] = colonne
+            effet.nb_colonnes = effet.nb_colonnes + 1
+            
+            RETRAITE effet.nb_colonnes
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION INITIALISER_CARACTERES_COLONNE
+        PARAMETRE colonne POINTEUR
+        PARAMETRE mode ENTIER
+        
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A colonne.longueur - 1
+                // Choisir un caractère aléatoire selon le mode
+                colonne.caracteres[i] = EXECUTION OBTENIR_CARACTERE_ALEATOIRE mode
+                
+                // Définir une opacité initiale (dégradé)
+                SI CIBLE i == 0
+                    colonne.opacites[i] = 1.0  // Tête toujours à pleine opacité
+                SINON
+                    colonne.opacites[i] = 1.0 - (i / colonne.longueur)
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION OBTENIR_CARACTERE_ALEATOIRE
+        PARAMETRE mode ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION index = 0
+            MUNITION caractere = '0'
+            
+            SELON mode
+                CAS MODE_CARACTERES_LATIN:
+                    index = EXECUTION NOMBRE_ALEATOIRE 0, 35
+                    caractere = CARACTERES_LATIN[index]
+                    PAUSE
+                
+                CAS MODE_CARACTERES_JAPONAIS:
+                    index = EXECUTION NOMBRE_ALEATOIRE 0, 19
+                    caractere = CARACTERES_JAPONAIS[index]
+                    PAUSE
+                
+                CAS MODE_CARACTERES_SYMBOLES:
+                    index = EXECUTION NOMBRE_ALEATOIRE 0, 19
+                    caractere = CARACTERES_SYMBOLES[index]
+                    PAUSE
+                
+                CAS MODE_CARACTERES_MIXTE:
+                    // Mélange de tous les types
+                    MUNITION choix = EXECUTION NOMBRE_ALEATOIRE 0, 2
+                    
+                    SI CIBLE choix == 0
+                        index = EXECUTION NOMBRE_ALEATOIRE 0, 35
+                        caractere = CARACTERES_LATIN[index]
+                    SINON SI CIBLE choix == 1
+                        index = EXECUTION NOMBRE_ALEATOIRE 0, 19
+                        caractere = CARACTERES_JAPONAIS[index]
+                    SINON
+                        index = EXECUTION NOMBRE_ALEATOIRE 0, 19
+                        caractere = CARACTERES_SYMBOLES[index]
+                    FIN SI
+                    PAUSE
+                
+                DEFAUT:
+                    index = EXECUTION NOMBRE_ALEATOIRE 0, 35
+                    caractere = CARACTERES_LATIN[index]
+            FIN SELON
+            
+            RETRAITE caractere
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // MISE À JOUR
+    //----------------------------------------------
+    
+    MISSION METTRE_A_JOUR_EFFET_MATRIX
+        PARAMETRE effet POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour le temps écoulé
+            effet.temps_ecoule = effet.temps_ecoule + delta_temps
+            
+            // Possibilité de créer une nouvelle colonne
+            SI CIBLE EXECUTION NOMBRE_ALEATOIRE_DECIMAL 0, 1 < effet.probabilite_nouvelle_colonne
+                EXECUTION CREER_COLONNE_MATRIX effet
+            FIN SI
+            
+            // Mettre à jour chaque colonne
+            MANOEUVRE POUR i DE 0 A effet.nb_colonnes - 1
+                SI CIBLE effet.colonnes[i].est_active
+                    EXECUTION METTRE_A_JOUR_COLONNE effet.colonnes[i], delta_temps, effet.temps_ecoule, effet.hauteur_ecran
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Vérifier et supprimer les colonnes inactives
+            SI CIBLE effet.nb_colonnes > 50  // Seuil arbitraire pour éviter trop de compactage
+                EXECUTION COMPACTER_COLONNES effet
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_COLONNE
+        PARAMETRE colonne POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        PARAMETRE temps_global FLOTTANT
+        PARAMETRE hauteur_ecran ENTIER
+        
+        ORDRE DE BATAILLE
+            // Déplacer la colonne vers le bas
+            colonne.position_y = colonne.position_y + colonne.vitesse * delta_temps
+            
+            // Changer les caractères périodiquement
+            SI CIBLE temps_global - colonne.temps_dernier_changement > colonne.delai_changement
+                MANOEUVRE POUR i DE 0 A colonne.longueur - 1
+                    // Chance aléatoire de changer chaque caractère, sauf celui en tête
+                    SI CIBLE i != colonne.index_tete && EXECUTION NOMBRE_ALEATOIRE_DECIMAL 0, 1 < colonne.probabilite_changement
+                        colonne.caracteres[i] = EXECUTION OBTENIR_CARACTERE_ALEATOIRE colonne.mode_caracteres
+                    FIN SI
+                FIN MANOEUVRE
+                
+                colonne.temps_dernier_changement = temps_global
+            FIN SI
+            
+            // Mettre à jour l'index de tête (caractère en surbrillance)
+            colonne.index_tete = (colonne.index_tete + 1) % colonne.longueur
+            
+            // Vérifier si la colonne est sortie de l'écran
+            SI CIBLE colonne.position_y - colonne.longueur > hauteur_ecran
+                colonne.est_active = FAUX
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION COMPACTER_COLONNES
+        PARAMETRE effet POINTEUR
+        
+        ORDRE DE BATAILLE
+            MUNITION index = 0
+            
+            // Déplacer toutes les colonnes actives au début du tableau
+            MANOEUVRE POUR i DE 0 A effet.nb_colonnes - 1
+                SI CIBLE effet.colonnes[i].est_active
+                    SI CIBLE i != index
+                        effet.colonnes[index] = effet.colonnes[i]
+                    FIN SI
+                    
+                    index = index + 1
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Mettre à jour le nombre de colonnes
+            effet.nb_colonnes = index
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // RENDU
+    //----------------------------------------------
+    
+    MISSION DESSINER_EFFET_MATRIX
+        PARAMETRE effet POINTEUR
+        PARAMETRE contexte POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Effacer l'écran (noir)
+            EXECUTION EFFACER_ECRAN contexte, [0, 0, 0, 255]
+            
+            // Dessiner chaque colonne active
+            MANOEUVRE POUR i DE 0 A effet.nb_colonnes - 1
+                SI CIBLE effet.colonnes[i].est_active
+                    EXECUTION DESSINER_COLONNE effet.colonnes[i], contexte, 
+                                              effet.espacement_y, 
+                                              effet.taille_caractere,
+                                              effet.couleur_principale,
+                                              effet.couleur_surbrillance,
+                                              effet.raindrops_actifs,
+                                              effet.ondulation_active,
+                                              effet.ondulation_amplitude,
+                                              effet.ondulation_frequence,
+                                              effet.temps_ecoule
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION DESSINER_COLONNE
+        PARAMETRE colonne POINTEUR
+        PARAMETRE contexte POINTEUR
+        PARAMETRE espacement_y ENTIER
+        PARAMETRE taille_police ENTIER
+        PARAMETRE couleur_base COULEUR_TACTIQUE
+        PARAMETRE couleur_tete COULEUR_TACTIQUE
+        PARAMETRE raindrops_actifs BOOLEEN
+        PARAMETRE ondulation_active BOOLEEN
+        PARAMETRE amplitude FLOTTANT
+        PARAMETRE frequence FLOTTANT
+        PARAMETRE temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A colonne.longueur - 1
+                // Calculer la position Y de ce caractère
+                MUNITION y = colonne.position_y + i * espacement_y
+                
+                // Ne dessiner que si visible à l'écran
+                SI CIBLE y >= -espacement_y && y <= contexte.hauteur + espacement_y
+                    MUNITION x = colonne.position_x
+                    
+                    // Appliquer un effet d'ondulation si actif
+                    SI CIBLE ondulation_active
+                        x = x + amplitude * sin(frequence * temps + colonne.position_x / 50)
+                    FIN SI
+                    
+                    // Déterminer la couleur et l'opacité
+                    MUNITION couleur = couleur_base
+                    MUNITION opacite = colonne.opacites[i]
+                    
+                    // Caractère en surbrillance (tête) ou effet raindrop
+                    SI CIBLE raindrops_actifs && i == colonne.index_tete
+                        couleur = couleur_tete
+                        opacite = 1.0
+                    SINON SI CIBLE i < colonne.index_tete && i >= colonne.index_tete - 3
+                        // Dégradé pour quelques caractères après la tête
+                        MUNITION distance = colonne.index_tete - i
+                        MUNITION facteur = 1.0 - (distance / 3.0)
+                        
+                        // Mélange entre couleur de base et surbrillance
+                        couleur.rouge = couleur_base.rouge + facteur * (VERT_BRILLANT.rouge - couleur_base.rouge)
+                        couleur.vert = couleur_base.vert + facteur * (VERT_BRILLANT.vert - couleur_base.vert)
+                        couleur.bleu = couleur_base.bleu + facteur * (VERT_BRILLANT.bleu - couleur_base.bleu)
+                        
+                        opacite = 1.0
+                    FIN SI
+                    
+                    // Dessiner le caractère
+                    EXECUTION DESSINER_CARACTERE contexte, 
+                                              colonne.caracteres[i],
+                                              x, y,
+                                              taille_police,
+                                              couleur,
+                                              opacite
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // UTILITAIRES
+    //----------------------------------------------
+    
+    MISSION NOMBRE_ALEATOIRE
+        PARAMETRE min ENTIER
+        PARAMETRE max ENTIER
+        
+        ORDRE DE BATAILLE
+            // Génère un nombre aléatoire entre min et max (inclus)
+            MUNITION resultat = APPEL_SYSTEME("aleatoire") * (max - min + 1) + min
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION NOMBRE_ALEATOIRE_DECIMAL
+        PARAMETRE min FLOTTANT
+        PARAMETRE max FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Génère un nombre décimal aléatoire entre min et max
+            MUNITION resultat = APPEL_SYSTEME("aleatoire") * (max - min) + min
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CHANGER_COULEUR_PRINCIPALE
+        PARAMETRE effet POINTEUR
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            effet.couleur_principale = couleur
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CHANGER_MODE_CARACTERES
+        PARAMETRE effet POINTEUR
+        PARAMETRE mode ENTIER
+        
+        ORDRE DE BATAILLE
+            effet.mode_caracteres = mode
+            
+            // Mettre à jour les colonnes existantes progressivement
+            MANOEUVRE POUR i DE 0 A effet.nb_colonnes - 1
+                SI CIBLE effet.colonnes[i].est_active
+                    effet.colonnes[i].mode_caracteres = mode
+                    
+                    // 20% des caractères sont immédiatement changés
+                    MUNITION nb_a_changer = (colonne.longueur * 0.2)
+                    
+                    MANOEUVRE POUR j DE 0 A nb_a_changer - 1
+                        MUNITION index = EXECUTION NOMBRE_ALEATOIRE 0, colonne.longueur - 1
+                        colonne.caracteres[index] = EXECUTION OBTENIR_CARACTERE_ALEATOIRE mode
+                    FIN MANOEUVRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_ONDULATION
+        PARAMETRE effet POINTEUR
+        PARAMETRE activer BOOLEEN = VRAI
+        PARAMETRE amplitude FLOTTANT = 10
+        PARAMETRE frequence FLOTTANT = 0.5
+        
+        ORDRE DE BATAILLE
+            effet.ondulation_active = activer
+            
+            SI CIBLE activer
+                effet.ondulation_amplitude = amplitude
+                effet.ondulation_frequence = frequence
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_RAINDROPS
+        PARAMETRE effet POINTEUR
+        PARAMETRE activer BOOLEEN = VRAI
+        
+        ORDRE DE BATAILLE
+            effet.raindrops_actifs = activer
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION EFFET_FLASH
+        PARAMETRE effet POINTEUR
+        PARAMETRE contexte POINTEUR
+        PARAMETRE intensite FLOTTANT = 0.8
+        
+        ORDRE DE BATAILLE
+            // Dessine un rectangle blanc semi-transparent sur tout l'écran
+            MUNITION opacite = intensite
+            EXECUTION DESSINER_RECTANGLE contexte, 
+                                      0, 0, 
+                                      effet.largeur_ecran, effet.hauteur_ecran, 
+                                      [255, 255, 255, opacite * 255]
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

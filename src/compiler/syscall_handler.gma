@@ -1,0 +1,83 @@
+BASE GESTIONNAIRE_SYSCALLS
+
+STRATEGIE ConfigurationSyscalls {
+    FORMATION appels_systeme = [
+        {
+            code: "SYS_LIRE",
+            parametres: ["descripteur", "buffer", "taille"],
+            permission: "UTILISATEUR"
+        },
+        {
+            code: "SYS_ECRIRE",
+            parametres: ["descripteur", "buffer", "taille"],
+            permission: "UTILISATEUR"
+        },
+        {
+            code: "SYS_OUVRIR",
+            parametres: ["chemin", "flags"],
+            permission: "UTILISATEUR"
+        }
+    ]
+}
+
+MISSION TraiterAppelSysteme {
+    PARAMETRE code_appel
+    PARAMETRE parametres
+    
+    ORDRE DE BATAILLE {
+        # Vérification des permissions
+        SI CIBLE NON VerifierPermissions code_appel {
+            RETRAITE ERREUR_PERMISSION
+        }
+        
+        # Validation des paramètres
+        SI CIBLE NON ValiderParametres code_appel parametres {
+            RETRAITE ERREUR_PARAMETRES
+        }
+        
+        # Exécution de l'appel système
+        SELON code_appel {
+            CAS "SYS_LIRE":
+                RETRAITE EXECUTION LireSysteme parametres
+            CAS "SYS_ECRIRE":
+                RETRAITE EXECUTION EcrireSysteme parametres
+            CAS "SYS_OUVRIR":
+                RETRAITE EXECUTION OuvrirSysteme parametres
+            DEFAUT:
+                RETRAITE ERREUR_APPEL_INCONNU
+        }
+    }
+}
+
+MISSION VerifierPermissions {
+    PARAMETRE code_appel
+    
+    ORDRE DE BATAILLE {
+        POUR appel DANS ConfigurationSyscalls.appels_systeme {
+            SI CIBLE appel.code VERIFICATION code_appel {
+                SI CIBLE appel.permission VERIFICATION NIVEAU_PRIVILEGE_ACTUEL {
+                    RETRAITE VRAI
+                }
+            }
+        }
+        RETRAITE FAUX
+    }
+}
+
+MISSION ValiderParametres {
+    PARAMETRE code_appel
+    PARAMETRE parametres
+    
+    ORDRE DE BATAILLE {
+        POUR appel DANS ConfigurationSyscalls.appels_systeme {
+            SI CIBLE appel.code VERIFICATION code_appel {
+                SI CIBLE RECONNAISSANCE parametres == RECONNAISSANCE appel.parametres {
+                    RETRAITE ValiderTypesParametres parametres appel.parametres
+                }
+            }
+        }
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

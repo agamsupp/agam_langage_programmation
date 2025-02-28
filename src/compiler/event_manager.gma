@@ -1,0 +1,83 @@
+BASE GESTIONNAIRE_EVENEMENTS
+
+STRATEGIE ConfigurationEvenements {
+    FORMATION types_evenements = [
+        "COMPILATION_DEBUT",
+        "COMPILATION_FIN",
+        "ERREUR_COMPILATION",
+        "AVERTISSEMENT",
+        "OPTIMISATION"
+    ]
+    
+    FORMATION ecouteurs = []
+    FORMATION file_evenements = []
+}
+
+MISSION EnregistrerEcouteur {
+    PARAMETRE type_evenement
+    PARAMETRE gestionnaire
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE type_evenement DANS ConfigurationEvenements.types_evenements {
+            STRATEGIE nouvel_ecouteur = {
+                type: type_evenement,
+                gestionnaire: gestionnaire,
+                actif: VRAI
+            }
+            
+            ConfigurationEvenements.ecouteurs = DEPLOIEMENT 
+                ConfigurationEvenements.ecouteurs 
+                nouvel_ecouteur
+                
+            RETRAITE SUCCES
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+MISSION DeclencherEvenement {
+    PARAMETRE type
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE evenement = {
+            type: type,
+            donnees: donnees,
+            timestamp: TEMPS_ACTUEL,
+            traite: FAUX
+        }
+        
+        ConfigurationEvenements.file_evenements = DEPLOIEMENT 
+            ConfigurationEvenements.file_evenements 
+            evenement
+            
+        # Notification immédiate des écouteurs
+        POUR ecouteur DANS ConfigurationEvenements.ecouteurs {
+            SI CIBLE ecouteur.type VERIFICATION type {
+                SI CIBLE ecouteur.actif {
+                    EXECUTION ecouteur.gestionnaire evenement
+                }
+            }
+        }
+    }
+}
+
+MISSION TraiterFile {
+    ORDRE DE BATAILLE {
+        TANT_QUE RECONNAISSANCE ConfigurationEvenements.file_evenements > 0 {
+            MUNITION evenement = ConfigurationEvenements.file_evenements[0]
+            
+            SI CIBLE NON evenement.traite {
+                EXECUTION TraiterEvenement evenement
+                evenement.traite = VRAI
+            }
+            
+            ConfigurationEvenements.file_evenements = RETRAIT 
+                ConfigurationEvenements.file_evenements 
+                0
+        }
+    }
+}
+
+FIN BASE

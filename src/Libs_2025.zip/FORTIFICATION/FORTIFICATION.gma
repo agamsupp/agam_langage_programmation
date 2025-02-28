@@ -1,0 +1,22 @@
+// Bibliothèque FORTIFICATION - Sécurité et gestion des erreurs
+// Inclusion : INCLURE "FORTIFICATION"
+
+MISSION BARRICADE action sinon
+    [exécute 'action' ou 'sinon' si échec]
+FIN MISSION
+
+MISSION MINE condition message
+    SI CIBLE NON condition
+        RAPPORT message
+        RETRAITE
+    FIN CIBLE
+FIN MISSION
+
+MISSION BLINDAGE donnees
+    [vérifie intégrité de 'donnees']
+    RETRAITE donnees
+FIN MISSION
+
+MISSION EVACUATION code
+    [point de sortie d’urgence]
+FIN MISSION

@@ -1,0 +1,94 @@
+BASE GENERATEUR_OPTIMISE
+
+STRATEGIE ConfigurationGeneration {
+    FORMATION strategies = [
+        {
+            type: "PIPELINE",
+            optimisations: [
+                "ORDONNANCEMENT",
+                "FUSION",
+                "ELIMINATION"
+            ],
+            niveau: 1
+        },
+        {
+            type: "REGISTRES",
+            optimisations: [
+                "ALLOCATION",
+                "COLORIAGE",
+                "REUTILISATION"
+            ],
+            niveau: 2
+        },
+        {
+            type: "MEMOIRE",
+            optimisations: [
+                "ALIGNEMENT",
+                "CACHE",
+                "PREFETCH"
+            ],
+            niveau: 3
+        }
+    ]
+
+    STRATEGIE parametres = {
+        architecture: "NATIVE",
+        parallelisation: VRAI,
+        vectorisation: VRAI
+    }
+}
+
+MISSION GenererCodeOptimise {
+    PARAMETRE ast
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            registres: [],
+            memoire: [],
+            instructions: []
+        }
+        
+        # Application des stratégies d'optimisation
+        POUR strategie DANS ConfigurationGeneration.strategies {
+            SI CIBLE StrategieApplicable strategie ast {
+                EXECUTION AppliquerOptimisations strategie ast contexte
+            }
+        }
+        
+        # Génération du code machine
+        MANOEUVRE GENERATION {
+            # Sélection des instructions
+            EXECUTION SelectionnerInstructions ast contexte
+            
+            # Ordonnancement des instructions
+            EXECUTION OrdonnancerInstructions contexte
+            
+            # Allocation des registres
+            EXECUTION AllouerRegistres contexte
+            
+            # Optimisation mémoire
+            EXECUTION OptimiserAccesMemoire contexte
+        }
+        
+        RETRAITE contexte.instructions
+    }
+}
+
+MISSION OptimiserPipeline {
+    PARAMETRE instructions
+    
+    ORDRE DE BATAILLE {
+        # Analyse des dépendances
+        STRATEGIE deps = EXECUTION AnalyserDependances instructions
+        
+        # Réordonnancement
+        FORMATION sequence = EXECUTION OrdonnancerPipeline instructions deps
+        
+        # Fusion des instructions
+        sequence = EXECUTION FusionnerInstructions sequence
+        
+        RETRAITE sequence
+    }
+}
+
+FIN BASE

@@ -1,0 +1,86 @@
+BASE MONITEUR_EXECUTION
+
+STRATEGIE ConfigurationMoniteur {
+    FORMATION sondes = [
+        {
+            type: "PERFORMANCES",
+            metriques: ["CPU", "MEMOIRE", "IO"],
+            intervalle: 100  # ms
+        },
+        {
+            type: "EXECUTION",
+            metriques: ["INSTRUCTIONS", "CYCLES", "BRANCHES"],
+            intervalle: 50
+        },
+        {
+            type: "RESSOURCES",
+            metriques: ["FICHIERS", "THREADS", "SOCKETS"],
+            intervalle: 200
+        }
+    ]
+
+    STRATEGIE alertes = {
+        seuils: {
+            cpu_max: 90,      # pourcentage
+            memoire_max: 85,  # pourcentage
+            io_max: 1000      # opérations/s
+        },
+        actions: ["LOG", "ALERTE", "CORRECTION"]
+    }
+}
+
+MISSION SurveillanceExecution {
+    ORDRE DE BATAILLE {
+        # Initialisation des sondes
+        POUR sonde DANS ConfigurationMoniteur.sondes {
+            EXECUTION InitialiserSonde sonde
+        }
+        
+        # Démarrage de la surveillance
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE SURVEILLANCE_ACTIVE {
+                # Collecte des métriques
+                POUR sonde DANS ConfigurationMoniteur.sondes {
+                    EXECUTION CollecterMetriques sonde
+                    
+                    # Vérification des seuils
+                    SI CIBLE DepassementSeuil sonde {
+                        EXECUTION GenererAlerte sonde
+                    }
+                }
+                
+                # Analyse temps réel
+                EXECUTION AnalyserTendances
+                
+                # Génération rapport périodique
+                SI CIBLE TEMPS_RAPPORT_ATTEINT {
+                    EXECUTION GenererRapportSurveillance
+                }
+                
+                ATTENDRE MINIMUM_INTERVALLE sondes
+            }
+        }
+    }
+}
+
+MISSION GenererAlerte {
+    PARAMETRE sonde
+    PARAMETRE depassement
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE alerte = {
+            timestamp: TEMPS_ACTUEL,
+            type: sonde.type,
+            metrique: depassement.metrique,
+            valeur: depassement.valeur,
+            seuil: depassement.seuil
+        }
+        
+        # Actions correctives
+        POUR action DANS ConfigurationMoniteur.alertes.actions {
+            EXECUTION ExecuterAction action alerte
+        }
+    }
+}
+
+FIN BASE

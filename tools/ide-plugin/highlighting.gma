@@ -1,0 +1,60 @@
+BASE COLORATION_SYNTAXIQUE
+
+STRATEGIE ThèmeCouleurs {
+    FORMATION mots_clés = [
+        {
+            mot: "BASE",
+            couleur: "#FF0000",
+            style: "gras"
+        },
+        {
+            mot: "MISSION",
+            couleur: "#00FF00",
+            style: "normal"
+        },
+        {
+            mot: "ORDRE",
+            couleur: "#0000FF",
+            style: "normal"
+        }
+    ]
+    
+    FORMATION opérateurs = [
+        {
+            symbole: "ASSAUT",
+            couleur: "#FFA500"
+        },
+        {
+            symbole: "REPLI",
+            couleur: "#FFA500"
+        }
+    ]
+}
+
+MISSION AppliquerColoration {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        POUR mot_clé DANS ThèmeCouleurs.mots_clés {
+            texte = ColorerMotClé texte mot_clé
+        }
+        
+        POUR opérateur DANS ThèmeCouleurs.opérateurs {
+            texte = ColorerOpérateur texte opérateur
+        }
+        
+        RETRAITE texte
+    }
+}
+
+MISSION ColorerMotClé {
+    PARAMETRE texte
+    PARAMETRE mot_clé
+    
+    ORDRE DE BATAILLE {
+        # Logique de coloration
+        RETRAITE texte_coloré
+    }
+}
+
+FIN BASE

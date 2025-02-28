@@ -1,0 +1,79 @@
+BASE PREPROCESSEUR
+
+STRATEGIE DirectivesPreprocesseur {
+    FORMATION directives = [
+        "INCLURE",       # Pour inclure d'autres fichiers
+        "DEFINIR",       # Pour définir des macros
+        "SI_DEFINI",     # Pour les conditions de compilation
+        "SINON_DEFINI",
+        "FIN_SI"
+    ]
+}
+
+MISSION TraiterDirectives {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            macros: {},
+            inclusions: [],
+            niveau_conditionnels: 0
+        }
+        
+        FORMATION lignes = SEPARER_LIGNES code_source
+        FORMATION resultat = []
+        
+        POUR ligne DANS lignes {
+            SI CIBLE EstDirective ligne {
+                EXECUTION TraiterDirectivePreprocesseur ligne contexte
+            } SINON {
+                SI CIBLE ConditionCompilationValide contexte {
+                    resultat = DEPLOIEMENT resultat RemplacerMacros ligne contexte
+                }
+            }
+        }
+        
+        RETRAITE JOINDRE_LIGNES resultat
+    }
+}
+
+MISSION TraiterDirectivePreprocesseur {
+    PARAMETRE ligne
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE directive = ExtraireDirective ligne
+        
+        SELON directive.type {
+            CAS "INCLURE":
+                EXECUTION InclurerFichier directive.argument contexte
+            
+            CAS "DEFINIR":
+                EXECUTION DefinirMacro directive.nom directive.valeur contexte
+            
+            CAS "SI_DEFINI":
+                contexte.niveau_conditionnels = contexte.niveau_conditionnels ASSAUT 1
+                EXECUTION EvaluerCondition directive.condition contexte
+            
+            CAS "FIN_SI":
+                contexte.niveau_conditionnels = contexte.niveau_conditionnels REPLI 1
+        }
+    }
+}
+
+MISSION RemplacerMacros {
+    PARAMETRE ligne
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        POUR macro DANS contexte.macros {
+            SI CIBLE ContenirMacro ligne macro.nom {
+                ligne = REMPLACER ligne macro.nom macro.valeur
+            }
+        }
+        
+        RETRAITE ligne
+    }
+}
+
+FIN BASE

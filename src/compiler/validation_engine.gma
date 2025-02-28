@@ -1,0 +1,79 @@
+BASE MOTEUR_VALIDATION
+
+STRATEGIE ReglesValidation {
+    FORMATION regles_syntaxe = [
+        {
+            id: "SYN001",
+            description: "Structure BASE requise",
+            niveau: "ERREUR"
+        },
+        {
+            id: "SYN002",
+            description: "MISSION mal formée",
+            niveau: "ERREUR"
+        }
+    ]
+
+    FORMATION regles_semantique = [
+        {
+            id: "SEM001",
+            description: "Variable non déclarée",
+            niveau: "ERREUR"
+        },
+        {
+            id: "SEM002",
+            description: "Type incompatible",
+            niveau: "ERREUR"
+        }
+    ]
+}
+
+MISSION ValiderCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport_validation = {
+            erreurs: [],
+            avertissements: [],
+            niveau_conformite: 100
+        }
+
+        # Validation syntaxique
+        MANOEUVRE VALIDATION_SYNTAXE {
+            POUR regle DANS ReglesValidation.regles_syntaxe {
+                EXECUTION ValiderRegleSyntaxe code_source regle rapport_validation
+            }
+        }
+
+        # Validation sémantique
+        MANOEUVRE VALIDATION_SEMANTIQUE {
+            POUR regle DANS ReglesValidation.regles_semantique {
+                EXECUTION ValiderRegleSemantique code_source regle rapport_validation
+            }
+        }
+
+        # Calcul du niveau de conformité
+        SI CIBLE RECONNAISSANCE rapport_validation.erreurs > 0 {
+            rapport_validation.niveau_conformite = 
+                100 REPLI (RECONNAISSANCE rapport_validation.erreurs * 10)
+        }
+
+        RETRAITE rapport_validation
+    }
+}
+
+MISSION VerifierConformite {
+    PARAMETRE code
+    PARAMETRE regles
+    
+    ORDRE DE BATAILLE {
+        POUR regle DANS regles {
+            SI CIBLE NON VerifierRegle code regle {
+                RETRAITE FAUX
+            }
+        }
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

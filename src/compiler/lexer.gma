@@ -1,0 +1,573 @@
+// Lexer AGAM - Analyseur lexical pour le langage AGAM
+// Version : 2025
+// Description : Convertit le code source AGAM en une liste de tokens
+
+BASE Lexer-AGAM
+
+    STRATEGIE TypeToken
+        MUNITION BASE = 1
+        MUNITION FIN_BASE = 2
+        MUNITION MISSION = 3
+        MUNITION STRATEGIE = 4
+        MUNITION ORDRE_BATAILLE = 5
+        MUNITION FIN_ORDRE = 6
+        MUNITION MUNITION = 7
+        MUNITION FORMATION = 8
+        MUNITION PARAMETRE = 9
+        MUNITION SI_CIBLE = 10
+        MUNITION SINON = 11
+        MUNITION FIN_SI = 12
+        MUNITION MANOEUVRE = 13
+        MUNITION FIN_MANOEUVRE = 14
+        MUNITION POUR = 15
+        MUNITION DANS = 16
+        MUNITION RETRAITE = 17
+        MUNITION EXECUTION = 18
+        MUNITION RAPPORT = 19
+        MUNITION VERIFICATION = 20
+        MUNITION ASSAUT = 21  // Addition
+        MUNITION REPLI = 22   // Soustraction
+        MUNITION RECONNAISSANCE = 23  // Longueur
+        MUNITION FUSION = 24  // Concaténation
+        MUNITION EXTRACTION = 25  // Obtention d'élément
+        MUNITION DEPLOIEMENT = 26  // Ajout d'élément
+        MUNITION SELON = 27
+        MUNITION CAS = 28
+        MUNITION DEFAUT = 29
+        MUNITION PAUSE = 30
+        MUNITION INTERROMPRE = 31
+        MUNITION CONTINUER = 32
+        MUNITION IDENTIFIANT = 40
+        MUNITION NOMBRE = 41
+        MUNITION CHAINE = 42
+        MUNITION COMMENTAIRE = 43
+        MUNITION ACCOLADE_OUVRANTE = 50  // {
+        MUNITION ACCOLADE_FERMANTE = 51  // }
+        MUNITION CROCHET_OUVRANT = 52    // [
+        MUNITION CROCHET_FERMANT = 53    // ]
+        MUNITION PARENTHESE_OUVRANTE = 54  // (
+        MUNITION PARENTHESE_FERMANTE = 55  // )
+        MUNITION VIRGULE = 56           // ,
+        MUNITION POINT_VIRGULE = 57     // ;
+        MUNITION DEUX_POINTS = 58       // :
+        MUNITION POINT = 59             // .
+        MUNITION PLUS = 60              // +
+        MUNITION MOINS = 61             // -
+        MUNITION MULTIPLICATION = 62    // *
+        MUNITION DIVISION = 63          // /
+        MUNITION MODULO = 64            // %
+        MUNITION EGAL = 65              // =
+        MUNITION DOUBLE_EGAL = 66       // ==
+        MUNITION DIFFERENT = 67         // !=
+        MUNITION INFERIEUR = 68         // <
+        MUNITION SUPERIEUR = 69         // >
+        MUNITION INFERIEUR_EGAL = 70    // <=
+        MUNITION SUPERIEUR_EGAL = 71    // >=
+        MUNITION ET = 72                // &&
+        MUNITION OU = 73                // ||
+        MUNITION NON = 74               // !
+        MUNITION FIN = 90               // Fin de fichier
+        MUNITION ERREUR = 99            // Erreur lexicale
+    FIN STRATEGIE
+
+    STRATEGIE Token
+        MUNITION type
+        MUNITION valeur
+        MUNITION ligne
+        MUNITION colonne
+    FIN STRATEGIE
+
+    STRATEGIE Lexer
+        MUNITION source
+        MUNITION longueur
+        MUNITION position
+        MUNITION ligne
+        MUNITION colonne
+        MUNITION caractere_courant
+    FIN STRATEGIE
+
+    MISSION Initialiser source
+        ORDRE DE BATAILLE
+            STRATEGIE lexer
+                DEPLOIEMENT "source" source
+                DEPLOIEMENT "longueur" RECONNAISSANCE source
+                DEPLOIEMENT "position" 0
+                DEPLOIEMENT "ligne" 1
+                DEPLOIEMENT "colonne" 0
+                DEPLOIEMENT "caractere_courant" SI CIBLE RECONNAISSANCE source > 0 ALORS EXTRACTION source 0 SINON "" FIN CIBLE
+            FIN STRATEGIE
+            RETRAITE lexer
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION Avancer lexer
+        ORDRE DE BATAILLE
+            SI CIBLE lexer.position < lexer.longueur
+                SI CIBLE lexer.caractere_courant == "\n"
+                    lexer.ligne = ASSAUT lexer.ligne 1
+                    lexer.colonne = 0
+                SINON
+                    lexer.colonne = ASSAUT lexer.colonne 1
+                FIN CIBLE
+                lexer.position = ASSAUT lexer.position 1
+                lexer.caractere_courant = SI CIBLE lexer.position < lexer.longueur ALORS EXTRACTION lexer.source lexer.position SINON "" FIN CIBLE
+            FIN CIBLE
+            RETRAITE lexer
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION CaractereSuivant lexer
+        ORDRE DE BATAILLE
+            SI CIBLE ASSAUT lexer.position 1 >= lexer.longueur
+                RETRAITE ""
+            FIN CIBLE
+            RETRAITE EXTRACTION lexer.source ASSAUT lexer.position 1
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION EstLettre c
+        ORDRE DE BATAILLE
+            SI CIBLE c == ""
+                RETRAITE "FAUX"
+            FIN CIBLE
+            MUNITION code = RECONNAISSANCE c  # Code ASCII simulé
+            RETRAITE VERIFICATION (code >= 65 ET code <= 90) OU (code >= 97 ET code <= 122) OU c == "_"
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION EstChiffre c
+        ORDRE DE BATAILLE
+            SI CIBLE c == ""
+                RETRAITE "FAUX"
+            FIN CIBLE
+            MUNITION code = RECONNAISSANCE c
+            RETRAITE VERIFICATION code >= 48 ET code <= 57
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION EstEspace c
+        ORDRE DE BATAILLE
+            RETRAITE VERIFICATION c == " " OU c == "\t" OU c == "\n" OU c == "\r"
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION SauterEspacesEtCommentaires lexer
+        ORDRE DE BATAILLE
+            MANOEUVRE ESPACES
+                TANT_QUE lexer.caractere_courant != ""
+                    SI CIBLE EXECUTION EstEspace lexer.caractere_courant
+                        lexer = EXECUTION Avancer lexer
+                        CONTINUER
+                    FIN CIBLE
+                    SI CIBLE lexer.caractere_courant == "/" ET EXECUTION CaractereSuivant lexer == "/"
+                        MANOEUVRE LIGNE
+                            TANT_QUE lexer.caractere_courant != "" ET lexer.caractere_courant != "\n"
+                                lexer = EXECUTION Avancer lexer
+                            FIN TANT_QUE
+                        FIN MANOEUVRE
+                        CONTINUER
+                    FIN CIBLE
+                    SI CIBLE lexer.caractere_courant == "/" ET EXECUTION CaractereSuivant lexer == "*"
+                        lexer = EXECUTION Avancer lexer  # Sauter '/'
+                        lexer = EXECUTION Avancer lexer  # Sauter '*'
+                        MANOEUVRE MULTI_LIGNES
+                            TANT_QUE lexer.caractere_courant != "" ET NON (lexer.caractere_courant == "*" ET EXECUTION CaractereSuivant lexer == "/")
+                                lexer = EXECUTION Avancer lexer
+                            FIN TANT_QUE
+                            lexer = EXECUTION Avancer lexer  # Sauter '*'
+                            lexer = EXECUTION Avancer lexer  # Sauter '/'
+                        FIN MANOEUVRE
+                        CONTINUER
+                    FIN CIBLE
+                    INTERROMPRE
+                FIN TANT_QUE
+            FIN MANOEUVRE
+            RETRAITE lexer
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION EstMotCle mot
+        ORDRE DE BATAILLE
+            FORMATION mots_cles = [
+                "BASE", "FIN BASE", "MISSION", "STRATEGIE", "ORDRE DE BATAILLE",
+                "FIN ORDRE", "MUNITION", "FORMATION", "PARAMETRE", "SI CIBLE",
+                "SINON", "FIN SI", "MANOEUVRE", "FIN MANOEUVRE", "POUR", "DANS",
+                "RETRAITE", "EXECUTION", "RAPPORT", "VERIFICATION", "ASSAUT",
+                "REPLI", "RECONNAISSANCE", "FUSION", "EXTRACTION", "DEPLOIEMENT",
+                "SELON", "CAS", "DEFAUT", "PAUSE", "INTERROMPRE", "CONTINUER"
+            ]
+            POUR mot_cle DANS mots_cles
+                SI CIBLE VERIFICATION mot mot_cle
+                    RETRAITE "VRAI"
+                FIN CIBLE
+            FIN POUR
+            RETRAITE "FAUX"
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION ObtenirTypeMotCle mot
+        ORDRE DE BATAILLE
+            SELON mot
+                CAS "BASE" RETRAITE TypeToken.BASE
+                CAS "FIN BASE" RETRAITE TypeToken.FIN_BASE
+                CAS "MISSION" RETRAITE TypeToken.MISSION
+                CAS "STRATEGIE" RETRAITE TypeToken.STRATEGIE
+                CAS "ORDRE DE BATAILLE" RETRAITE TypeToken.ORDRE_BATAILLE
+                CAS "FIN ORDRE" RETRAITE TypeToken.FIN_ORDRE
+                CAS "MUNITION" RETRAITE TypeToken.MUNITION
+                CAS "FORMATION" RETRAITE TypeToken.FORMATION
+                CAS "PARAMETRE" RETRAITE TypeToken.PARAMETRE
+                CAS "SI CIBLE" RETRAITE TypeToken.SI_CIBLE
+                CAS "SINON" RETRAITE TypeToken.SINON
+                CAS "FIN SI" RETRAITE TypeToken.FIN_SI
+                CAS "MANOEUVRE" RETRAITE TypeToken.MANOEUVRE
+                CAS "FIN MANOEUVRE" RETRAITE TypeToken.FIN_MANOEUVRE
+                CAS "POUR" RETRAITE TypeToken.POUR
+                CAS "DANS" RETRAITE TypeToken.DANS
+                CAS "RETRAITE" RETRAITE TypeToken.RETRAITE
+                CAS "EXECUTION" RETRAITE TypeToken.EXECUTION
+                CAS "RAPPORT" RETRAITE TypeToken.RAPPORT
+                CAS "VERIFICATION" RETRAITE TypeToken.VERIFICATION
+                CAS "ASSAUT" RETRAITE TypeToken.ASSAUT
+                CAS "REPLI" RETRAITE TypeToken.REPLI
+                CAS "RECONNAISSANCE" RETRAITE TypeToken.RECONNAISSANCE
+                CAS "FUSION" RETRAITE TypeToken.FUSION
+                CAS "EXTRACTION" RETRAITE TypeToken.EXTRACTION
+                CAS "DEPLOIEMENT" RETRAITE TypeToken.DEPLOIEMENT
+                CAS "SELON" RETRAITE TypeToken.SELON
+                CAS "CAS" RETRAITE TypeToken.CAS
+                CAS "DEFAUT" RETRAITE TypeToken.DEFAUT
+                CAS "PAUSE" RETRAITE TypeToken.PAUSE
+                CAS "INTERROMPRE" RETRAITE TypeToken.INTERROMPRE
+                CAS "CONTINUER" RETRAITE TypeToken.CONTINUER
+                DEFAUT RETRAITE TypeToken.IDENTIFIANT
+            FIN SELON
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION IdentifierOuMotCle lexer
+        ORDRE DE BATAILLE
+            MUNITION ligne_debut = lexer.ligne
+            MUNITION colonne_debut = lexer.colonne
+            MUNITION buffer = ""
+            MANOEUVRE LECTURE
+                TANT_QUE EXECUTION EstLettre lexer.caractere_courant OU EXECUTION EstChiffre lexer.caractere_courant
+                    buffer = FUSION buffer lexer.caractere_courant
+                    lexer = EXECUTION Avancer lexer
+                FIN TANT_QUE
+            FIN MANOEUVRE
+            SI CIBLE buffer == "FIN" OU buffer == "ORDRE" OU buffer == "SI"
+                MUNITION position_save = lexer.position
+                MUNITION ligne_save = lexer.ligne
+                MUNITION colonne_save = lexer.colonne
+                MUNITION caractere_save = lexer.caractere_courant
+                MANOEUVRE ESPACES
+                    TANT_QUE EXECUTION EstEspace lexer.caractere_courant
+                        lexer = EXECUTION Avancer lexer
+                    FIN TANT_QUE
+                FIN MANOEUVRE
+                MUNITION mot_suivant = ""
+                MANOEUVRE SUIVANT
+                    TANT_QUE EXECUTION EstLettre lexer.caractere_courant
+                        mot_suivant = FUSION mot_suivant lexer.caractere_courant
+                        lexer = EXECUTION Avancer lexer
+                    FIN TANT_QUE
+                FIN MANOEUVRE
+                SI CIBLE buffer == "FIN" ET mot_suivant == "BASE"
+                    buffer = "FIN BASE"
+                SINON SI CIBLE buffer == "FIN" ET mot_suivant == "SI"
+                    buffer = "FIN SI"
+                SINON SI CIBLE buffer == "FIN" ET mot_suivant == "ORDRE"
+                    buffer = "FIN ORDRE"
+                SINON SI CIBLE buffer == "FIN" ET mot_suivant == "MANOEUVRE"
+                    buffer = "FIN MANOEUVRE"
+                SINON SI CIBLE buffer == "ORDRE" ET mot_suivant == "DE"
+                    lexer = EXECUTION Avancer lexer  # Sauter "DE"
+                    MANOEUVRE ESPACES2
+                        TANT_QUE EXECUTION EstEspace lexer.caractere_courant
+                            lexer = EXECUTION Avancer lexer
+                        FIN TANT_QUE
+                    FIN MANOEUVRE
+                    MUNITION bataille = ""
+                    MANOEUVRE BATAILLE
+                        TANT_QUE EXECUTION EstLettre lexer.caractere_courant
+                            bataille = FUSION bataille lexer.caractere_courant
+                            lexer = EXECUTION Avancer lexer
+                        FIN TANT_QUE
+                    FIN MANOEUVRE
+                    SI CIBLE bataille == "BATAILLE"
+                        buffer = "ORDRE DE BATAILLE"
+                    SINON
+                        lexer.position = position_save
+                        lexer.ligne = ligne_save
+                        lexer.colonne = colonne_save
+                        lexer.caractere_courant = caractere_save
+                    FIN CIBLE
+                SINON SI CIBLE buffer == "SI" ET mot_suivant == "CIBLE"
+                    buffer = "SI CIBLE"
+                SINON
+                    lexer.position = position_save
+                    lexer.ligne = ligne_save
+                    lexer.colonne = colonne_save
+                    lexer.caractere_courant = caractere_save
+                FIN CIBLE
+            FIN CIBLE
+            STRATEGIE token
+                DEPLOIEMENT "valeur" buffer
+                DEPLOIEMENT "ligne" ligne_debut
+                DEPLOIEMENT "colonne" colonne_debut
+                DEPLOIEMENT "type" SI CIBLE EXECUTION EstMotCle buffer ALORS EXECUTION ObtenirTypeMotCle buffer SINON TypeToken.IDENTIFIANT FIN CIBLE
+            FIN STRATEGIE
+            RETRAITE token
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION ObtenirNombre lexer
+        ORDRE DE BATAILLE
+            MUNITION ligne_debut = lexer.ligne
+            MUNITION colonne_debut = lexer.colonne
+            MUNITION buffer = ""
+            MUNITION est_decimal = "FAUX"
+            MANOEUVRE CHIFFRES
+                TANT_QUE EXECUTION EstChiffre lexer.caractere_courant
+                    buffer = FUSION buffer lexer.caractere_courant
+                    lexer = EXECUTION Avancer lexer
+                FIN TANT_QUE
+            FIN MANOEUVRE
+            SI CIBLE lexer.caractere_courant == "."
+                est_decimal = "VRAI"
+                buffer = FUSION buffer "."
+                lexer = EXECUTION Avancer lexer
+                MANOEUVRE DECIMAL
+                    TANT_QUE EXECUTION EstChiffre lexer.caractere_courant
+                        buffer = FUSION buffer lexer.caractere_courant
+                        lexer = EXECUTION Avancer lexer
+                    FIN TANT_QUE
+                FIN MANOEUVRE
+            FIN CIBLE
+            STRATEGIE token
+                DEPLOIEMENT "type" TypeToken.NOMBRE
+                DEPLOIEMENT "valeur" buffer
+                DEPLOIEMENT "ligne" ligne_debut
+                DEPLOIEMENT "colonne" colonne_debut
+            FIN STRATEGIE
+            RETRAITE token
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION ObtenirChaine lexer
+        ORDRE DE BATAILLE
+            MUNITION ligne_debut = lexer.ligne
+            MUNITION colonne_debut = lexer.colonne
+            lexer = EXECUTION Avancer lexer  # Sauter '"'
+            MUNITION buffer = ""
+            MANOEUVRE LECTURE
+                TANT_QUE lexer.caractere_courant != "" ET lexer.caractere_courant != "\""
+                    SI CIBLE lexer.caractere_courant == "\\"
+                        lexer = EXECUTION Avancer lexer
+                        SELON lexer.caractere_courant
+                            CAS "n" buffer = FUSION buffer "\n"
+                            CAS "t" buffer = FUSION buffer "\t"
+                            CAS "\"" buffer = FUSION buffer "\""
+                            CAS "\\" buffer = FUSION buffer "\\"
+                            DEFAUT buffer = FUSION buffer lexer.caractere_courant
+                        FIN SELON
+                    SINON
+                        buffer = FUSION buffer lexer.caractere_courant
+                    FIN CIBLE
+                    lexer = EXECUTION Avancer lexer
+                FIN TANT_QUE
+            FIN MANOEUVRE
+            SI CIBLE lexer.caractere_courant != "\""
+                STRATEGIE token
+                    DEPLOIEMENT "type" TypeToken.ERREUR
+                    DEPLOIEMENT "valeur" "Chaîne non terminée"
+                    DEPLOIEMENT "ligne" ligne_debut
+                    DEPLOIEMENT "colonne" colonne_debut
+                FIN STRATEGIE
+                RETRAITE token
+            FIN CIBLE
+            lexer = EXECUTION Avancer lexer  # Sauter '"'
+            STRATEGIE token
+                DEPLOIEMENT "type" TypeToken.CHAINE
+                DEPLOIEMENT "valeur" buffer
+                DEPLOIEMENT "ligne" ligne_debut
+                DEPLOIEMENT "colonne" colonne_debut
+            FIN STRATEGIE
+            RETRAITE token
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION ObtenirProchainToken lexer
+        ORDRE DE BATAILLE
+            lexer = EXECUTION SauterEspacesEtCommentaires lexer
+            SI CIBLE lexer.caractere_courant == ""
+                STRATEGIE token
+                    DEPLOIEMENT "type" TypeToken.FIN
+                    DEPLOIEMENT "valeur" ""
+                    DEPLOIEMENT "ligne" lexer.ligne
+                    DEPLOIEMENT "colonne" lexer.colonne
+                FIN STRATEGIE
+                RETRAITE token
+            FIN CIBLE
+            MUNITION ligne_debut = lexer.ligne
+            MUNITION colonne_debut = lexer.colonne
+            SI CIBLE EXECUTION EstLettre lexer.caractere_courant
+                RETRAITE EXECUTION IdentifierOuMotCle lexer
+            FIN CIBLE
+            SI CIBLE EXECUTION EstChiffre lexer.caractere_courant
+                RETRAITE EXECUTION ObtenirNombre lexer
+            FIN CIBLE
+            SI CIBLE lexer.caractere_courant == "\""
+                RETRAITE EXECUTION ObtenirChaine lexer
+            FIN CIBLE
+            STRATEGIE token
+                DEPLOIEMENT "ligne" ligne_debut
+                DEPLOIEMENT "colonne" colonne_debut
+            FIN STRATEGIE
+            SELON lexer.caractere_courant
+                CAS "{" 
+                    DEPLOIEMENT token "type" TypeToken.ACCOLADE_OUVRANTE
+                    DEPLOIEMENT token "valeur" "{"
+                    lexer = EXECUTION Avancer lexer
+                CAS "}" 
+                    DEPLOIEMENT token "type" TypeToken.ACCOLADE_FERMANTE
+                    DEPLOIEMENT token "valeur" "}"
+                    lexer = EXECUTION Avancer lexer
+                CAS "[" 
+                    DEPLOIEMENT token "type" TypeToken.CROCHET_OUVRANT
+                    DEPLOIEMENT token "valeur" "["
+                    lexer = EXECUTION Avancer lexer
+                CAS "]" 
+                    DEPLOIEMENT token "type" TypeToken.CROCHET_FERMANT
+                    DEPLOIEMENT token "valeur" "]"
+                    lexer = EXECUTION Avancer lexer
+                CAS "(" 
+                    DEPLOIEMENT token "type" TypeToken.PARENTHESE_OUVRANTE
+                    DEPLOIEMENT token "valeur" "("
+                    lexer = EXECUTION Avancer lexer
+                CAS ")" 
+                    DEPLOIEMENT token "type" TypeToken.PARENTHESE_FERMANTE
+                    DEPLOIEMENT token "valeur" ")"
+                    lexer = EXECUTION Avancer lexer
+                CAS "," 
+                    DEPLOIEMENT token "type" TypeToken.VIRGULE
+                    DEPLOIEMENT token "valeur" ","
+                    lexer = EXECUTION Avancer lexer
+                CAS ";" 
+                    DEPLOIEMENT token "type" TypeToken.POINT_VIRGULE
+                    DEPLOIEMENT token "valeur" ";"
+                    lexer = EXECUTION Avancer lexer
+                CAS ":" 
+                    DEPLOIEMENT token "type" TypeToken.DEUX_POINTS
+                    DEPLOIEMENT token "valeur" ":"
+                    lexer = EXECUTION Avancer lexer
+                CAS "." 
+                    DEPLOIEMENT token "type" TypeToken.POINT
+                    DEPLOIEMENT token "valeur" "."
+                    lexer = EXECUTION Avancer lexer
+                CAS "+" 
+                    DEPLOIEMENT token "type" TypeToken.PLUS
+                    DEPLOIEMENT token "valeur" "+"
+                    lexer = EXECUTION Avancer lexer
+                CAS "-" 
+                    DEPLOIEMENT token "type" TypeToken.MOINS
+                    DEPLOIEMENT token "valeur" "-"
+                    lexer = EXECUTION Avancer lexer
+                CAS "*" 
+                    DEPLOIEMENT token "type" TypeToken.MULTIPLICATION
+                    DEPLOIEMENT token "valeur" "*"
+                    lexer = EXECUTION Avancer lexer
+                CAS "/" 
+                    DEPLOIEMENT token "type" TypeToken.DIVISION
+                    DEPLOIEMENT token "valeur" "/"
+                    lexer = EXECUTION Avancer lexer
+                CAS "%" 
+                    DEPLOIEMENT token "type" TypeToken.MODULO
+                    DEPLOIEMENT token "valeur" "%"
+                    lexer = EXECUTION Avancer lexer
+                CAS "=" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "="
+                        DEPLOIEMENT token "type" TypeToken.DOUBLE_EGAL
+                        DEPLOIEMENT token "valeur" "=="
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.EGAL
+                        DEPLOIEMENT token "valeur" "="
+                    FIN CIBLE
+                CAS "!" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "="
+                        DEPLOIEMENT token "type" TypeToken.DIFFERENT
+                        DEPLOIEMENT token "valeur" "!="
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.NON
+                        DEPLOIEMENT token "valeur" "!"
+                    FIN CIBLE
+                CAS "<" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "="
+                        DEPLOIEMENT token "type" TypeToken.INFERIEUR_EGAL
+                        DEPLOIEMENT token "valeur" "<="
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.INFERIEUR
+                        DEPLOIEMENT token "valeur" "<"
+                    FIN CIBLE
+                CAS ">" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "="
+                        DEPLOIEMENT token "type" TypeToken.SUPERIEUR_EGAL
+                        DEPLOIEMENT token "valeur" ">="
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.SUPERIEUR
+                        DEPLOIEMENT token "valeur" ">"
+                    FIN CIBLE
+                CAS "&" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "&"
+                        DEPLOIEMENT token "type" TypeToken.ET
+                        DEPLOIEMENT token "valeur" "&&"
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.ERREUR
+                        DEPLOIEMENT token "valeur" "Opérateur '&' isolé"
+                    FIN CIBLE
+                CAS "|" 
+                    lexer = EXECUTION Avancer lexer
+                    SI CIBLE lexer.caractere_courant == "|"
+                        DEPLOIEMENT token "type" TypeToken.OU
+                        DEPLOIEMENT token "valeur" "||"
+                        lexer = EXECUTION Avancer lexer
+                    SINON
+                        DEPLOIEMENT token "type" TypeToken.ERREUR
+                        DEPLOIEMENT token "valeur" "Opérateur '|' isolé"
+                    FIN CIBLE
+                DEFAUT
+                    DEPLOIEMENT token "type" TypeToken.ERREUR
+                    DEPLOIEMENT token "valeur" FUSION "Caractère inconnu: " lexer.caractere_courant
+                    lexer = EXECUTION Avancer lexer
+            FIN SELON
+            RETRAITE token
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION AnalyserCode code_source
+        ORDRE DE BATAILLE
+            MUNITION lexer = EXECUTION Initialiser code_source
+            FORMATION tokens = []
+            MANOEUVRE ANALYSE
+                MUNITION token = EXECUTION ObtenirProchainToken lexer
+                DEPLOIEMENT tokens token
+                SI CIBLE token.type == TypeToken.FIN OU token.type == TypeToken.ERREUR
+                    INTERROMPRE
+                FIN CIBLE
+            FIN MANOEUVRE
+            RETRAITE tokens
+        FIN BATAILLE
+    FIN MISSION
+
+FIN BASE

@@ -1,0 +1,102 @@
+BASE GENERATEUR_DOCUMENTATION
+
+STRATEGIE ConfigurationDoc {
+    FORMATION sections = [
+        {
+            type: "API",
+            elements: [
+                "FONCTIONS",
+                "STRUCTURES",
+                "TYPES",
+                "CONSTANTES"
+            ],
+            format: "MARKDOWN"
+        },
+        {
+            type: "EXEMPLES",
+            elements: [
+                "CODE_SOURCE",
+                "SORTIE",
+                "EXPLICATIONS"
+            ],
+            format: "INTERACTIF"
+        },
+        {
+            type: "GUIDES",
+            elements: [
+                "INSTALLATION",
+                "CONFIGURATION",
+                "UTILISATION"
+            ],
+            format: "HTML"
+        }
+    ]
+
+    STRATEGIE options = {
+        generation_automatique: VRAI,
+        inclusion_tests: VRAI,
+        version_integree: VRAI
+    }
+}
+
+MISSION GenererDocumentation {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE documentation = {
+            sections: [],
+            index: [],
+            references: []
+        }
+        
+        # Analyse du code source
+        EXECUTION AnalyserCodeSource code_source documentation
+        
+        # Génération des sections
+        POUR section DANS ConfigurationDoc.sections {
+            SELON section.type {
+                CAS "API":
+                    EXECUTION GenererDocAPI section documentation
+                CAS "EXEMPLES":
+                    EXECUTION GenererExemples section documentation
+                CAS "GUIDES":
+                    EXECUTION GenererGuides section documentation
+            }
+        }
+        
+        # Génération de l'index
+        EXECUTION GenererIndex documentation
+        
+        # Validation de la documentation
+        SI CIBLE NON ValiderDocumentation documentation {
+            RAPPORT "Erreur de génération de documentation"
+            RETRAITE ERREUR_DOCUMENTATION
+        }
+        
+        RETRAITE documentation
+    }
+}
+
+MISSION GenererDocAPI {
+    PARAMETRE section
+    PARAMETRE documentation
+    
+    ORDRE DE BATAILLE {
+        FORMATION elements_api = []
+        
+        # Extraction des éléments d'API
+        POUR element DANS section.elements {
+            EXECUTION ExtraireElementsAPI element documentation
+            elements_api = DEPLOIEMENT elements_api OBTENIR_ELEMENTS element
+        }
+        
+        # Formatage de la documentation
+        POUR element DANS elements_api {
+            EXECUTION FormaterDocElement element section.format
+        }
+        
+        RETRAITE elements_api
+    }
+}
+
+FIN BASE

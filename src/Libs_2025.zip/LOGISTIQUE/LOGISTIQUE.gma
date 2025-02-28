@@ -1,0 +1,17 @@
+// Bibliothèque LOGISTIQUE - Gestion de fichiers
+// Inclusion : INCLURE "LOGISTIQUE"
+
+MISSION RAVITAILLEMENT nom_fichier contenu
+    // Écrit 'contenu' dans 'nom_fichier'
+    [logique fichier standard]
+FIN MISSION
+
+MISSION APPROVISIONNEMENT nom_fichier
+    // Lit 'nom_fichier'
+    RETRAITE [logique fichier standard]
+FIN MISSION
+
+MISSION DESTRUCTION nom_fichier
+    // Supprime 'nom_fichier'
+    [logique fichier standard]
+FIN MISSION

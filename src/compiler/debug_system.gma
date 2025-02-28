@@ -1,0 +1,91 @@
+BASE SYSTEME_DEBOGAGE
+
+STRATEGIE ConfigurationDebogage {
+    FORMATION types_points_arret = [
+        {
+            type: "LIGNE",
+            condition: VIDE,
+            action: "PAUSE"
+        },
+        {
+            type: "CONDITION",
+            condition: "EXPRESSION",
+            action: "PAUSE"
+        },
+        {
+            type: "DONNEE",
+            condition: "MODIFICATION",
+            action: "PAUSE"
+        }
+    ]
+
+    STRATEGIE outils = {
+        inspection_memoire: VRAI,
+        trace_pile: VRAI,
+        evaluation_expressions: VRAI
+    }
+}
+
+MISSION DemarrerDebogage {
+    PARAMETRE programme
+    
+    ORDRE DE BATAILLE {
+        # Initialisation de l'environnement de débogage
+        STRATEGIE contexte = {
+            points_arret: [],
+            variables_surveillees: [],
+            niveau_trace: "COMPLET"
+        }
+        
+        # Installation des points d'arrêt
+        POUR point DANS programme.points_arret {
+            EXECUTION InstallerPointArret point contexte
+        }
+        
+        # Boucle principale de débogage
+        MANOEUVRE DEBOGAGE {
+            TANT_QUE NON TERMINAISON_DEMANDEE {
+                # Exécution pas à pas
+                EXECUTION ExecuterInstruction
+                
+                # Vérification des points d'arrêt
+                SI CIBLE PointArretAtteint {
+                    EXECUTION TraiterPointArret
+                    EXECUTION AfficherEtatDebug
+                    EXECUTION AttendreCommande
+                }
+                
+                # Mise à jour des variables surveillées
+                EXECUTION SurveillanceVariables
+            }
+        }
+    }
+}
+
+MISSION TraiterPointArret {
+    PARAMETRE point_arret
+    
+    ORDRE DE BATAILLE {
+        # Sauvegarde du contexte
+        EXECUTION SauvegarderContexte
+        
+        # Évaluation de la condition
+        SI CIBLE point_arret.condition NON VIDE {
+            SI CIBLE NON EvaluerCondition point_arret.condition {
+                RETRAITE
+            }
+        }
+        
+        # Actions spécifiques
+        SELON point_arret.action {
+            CAS "PAUSE":
+                EXECUTION PauserExecution
+            CAS "LOG":
+                EXECUTION JournaliserEtat
+            CAS "PERSONNALISE":
+                EXECUTION ExecuterActionPersonnalisee point_arret
+        }
+    }
+}
+
+FIN BASE

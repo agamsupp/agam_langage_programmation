@@ -1,0 +1,82 @@
+BASE REPARTITEUR_EVENEMENTS
+
+STRATEGIE ConfigurationEvenements {
+    FORMATION ecouteurs = []
+    FORMATION file_evenements = []
+    
+    STRATEGIE priorites = {
+        SYSTEME: 0,
+        CRITIQUE: 1,
+        NORMAL: 2,
+        FAIBLE: 3
+    }
+}
+
+MISSION EnregistrerEcouteur {
+    PARAMETRE type_evenement
+    PARAMETRE ecouteur
+    PARAMETRE priorite
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE nouvel_ecouteur = {
+            type: type_evenement,
+            fonction: ecouteur,
+            priorite: priorite,
+            actif: VRAI
+        }
+        
+        ConfigurationEvenements.ecouteurs = DEPLOIEMENT 
+            ConfigurationEvenements.ecouteurs 
+            nouvel_ecouteur
+            
+        # Tri des écouteurs par priorité
+        ConfigurationEvenements.ecouteurs = TRIER_ECOUTEURS 
+            ConfigurationEvenements.ecouteurs
+    }
+}
+
+MISSION EmettreEvenement {
+    PARAMETRE type
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE evenement = {
+            type: type,
+            donnees: donnees,
+            timestamp: TEMPS_ACTUEL,
+            traite: FAUX
+        }
+        
+        # Traitement synchrone pour événements critiques
+        SI CIBLE EstEvenementCritique type {
+            EXECUTION TraiterEvenement evenement
+        } SINON {
+            ConfigurationEvenements.file_evenements = DEPLOIEMENT 
+                ConfigurationEvenements.file_evenements 
+                evenement
+        }
+    }
+}
+
+MISSION TraiterEvenements {
+    ORDRE DE BATAILLE {
+        TANT_QUE RECONNAISSANCE ConfigurationEvenements.file_evenements > 0 {
+            MUNITION evenement = ConfigurationEvenements.file_evenements[0]
+            
+            POUR ecouteur DANS ConfigurationEvenements.ecouteurs {
+                SI CIBLE ecouteur.type VERIFICATION evenement.type {
+                    SI CIBLE ecouteur.actif {
+                        EXECUTION ecouteur.fonction evenement.donnees
+                    }
+                }
+            }
+            
+            evenement.traite = VRAI
+            ConfigurationEvenements.file_evenements = RETRAIT 
+                ConfigurationEvenements.file_evenements 
+                0
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,39 @@
+BASE GUIDE_INSTALLATION
+
+MISSION PremièreInstallation {
+    ORDRE DE BATAILLE {
+        # Étape 1: Vérification système
+        STRATEGIE Prérequis {
+            MUNITION mémoire_requise = 512  # Mo
+            MUNITION espace_disque = 1024   # Mo
+        }
+        
+        # Étape 2: Installation
+        MISSION VérifierSystème {
+            SI CIBLE MémoireDisponible > Prérequis.mémoire_requise {
+                RAPPORT "Mémoire OK"
+            } SINON REPLI {
+                RAPPORT "Mémoire insuffisante"
+                RETRAITE ÉCHEC
+            }
+        }
+    }
+}
+
+MISSION ConfigurationBase {
+    ORDRE DE BATAILLE {
+        STRATEGIE Répertoires {
+            FORMATION chemins = [
+                "bin/",
+                "config/",
+                "temp/"
+            ]
+        }
+        
+        POUR chemin DANS Répertoires.chemins {
+            CRÉER_RÉPERTOIRE chemin
+        }
+    }
+}
+
+FIN BASE

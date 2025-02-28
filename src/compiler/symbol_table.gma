@@ -1,0 +1,79 @@
+BASE TABLE_SYMBOLES
+
+STRATEGIE GestionnaireSymboles {
+    FORMATION portees = []  # Pile des portées
+    STRATEGIE portee_courante = VIDE
+    FORMATION symboles_globaux = []
+}
+
+MISSION CreerPortee {
+    PARAMETRE type_portee
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE nouvelle_portee = {
+            type: type_portee,
+            symboles: [],
+            parent: GestionnaireSymboles.portee_courante
+        }
+        
+        GestionnaireSymboles.portee_courante = nouvelle_portee
+        GestionnaireSymboles.portees = DEPLOIEMENT GestionnaireSymboles.portees nouvelle_portee
+        
+        RETRAITE nouvelle_portee
+    }
+}
+
+MISSION AjouterSymbole {
+    PARAMETRE nom
+    PARAMETRE type
+    PARAMETRE categorie
+    
+    ORDRE DE BATAILLE {
+        # Vérification doublon dans la portée courante
+        SI CIBLE SymboleExiste nom GestionnaireSymboles.portee_courante {
+            RAPPORT "ERREUR: Symbole déjà défini dans la portée courante"
+            RETRAITE FAUX
+        }
+        
+        STRATEGIE nouveau_symbole = {
+            nom: nom,
+            type: type,
+            categorie: categorie,
+            portee: GestionnaireSymboles.portee_courante,
+            adresse: OBTENIR_PROCHAINE_ADRESSE
+        }
+        
+        GestionnaireSymboles.portee_courante.symboles = 
+            DEPLOIEMENT GestionnaireSymboles.portee_courante.symboles nouveau_symbole
+            
+        RETRAITE nouveau_symbole
+    }
+}
+
+MISSION RechercherSymbole {
+    PARAMETRE nom
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE portee = GestionnaireSymboles.portee_courante
+        
+        TANT_QUE portee NON VIDE {
+            POUR symbole DANS portee.symboles {
+                SI CIBLE symbole.nom VERIFICATION nom {
+                    RETRAITE symbole
+                }
+            }
+            portee = portee.parent
+        }
+        
+        # Recherche dans les symboles globaux
+        POUR symbole DANS GestionnaireSymboles.symboles_globaux {
+            SI CIBLE symbole.nom VERIFICATION nom {
+                RETRAITE symbole
+            }
+        }
+        
+        RETRAITE VIDE
+    }
+}
+
+FIN BASE

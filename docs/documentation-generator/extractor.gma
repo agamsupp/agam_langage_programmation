@@ -1,0 +1,431 @@
+BASE GENERATEUR_DOCUMENTATION
+
+STRATEGIE ConfigurationDocumentation {
+    formats_sortie: ["MARKDOWN", "HTML", "PDF"],
+    extraction_commentaires: VRAI,
+    extraction_signatures: VRAI,
+    generation_exemples: VRAI,
+    inclure_diagrammes: VRAI,
+    profondeur_analyse: "COMPLETE",
+    stylesheets: {
+        HTML: "style_documentation.css",
+        PDF: "style_documentation.tex"
+    }
+}
+
+MISSION GenererDocumentation {
+    PARAMETRE code_source
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Démarrage de la génération de documentation"
+        
+        # Analyser le code source
+        FORMATION elements_code = EXECUTION AnalyserCodeSource code_source
+        
+        # Extraire la documentation
+        STRATEGIE documentation = {
+            bases: [],
+            missions: [],
+            strategies: [],
+            exemples: [],
+            diagrammes: []
+        }
+        
+        # Traiter les bases
+        POUR base DANS elements_code.bases {
+            documentation.bases = DEPLOIEMENT documentation.bases EXECUTION ExtraireDoccumentationBase base configuration
+        }
+        
+        # Traiter les missions
+        POUR mission DANS elements_code.missions {
+            documentation.missions = DEPLOIEMENT documentation.missions EXECUTION ExtraireDoccumentationMission mission configuration
+        }
+        
+        # Traiter les stratégies
+        POUR strategie DANS elements_code.strategies {
+            documentation.strategies = DEPLOIEMENT documentation.strategies EXECUTION ExtraireDoccumentationStrategie strategie configuration
+        }
+        
+        # Générer des exemples si demandé
+        SI CIBLE configuration.generation_exemples {
+            documentation.exemples = EXECUTION GenererExemples elements_code
+        }
+        
+        # Générer des diagrammes si demandé
+        SI CIBLE configuration.inclure_diagrammes {
+            documentation.diagrammes = EXECUTION GenererDiagrammes elements_code
+        }
+        
+        # Générer la documentation dans les formats demandés
+        FORMATION resultats = []
+        
+        POUR format DANS configuration.formats_sortie {
+            resultats = DEPLOIEMENT resultats EXECUTION GenererFormatSortie documentation format configuration
+        }
+        
+        RAPPORT "Génération de documentation terminée"
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION AnalyserCodeSource {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Analyse du code source"
+        
+        STRATEGIE elements_code = {
+            bases: [],
+            missions: [],
+            strategies: [],
+            variables: [],
+            formations: []
+        }
+        
+        # Extraire les bases
+        elements_code.bases = EXECUTION ExtraireBases code_source
+        
+        # Extraire les missions
+        elements_code.missions = EXECUTION ExtraireMissions code_source
+        
+        # Extraire les stratégies
+        elements_code.strategies = EXECUTION ExtraireStrategies code_source
+        
+        # Extraire les variables
+        elements_code.variables = EXECUTION ExtraireVariables code_source
+        
+        # Extraire les formations
+        elements_code.formations = EXECUTION ExtraireFormations code_source
+        
+        RETRAITE elements_code
+    }
+}
+
+MISSION ExtraireBases {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION bases = []
+        
+        # Pattern pour extraire les bases
+        STRATEGIE pattern_base = "BASE\\s+([^\\n]+)\\n([\\s\\S]*?)FIN\\s+BASE"
+        
+        # Rechercher toutes les bases dans le code
+        FORMATION occurrences = RECHERCHER_PATTERN code_source pattern_base
+        
+        POUR occurrence DANS occurrences {
+            bases = DEPLOIEMENT bases {
+                nom: occurrence.captures[1],
+                contenu: occurrence.captures[2],
+                position: occurrence.position,
+                commentaires: ExtraireCommentairesAvant code_source occurrence.position
+            }
+        }
+        
+        RETRAITE bases
+    }
+}
+
+MISSION ExtraireMissions {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION missions = []
+        
+        # Pattern pour extraire les missions
+        STRATEGIE pattern_mission = "MISSION\\s+([^\\s{]+)\\s*\\{([\\s\\S]*?)\\}"
+        
+        # Rechercher toutes les missions dans le code
+        FORMATION occurrences = RECHERCHER_PATTERN code_source pattern_mission
+        
+        POUR occurrence DANS occurrences {
+            # Extraire les paramètres
+            FORMATION parametres = ExtraireParametresMission occurrence.captures[2]
+            
+            # Extraire le corps de la mission
+            STRATEGIE corps = ExtraireCorpsMission occurrence.captures[2]
+            
+            missions = DEPLOIEMENT missions {
+                nom: occurrence.captures[1],
+                parametres: parametres,
+                corps: corps,
+                position: occurrence.position,
+                commentaires: ExtraireCommentairesAvant code_source occurrence.position
+            }
+        }
+        
+        RETRAITE missions
+    }
+}
+
+MISSION ExtraireParametresMission {
+    PARAMETRE contenu_mission
+    
+    ORDRE DE BATAILLE {
+        FORMATION parametres = []
+        
+        # Pattern pour extraire les paramètres
+        STRATEGIE pattern_parametre = "PARAMETRE\\s+([^\\n]+)"
+        
+        # Rechercher tous les paramètres
+        FORMATION occurrences = RECHERCHER_PATTERN contenu_mission pattern_parametre
+        
+        POUR occurrence DANS occurrences {
+            parametres = DEPLOIEMENT parametres occurrence.captures[1]
+        }
+        
+        RETRAITE parametres
+    }
+}
+
+MISSION ExtraireCorpsMission {
+    PARAMETRE contenu_mission
+    
+    ORDRE DE BATAILLE {
+        # Pattern pour extraire le corps (après ORDRE DE BATAILLE)
+        STRATEGIE pattern_corps = "ORDRE\\s+DE\\s+BATAILLE\\s*\\{([\\s\\S]*)\\}"
+        
+        # Rechercher le corps
+        FORMATION occurrences = RECHERCHER_PATTERN contenu_mission pattern_corps
+        
+        SI CIBLE RECONNAISSANCE occurrences > 0 {
+            RETRAITE occurrences[0].captures[1]
+        }
+        
+        # Si le pattern n'est pas trouvé, retourner le contenu entier
+        RETRAITE contenu_mission
+    }
+}
+
+MISSION ExtraireStrategies {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION strategies = []
+        
+        # Pattern pour extraire les stratégies
+        STRATEGIE pattern_strategie = "STRATEGIE\\s+([^\\s=]+)\\s*=\\s*\\{([\\s\\S]*?)\\}"
+        
+        # Rechercher toutes les stratégies dans le code
+        FORMATION occurrences = RECHERCHER_PATTERN code_source pattern_strategie
+        
+        POUR occurrence DANS occurrences {
+            strategies = DEPLOIEMENT strategies {
+                nom: occurrence.captures[1],
+                contenu: occurrence.captures[2],
+                position: occurrence.position,
+                commentaires: ExtraireCommentairesAvant code_source occurrence.position
+            }
+        }
+        
+        RETRAITE strategies
+    }
+}
+
+MISSION ExtraireVariables {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION variables = []
+        
+        # Pattern pour extraire les munitions (variables)
+        STRATEGIE pattern_variable = "MUNITION\\s+([^\\s=]+)\\s*=\\s*([^\\n]+)"
+        
+        # Rechercher toutes les variables dans le code
+        FORMATION occurrences = RECHERCHER_PATTERN code_source pattern_variable
+        
+        POUR occurrence DANS occurrences {
+            variables = DEPLOIEMENT variables {
+                nom: occurrence.captures[1],
+                valeur: occurrence.captures[2],
+                position: occurrence.position
+            }
+        }
+        
+        RETRAITE variables
+    }
+}
+
+MISSION ExtraireFormations {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION formations = []
+        
+        # Pattern pour extraire les formations (tableaux)
+        STRATEGIE pattern_formation = "FORMATION\\s+([^\\s=]+)\\s*=\\s*\\[([\\s\\S]*?)\\]"
+        
+        # Rechercher toutes les formations dans le code
+        FORMATION occurrences = RECHERCHER_PATTERN code_source pattern_formation
+        
+        POUR occurrence DANS occurrences {
+            formations = DEPLOIEMENT formations {
+                nom: occurrence.captures[1],
+                contenu: occurrence.captures[2],
+                position: occurrence.position
+            }
+        }
+        
+        RETRAITE formations
+    }
+}
+
+MISSION ExtraireCommentairesAvant {
+    PARAMETRE code_source
+    PARAMETRE position
+    
+    ORDRE DE BATAILLE {
+        # Extraire les lignes de code avant la position
+        STRATEGIE lignes_avant = ExtraireLignesAvant code_source position.ligne 5
+        
+        FORMATION commentaires = []
+        
+        # Pattern pour identifier les commentaires
+        STRATEGIE pattern_commentaire = "#\\s*(.*)"
+        
+        # Rechercher les commentaires
+        FORMATION occurrences = RECHERCHER_PATTERN lignes_avant pattern_commentaire
+        
+        POUR occurrence DANS occurrences {
+            commentaires = DEPLOIEMENT commentaires occurrence.captures[1]
+        }
+        
+        RETRAITE commentaires
+    }
+}
+
+MISSION ExtraireLignesAvant {
+    PARAMETRE code_source
+    PARAMETRE ligne
+    PARAMETRE nombre_lignes
+    
+    ORDRE DE BATAILLE {
+        # Diviser le code en lignes
+        FORMATION lignes = DIVISER code_source "\n"
+        
+        # Calculer la ligne de début
+        MUNITION debut = MAX(0, ligne - nombre_lignes - 1)
+        
+        # Extraire les lignes demandées
+        FORMATION resultat = EXTRACTION lignes debut (ligne - 1)
+        
+        # Rejoindre les lignes
+        RETRAITE JOINDRE resultat "\n"
+    }
+}
+
+MISSION ExtraireDoccumentationBase {
+    PARAMETRE base
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE doc_base = {
+            nom: base.nom,
+            description: JOINDRE base.commentaires "\n",
+            missions: [],
+            strategies: []
+        }
+        
+        # Extraire les missions de la base
+        FORMATION missions_base = RECHERCHER_ELEMENTS base.contenu "MISSION"
+        POUR mission DANS missions_base {
+            doc_base.missions = DEPLOIEMENT doc_base.missions {
+                nom: mission.nom,
+                signature: FormerSignatureMission mission,
+                description: ExtraireDescriptionMission mission
+            }
+        }
+        
+        # Extraire les stratégies de la base
+        FORMATION strategies_base = RECHERCHER_ELEMENTS base.contenu "STRATEGIE"
+        POUR strategie DANS strategies_base {
+            doc_base.strategies = DEPLOIEMENT doc_base.strategies {
+                nom: strategie.nom,
+                description: ExtraireDescriptionStrategie strategie
+            }
+        }
+        
+        RETRAITE doc_base
+    }
+}
+
+MISSION ExtraireDoccumentationMission {
+    PARAMETRE mission
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE doc_mission = {
+            nom: mission.nom,
+            signature: FormerSignatureMission mission,
+            description: JOINDRE mission.commentaires "\n",
+            parametres: [],
+            exemples: [],
+            details: ""
+        }
+        
+        # Documenter chaque paramètre
+        POUR parametre DANS mission.parametres {
+            doc_mission.parametres = DEPLOIEMENT doc_mission.parametres {
+                nom: parametre,
+                description: ExtraireDescriptionParametre mission parametre,
+                type: InfererTypeParametre mission parametre
+            }
+        }
+        
+        # Extraire les exemples d'utilisation si demandé
+        SI CIBLE configuration.generation_exemples {
+            doc_mission.exemples = EXECUTION GenererExemplesMission mission
+        }
+        
+        # Extraire des détails supplémentaires du corps
+        doc_mission.details = AnalyserDetailsMission mission.corps
+        
+        RETRAITE doc_mission
+    }
+}
+
+MISSION ExtraireDoccumentationStrategie {
+    PARAMETRE strategie
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE doc_strategie = {
+            nom: strategie.nom,
+            description: JOINDRE strategie.commentaires "\n",
+            champs: AnalyserChampsStrategie strategie.contenu
+        }
+        
+        RETRAITE doc_strategie
+    }
+}
+
+MISSION FormerSignatureMission {
+    PARAMETRE mission
+    
+    ORDRE DE BATAILLE {
+        MUNITION signature = mission.nom + "("
+        
+        # Ajouter les paramètres
+        POUR index DANS INDICE(mission.parametres) {
+            SI CIBLE index > 0 {
+                signature = signature + ", "
+            }
+            signature = signature + mission.parametres[index]
+        }
+        
+        signature = signature + ")"
+        
+        RETRAITE signature
+    }
+}
+
+MISSION ExtraireDescriptionMission {
+    PARAMETRE mission
+    
+    ORDRE DE BATAILLE {
+        # Si des commentaires sont disponibles, les utiliser
+        SI CIBLE RECONNAISSANCE mission.commentaires > 0 {
+            RETRAITE JOINDRE mission.commentaires "\n"
+        }

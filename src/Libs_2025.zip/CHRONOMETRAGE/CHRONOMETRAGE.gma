@@ -1,0 +1,18 @@
+// Bibliothèque CHRONOMETRAGE - Gestion du temps
+// Inclusion : INCLURE "CHRONOMETRAGE"
+
+MISSION CHRONO DEBUT
+    [démarre chronomètre interne]
+FIN MISSION
+
+MISSION CHRONO FIN
+    RETRAITE [temps écoulé en secondes]
+FIN MISSION
+
+MISSION ATTENTE duree
+    [pause de 'duree' secondes]
+FIN MISSION
+
+MISSION PLANIFICATION tache delai
+    [planifie 'tache' après 'delai' secondes]
+FIN MISSION

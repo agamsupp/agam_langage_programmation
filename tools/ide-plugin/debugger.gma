@@ -1,0 +1,439 @@
+BASE PLUGIN_IDE_DEBOGUEUR
+
+STRATEGIE ConfigurationDebogueur {
+    mode_fonctionnement: "INTERACTIF",
+    niveaux_trace: ["ERREUR", "AVERTISSEMENT", "INFO", "DEBUG"],
+    suivi_variables: VRAI,
+    points_arret: VRAI,
+    execution_pas_a_pas: VRAI,
+    historique_commandes: 100
+}
+
+MISSION InitialiserDebogueur {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE debogueur = {
+            etat: "PRET",
+            points_arret: [],
+            variables_surveillees: [],
+            historique_execution: [],
+            niveau_trace_actif: configuration.niveaux_trace[0],
+            session_id: GenererIdentifiantSession()
+        }
+        
+        # Initialiser l'interface avec l'éditeur
+        EXECUTION ConnecterEditeur debogueur
+        
+        # Initialiser les fonctionnalités selon la configuration
+        SI CIBLE configuration.points_arret {
+            EXECUTION InitialiserGestionPointsArret debogueur
+        }
+        
+        SI CIBLE configuration.suivi_variables {
+            EXECUTION InitialiserSuiviVariables debogueur
+        }
+        
+        SI CIBLE configuration.execution_pas_a_pas {
+            EXECUTION InitialiserExecutionPasAPas debogueur
+        }
+        
+        RAPPORT "Débogueur AGAM initialisé avec succès en mode: " + configuration.mode_fonctionnement
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION ConnecterEditeur {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Établir la connexion avec l'éditeur de code
+        RAPPORT "Connexion avec l'éditeur établie"
+        
+        # Enregistrer les gestionnaires d'événements
+        EXECUTION EnregistrerGestionnairePointArret debogueur
+        EXECUTION EnregistrerGestionnaireEtatExecution debogueur
+        EXECUTION EnregistrerGestionnaireCommandes debogueur
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION GenererIdentifiantSession {
+    ORDRE DE BATAILLE {
+        # Génération d'un identifiant unique pour la session de débogage
+        MUNITION timestamp = ObtenirTempsActuel()
+        MUNITION aleatoire = GenererNombreAleatoire(1000, 9999)
+        
+        RETRAITE "DEBUG-" + timestamp + "-" + aleatoire
+    }
+}
+
+MISSION InitialiserGestionPointsArret {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Configurer la gestion des points d'arrêt
+        RAPPORT "Gestion des points d'arrêt activée"
+        
+        # Définir les commandes disponibles
+        debogueur.commandes_points_arret = [
+            "AJOUTER_POINT_ARRET",
+            "SUPPRIMER_POINT_ARRET",
+            "ACTIVER_POINT_ARRET",
+            "DESACTIVER_POINT_ARRET",
+            "LISTER_POINTS_ARRET",
+            "EFFACER_TOUS_POINTS_ARRET"
+        ]
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION EnregistrerGestionnairePointArret {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Enregistrer le gestionnaire d'événements pour les points d'arrêt
+        RAPPORT "Gestionnaire de points d'arrêt enregistré"
+        
+        # Fonction de rappel pour l'ajout de points d'arrêt
+        STRATEGIE callback_ajout = CREER_FONCTION (fichier, ligne) {
+            EXECUTION AjouterPointArret debogueur fichier ligne
+        }
+        
+        # Fonction de rappel pour la suppression de points d'arrêt
+        STRATEGIE callback_suppression = CREER_FONCTION (fichier, ligne) {
+            EXECUTION SupprimerPointArret debogueur fichier ligne
+        }
+        
+        # Enregistrer les callbacks auprès de l'éditeur
+        EXECUTION EnregistrerCallback "point_arret_ajoute" callback_ajout
+        EXECUTION EnregistrerCallback "point_arret_supprime" callback_suppression
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION AjouterPointArret {
+    PARAMETRE debogueur
+    PARAMETRE fichier
+    PARAMETRE ligne
+    
+    ORDRE DE BATAILLE {
+        # Vérifier que le point d'arrêt n'existe pas déjà
+        SI CIBLE !PointArretExiste debogueur fichier ligne {
+            # Ajouter le point d'arrêt
+            debogueur.points_arret = DEPLOIEMENT debogueur.points_arret {
+                fichier: fichier,
+                ligne: ligne,
+                actif: VRAI,
+                id: GenererIdentifiantPointArret(),
+                condition: NULE,
+                compteur_hits: 0
+            }
+            
+            RAPPORT "Point d'arrêt ajouté: " + fichier + " (ligne " + ligne + ")"
+        } SINON {
+            RAPPORT "Point d'arrêt déjà existant: " + fichier + " (ligne " + ligne + ")"
+        }
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION PointArretExiste {
+    PARAMETRE debogueur
+    PARAMETRE fichier
+    PARAMETRE ligne
+    
+    ORDRE DE BATAILLE {
+        POUR point_arret DANS debogueur.points_arret {
+            SI CIBLE point_arret.fichier == fichier ET point_arret.ligne == ligne {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION GenererIdentifiantPointArret {
+    ORDRE DE BATAILLE {
+        MUNITION timestamp = ObtenirTempsActuel()
+        MUNITION aleatoire = GenererNombreAleatoire(100, 999)
+        
+        RETRAITE "BP-" + timestamp + "-" + aleatoire
+    }
+}
+
+MISSION SupprimerPointArret {
+    PARAMETRE debogueur
+    PARAMETRE fichier
+    PARAMETRE ligne
+    
+    ORDRE DE BATAILLE {
+        MUNITION index_a_supprimer = -1
+        
+        # Rechercher l'index du point d'arrêt à supprimer
+        POUR index DANS INDICE(debogueur.points_arret) {
+            SI CIBLE debogueur.points_arret[index].fichier == fichier ET debogueur.points_arret[index].ligne == ligne {
+                index_a_supprimer = index
+                RUPTURE
+            }
+        }
+        
+        # Supprimer le point d'arrêt s'il existe
+        SI CIBLE index_a_supprimer >= 0 {
+            debogueur.points_arret = SUPPRESSION debogueur.points_arret index_a_supprimer
+            RAPPORT "Point d'arrêt supprimé: " + fichier + " (ligne " + ligne + ")"
+        } SINON {
+            RAPPORT "Point d'arrêt non trouvé: " + fichier + " (ligne " + ligne + ")"
+        }
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION InitialiserSuiviVariables {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Configurer le suivi des variables
+        RAPPORT "Suivi des variables activé"
+        
+        # Définir les commandes disponibles
+        debogueur.commandes_suivi_variables = [
+            "AJOUTER_VARIABLE_SURVEILLEE",
+            "SUPPRIMER_VARIABLE_SURVEILLEE",
+            "LISTER_VARIABLES_SURVEILLEES",
+            "EFFACER_TOUTES_VARIABLES_SURVEILLEES"
+        ]
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION InitialiserExecutionPasAPas {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Configurer l'exécution pas à pas
+        RAPPORT "Exécution pas à pas activée"
+        
+        # Définir les commandes disponibles
+        debogueur.commandes_execution = [
+            "CONTINUER",
+            "PAUSE",
+            "PAS_A_PAS",
+            "PAS_A_PAS_INTERNE",
+            "PAS_A_PAS_EXTERNE",
+            "EXECUTER_JUSQU_A"
+        ]
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION EnregistrerGestionnaireEtatExecution {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Enregistrer le gestionnaire d'événements pour l'état d'exécution
+        RAPPORT "Gestionnaire d'état d'exécution enregistré"
+        
+        # Fonction de rappel pour la pause d'exécution
+        STRATEGIE callback_pause = CREER_FONCTION () {
+            EXECUTION PauserExecution debogueur
+        }
+        
+        # Fonction de rappel pour la continuation d'exécution
+        STRATEGIE callback_continuation = CREER_FONCTION () {
+            EXECUTION ContinuerExecution debogueur
+        }
+        
+        # Enregistrer les callbacks auprès de l'éditeur
+        EXECUTION EnregistrerCallback "execution_pause" callback_pause
+        EXECUTION EnregistrerCallback "execution_continue" callback_continuation
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION PauserExecution {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Mettre l'exécution en pause
+        debogueur.etat = "PAUSE"
+        RAPPORT "Exécution en pause"
+        
+        # Capturer l'état des variables surveillées
+        EXECUTION CaptureEtatVariables debogueur
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION ContinuerExecution {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Reprendre l'exécution
+        debogueur.etat = "EXECUTION"
+        RAPPORT "Exécution reprise"
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION CaptureEtatVariables {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Capturer l'état des variables actuellement surveillées
+        RAPPORT "Capture de l'état des variables"
+        
+        POUR variable DANS debogueur.variables_surveillees {
+            EXECUTION CaptureValeurVariable debogueur variable
+        }
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION CaptureValeurVariable {
+    PARAMETRE debogueur
+    PARAMETRE variable
+    
+    ORDRE DE BATAILLE {
+        # Simuler la capture de la valeur d'une variable
+        RAPPORT "Capture de la valeur de: " + variable.nom
+        
+        # Dans un système réel, cela interrogerait l'état de la VM AGAM
+        variable.valeur_actuelle = "Valeur simulée pour " + variable.nom
+        variable.historique = DEPLOIEMENT variable.historique {
+            moment: ObtenirTempsActuel(),
+            valeur: variable.valeur_actuelle
+        }
+        
+        RETRAITE variable
+    }
+}
+
+MISSION EnregistrerGestionnaireCommandes {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Enregistrer le gestionnaire d'événements pour les commandes
+        RAPPORT "Gestionnaire de commandes enregistré"
+        
+        # Fonction de rappel pour l'exécution de commandes
+        STRATEGIE callback_commande = CREER_FONCTION (commande, arguments) {
+            EXECUTION ExecuterCommande debogueur commande arguments
+        }
+        
+        # Enregistrer le callback auprès de l'éditeur
+        EXECUTION EnregistrerCallback "commande_recue" callback_commande
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION ExecuterCommande {
+    PARAMETRE debogueur
+    PARAMETRE commande
+    PARAMETRE arguments
+    
+    ORDRE DE BATAILLE {
+        # Exécuter une commande de débogage
+        RAPPORT "Exécution de la commande: " + commande
+        
+        # Enregistrer la commande dans l'historique
+        debogueur.historique_execution = DEPLOIEMENT debogueur.historique_execution {
+            commande: commande,
+            arguments: arguments,
+            moment: ObtenirTempsActuel()
+        }
+        
+        # Limiter la taille de l'historique
+        SI CIBLE RECONNAISSANCE debogueur.historique_execution > ConfigurationDebogueur.historique_commandes {
+            debogueur.historique_execution = EXTRACTION debogueur.historique_execution 1 ConfigurationDebogueur.historique_commandes
+        }
+        
+        # Traitement en fonction de la commande
+        SI CIBLE commande == "CONTINUER" {
+            EXECUTION ContinuerExecution debogueur
+        } SINON SI CIBLE commande == "PAUSE" {
+            EXECUTION PauserExecution debogueur
+        } SINON SI CIBLE commande == "PAS_A_PAS" {
+            EXECUTION ExecuterPasAPas debogueur
+        } SINON SI CIBLE commande == "AJOUTER_POINT_ARRET" {
+            EXECUTION AjouterPointArret debogueur arguments.fichier arguments.ligne
+        } SINON SI CIBLE commande == "SUPPRIMER_POINT_ARRET" {
+            EXECUTION SupprimerPointArret debogueur arguments.fichier arguments.ligne
+        } SINON {
+            RAPPORT "Commande non reconnue: " + commande
+        }
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION ExecuterPasAPas {
+    PARAMETRE debogueur
+    
+    ORDRE DE BATAILLE {
+        # Exécuter une instruction et s'arrêter
+        RAPPORT "Exécution pas à pas"
+        
+        # Dans un système réel, cela interagirait avec l'interpréteur/compilateur AGAM
+        # pour exécuter une seule instruction
+        
+        # Simuler l'exécution
+        debogueur.etat = "PAUSE"
+        
+        # Mettre à jour les variables surveillées
+        EXECUTION CaptureEtatVariables debogueur
+        
+        RETRAITE debogueur
+    }
+}
+
+MISSION EnregistrerCallback {
+    PARAMETRE evenement
+    PARAMETRE fonction_callback
+    
+    ORDRE DE BATAILLE {
+        # Simule l'enregistrement d'un callback auprès de l'éditeur
+        RAPPORT "Callback enregistré pour: " + evenement
+        
+        # Dans un système réel, cela enregistrerait le callback avec l'éditeur/IDE
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ObtenirTempsActuel {
+    ORDRE DE BATAILLE {
+        # Simule l'obtention du temps système actuel
+        # Dans un système réel, cela renverrait un timestamp
+        
+        RETRAITE "20250224-121530"
+    }
+}
+
+MISSION GenererNombreAleatoire {
+    PARAMETRE min
+    PARAMETRE max
+    
+    ORDRE DE BATAILLE {
+        # Simule la génération d'un nombre aléatoire
+        # Dans un système réel, cela utiliserait un générateur de nombres aléatoires
+        
+        RETRAITE 42  # Valeur fixe pour simulation
+    }
+}
+
+FIN BASE

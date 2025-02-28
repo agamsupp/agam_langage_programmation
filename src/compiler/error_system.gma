@@ -1,0 +1,89 @@
+BASE SYSTEME_ERREURS
+
+STRATEGIE CatalogueErreurs {
+    FORMATION categories = [
+        {
+            code: "SYNTAXE",
+            niveaux: [
+                {code: "E100", message: "Erreur de syntaxe"},
+                {code: "E101", message: "Symbole manquant"},
+                {code: "E102", message: "Structure invalide"}
+            ]
+        },
+        {
+            code: "EXECUTION",
+            niveaux: [
+                {code: "E200", message: "Débordement de pile"},
+                {code: "E201", message: "Division par zéro"},
+                {code: "E202", message: "Accès mémoire invalide"}
+            ]
+        }
+    ]
+}
+
+MISSION SouleverErreur {
+    PARAMETRE code_erreur
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE erreur = {
+            code: code_erreur,
+            contexte: contexte,
+            pile_appels: OBTENIR_PILE_APPELS,
+            horodatage: TEMPS_ACTUEL
+        }
+        
+        # Enrichissement de l'erreur
+        MISSION EnrichirErreur {
+            erreur.ligne = contexte.ligne
+            erreur.colonne = contexte.colonne
+            erreur.fichier = contexte.fichier
+            erreur.segment = EXTRAIRE_SEGMENT contexte.code erreur.ligne
+        }
+        
+        # Journalisation
+        EXECUTION JournaliserErreur erreur
+        
+        # Notification
+        EXECUTION NotifierErreur erreur
+        
+        # Gestion de la récupération
+        SI CIBLE EST_ERREUR_CRITIQUE erreur {
+            EXECUTION ArreterExecution
+        } SINON {
+            EXECUTION TenterRecuperation erreur
+        }
+    }
+}
+
+MISSION TenterRecuperation {
+    PARAMETRE erreur
+    
+    ORDRE DE BATAILLE {
+        POUR strategie DANS STRATEGIES_RECUPERATION {
+            SI CIBLE EstStrategieApplicable strategie erreur {
+                EXECUTION AppliquerStrategie strategie erreur
+                RETRAITE
+            }
+        }
+        
+        # Si aucune stratégie n'est applicable
+        EXECUTION PropagerErreur erreur
+    }
+}
+
+MISSION GenererRapportErreur {
+    PARAMETRE erreur
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            message: FORMATER_MESSAGE erreur,
+            details: COLLECTER_DETAILS erreur,
+            suggestions: GENERER_SUGGESTIONS erreur
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

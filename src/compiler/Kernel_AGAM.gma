@@ -1,0 +1,288 @@
+// Kernel AGAM - Noyau système
+// Version : 2025
+// Description : Gestion mémoire, processus, threads, interruptions, fichiers, ordonnancement et matériel
+
+BASE Kernel-AGAM
+
+    # Module de Gestion Mémoire
+    STRATEGIE MemoryMap
+        FORMATION segments = []
+        MUNITION taille_disponible = 1024  # Taille en octets
+        MUNITION taille_utilisee = 0
+
+    MISSION Allouer taille_requise
+        SI CIBLE (MemoryMap.taille_disponible - MemoryMap.taille_utilisee) >= taille_requise
+            STRATEGIE nouvelle_allocation
+                DEPLOIEMENT nouvelle_allocation "debut" MemoryMap.taille_utilisee
+                DEPLOIEMENT nouvelle_allocation "taille" taille_requise
+                DEPLOIEMENT nouvelle_allocation "status" "ACTIF"
+            DEPLOIEMENT MemoryMap.segments nouvelle_allocation
+            MemoryMap.taille_utilisee = ASSAUT MemoryMap.taille_utilisee taille_requise
+            RETRAITE nouvelle_allocation
+        SINON
+            RAPPORT "ERREUR: Mémoire insuffisante"
+            RETRAITE "ECHEC"
+        FIN CIBLE
+    FIN MISSION
+
+    MISSION Liberer segment
+        SI CIBLE segment.status == "ACTIF"
+            segment.status = "LIBRE"
+            MemoryMap.taille_utilisee = REPLI MemoryMap.taille_utilisee segment.taille
+            RAPPORT "Segment libéré"
+        SINON
+            RAPPORT "ERREUR: Segment déjà libre ou invalide"
+        FIN CIBLE
+    FIN MISSION
+
+    MISSION CompacterMemoire
+        FORMATION nouveaux_segments = []
+        MUNITION offset = 0
+        POUR segment DANS MemoryMap.segments
+            SI CIBLE segment.status == "ACTIF"
+                segment.debut = offset
+                DEPLOIEMENT nouveaux_segments segment
+                offset = ASSAUT offset segment.taille
+            FIN CIBLE
+        FIN POUR
+        MemoryMap.segments = nouveaux_segments
+        MemoryMap.taille_utilisee = offset
+        RAPPORT "Mémoire compactée"
+    FIN MISSION
+
+    # Gestionnaire de Processus et Threads
+    STRATEGIE ProcessMap
+        FORMATION processus_actifs = []
+        FORMATION threads_actifs = []
+        MUNITION processus_en_cours = 0
+
+    MISSION CreerProcessus parametres
+        STRATEGIE nouveau_processus
+            DEPLOIEMENT nouveau_processus "id" ASSAUT RECONNAISSANCE ProcessMap.processus_actifs 1
+            DEPLOIEMENT nouveau_processus "status" "PRET"
+            DEPLOIEMENT nouveau_processus "priorite" parametres.priorite
+            DEPLOIEMENT nouveau_processus "code" parametres.code
+            DEPLOIEMENT nouveau_processus "threads" FORMATION []
+        DEPLOIEMENT ProcessMap.processus_actifs nouveau_processus
+        RETRAITE nouveau_processus.id
+    FIN MISSION
+
+    MISSION CreerThread parametres
+        MUNITION pid = parametres.pid
+        POUR processus DANS ProcessMap.processus_actifs
+            SI CIBLE processus.id == pid
+                STRATEGIE nouveau_thread
+                    DEPLOIEMENT nouveau_thread "tid" ASSAUT RECONNAISSANCE ProcessMap.threads_actifs 1
+                    DEPLOIEMENT nouveau_thread "status" "PRET"
+                    DEPLOIEMENT nouveau_thread "code" parametres.code
+                    DEPLOIEMENT nouveau_thread "pid" pid
+                DEPLOIEMENT ProcessMap.threads_actifs nouveau_thread
+                DEPLOIEMENT processus.threads nouveau_thread
+                RETRAITE nouveau_thread.tid
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Processus non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    MISSION ExecuterProcessus pid
+        POUR processus DANS ProcessMap.processus_actifs
+            SI CIBLE processus.id == pid
+                processus.status = "EN_EXECUTION"
+                RAPPORT FUSION "Exécution du processus " pid
+                EXECUTION processus.code
+                POUR thread DANS processus.threads
+                    thread.status = "EN_EXECUTION"
+                    EXECUTION thread.code
+                    thread.status = "TERMINE"
+                FIN POUR
+                processus.status = "TERMINE"
+                RETRAITE "SUCCES"
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Processus non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    # Synchronisation (Verrous)
+    STRATEGIE LockMap
+        FORMATION verrous = []
+
+    MISSION CreerVerrou nom
+        STRATEGIE nouveau_verrou
+            DEPLOIEMENT nouveau_verrou "nom" nom
+            DEPLOIEMENT nouveau_verrou "etat" "LIBRE"
+            DEPLOIEMENT nouveau_verrou "proprietaire" "AUCUN"
+        DEPLOIEMENT LockMap.verrous nouveau_verrou
+        RETRAITE nom
+    FIN MISSION
+
+    MISSION AcquérirVerrou nom
+        POUR verrou DANS LockMap.verrous
+            SI CIBLE verrou.nom == nom
+                SI CIBLE verrou.etat == "LIBRE"
+                    verrou.etat = "VERROUILLE"
+                    verrou.proprietaire = ProcessMap.processus_en_cours
+                    RETRAITE "SUCCES"
+                SINON
+                    RAPPORT "ERREUR: Verrou déjà pris"
+                    RETRAITE "ECHEC"
+                FIN CIBLE
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Verrou non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    MISSION LibererVerrou nom
+        POUR verrou DANS LockMap.verrous
+            SI CIBLE verrou.nom == nom
+                SI CIBLE verrou.proprietaire == ProcessMap.processus_en_cours
+                    verrou.etat = "LIBRE"
+                    verrou.proprietaire = "AUCUN"
+                    RETRAITE "SUCCES"
+                SINON
+                    RAPPORT "ERREUR: Non autorisé à libérer ce verrou"
+                    RETRAITE "ECHEC"
+                FIN CIBLE
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Verrou non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    # Gestionnaire d'Interruptions
+    FORMATION table_interruptions = []
+
+    MISSION EnregistrerInterruption parametres
+        STRATEGIE interruption
+            DEPLOIEMENT interruption "type" parametres.type
+            DEPLOIEMENT interruption "handler" parametres.handler
+            DEPLOIEMENT interruption "priorite" parametres.priorite
+        DEPLOIEMENT table_interruptions interruption
+        RAPPORT FUSION "Interruption " parametres.type " enregistrée"
+    FIN MISSION
+
+    MISSION TraiterInterruption type_interruption
+        POUR interruption DANS table_interruptions
+            SI CIBLE interruption.type == type_interruption
+                RAPPORT FUSION "Traitement de " type_interruption
+                EXECUTION interruption.handler
+                RETRAITE "SUCCES"
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "Aucune interruption correspondante"
+    FIN MISSION
+
+    # Gestionnaire de Fichiers
+    STRATEGIE FileSystem
+        FORMATION fichiers = []
+        MUNITION espace_disponible = 10000  # En octets
+
+    MISSION OuvrirFichier parametres
+        MUNITION nom = parametres.nom
+        MUNITION mode = parametres.mode SINON "LECTURE"
+        STRATEGIE descripteur
+            DEPLOIEMENT descripteur "nom" nom
+            DEPLOIEMENT descripteur "mode" mode
+            DEPLOIEMENT descripteur "id" ASSAUT RECONNAISSANCE FileSystem.fichiers 1
+        DEPLOIEMENT FileSystem.fichiers descripteur
+        RETRAITE descripteur.id
+    FIN MISSION
+
+    MISSION LireFichier descripteur
+        POUR fichier DANS FileSystem.fichiers
+            SI CIBLE fichier.id == descripteur
+                RETRAITE fichier.contenu SINON "Fichier vide"
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Descripteur invalide"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    MISSION EcrireFichier parametres
+        MUNITION descripteur = parametres.descripteur
+        MUNITION contenu = parametres.contenu
+        SI CIBLE espace_disponible >= RECONNAISSANCE contenu
+            POUR fichier DANS FileSystem.fichiers
+                SI CIBLE fichier.id == descripteur
+                    fichier.contenu = contenu
+                    espace_disponible = REPLI espace_disponible RECONNAISSANCE contenu
+                    RETRAITE "SUCCES"
+                FIN CIBLE
+            FIN POUR
+            RAPPORT "ERREUR: Descripteur invalide"
+        SINON
+            RAPPORT "ERREUR: Espace insuffisant"
+        FIN CIBLE
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    # Drivers Matériels
+    STRATEGIE HardwareMap
+        FORMATION peripheriques = []
+
+    MISSION EnregistrerPeripherique parametres
+        STRATEGIE peripherique
+            DEPLOIEMENT peripherique "id" parametres.id
+            DEPLOIEMENT peripherique "type" parametres.type
+            DEPLOIEMENT peripherique "handler" parametres.handler
+        DEPLOIEMENT HardwareMap.peripheriques peripherique
+        RAPPORT FUSION "Périphérique " parametres.id " enregistré"
+    FIN MISSION
+
+    MISSION LirePeripherique id
+        POUR peripherique DANS HardwareMap.peripheriques
+            SI CIBLE peripherique.id == id
+                RETRAITE EXECUTION peripherique.handler "LIRE"
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Périphérique non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    MISSION EcrirePeripherique parametres
+        MUNITION id = parametres.id
+        MUNITION donnees = parametres.donnees
+        POUR peripherique DANS HardwareMap.peripheriques
+            SI CIBLE peripherique.id == id
+                RETRAITE EXECUTION peripherique.handler "ECRIRE" donnees
+            FIN CIBLE
+        FIN POUR
+        RAPPORT "ERREUR: Périphérique non trouvé"
+        RETRAITE "ECHEC"
+    FIN MISSION
+
+    # Ordonnanceur
+    STRATEGIE Scheduler
+        FORMATION file_attente = []
+        MUNITION quantum = 100  # Temps en millisecondes
+
+    MISSION AjouterProcessus processus
+        DEPLOIEMENT Scheduler.file_attente processus
+        RAPPORT FUSION "Processus " processus.id " ajouté à la file"
+    FIN MISSION
+
+    MISSION ExecuterSuivant
+        SI CIBLE RECONNAISSANCE Scheduler.file_attente > 0
+            MUNITION processus = Scheduler.file_attente[0]
+            Scheduler.file_attente = RETRAIT Scheduler.file_attente 0
+            ProcessMap.processus_en_cours = processus.id
+            EXECUTION ExecuterProcessus processus.id
+            ProcessMap.processus_en_cours = 0
+            RAPPORT "Processus exécuté"
+        SINON
+            RAPPORT "Aucune tâche en attente"
+        FIN CIBLE
+    FIN MISSION
+
+    # Initialisation du Kernel
+    MISSION InitialiserKernel
+        RAPPORT "Initialisation du Kernel AGAM"
+        RAPPORT "Mémoire disponible : " FUSION MemoryMap.taille_disponible " octets"
+        RAPPORT "Espace fichier disponible : " FUSION FileSystem.espace_disponible " octets"
+        RAPPORT "Quantum d’ordonnancement : " FUSION Scheduler.quantum " ms"
+        RAPPORT "Kernel AGAM initialisé avec succès"
+    FIN MISSION
+
+FIN BASE

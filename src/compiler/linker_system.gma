@@ -1,0 +1,86 @@
+BASE SYSTEME_LINKAGE
+
+STRATEGIE ConfigurationLinkage {
+    FORMATION sections = [
+        {
+            nom: ".text",
+            type: "CODE",
+            attributs: ["EXECUTABLE"]
+        },
+        {
+            nom: ".data",
+            type: "DONNEES",
+            attributs: ["LECTURE", "ECRITURE"]
+        },
+        {
+            nom: ".bss",
+            type: "ZERO",
+            attributs: ["LECTURE", "ECRITURE"]
+        }
+    ]
+
+    STRATEGIE resolution = {
+        mode: "STATIQUE",
+        bibliotheques: [],
+        symboles_exportes: [],
+        symboles_importes: []
+    }
+}
+
+MISSION EditerLiens {
+    PARAMETRE objets
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE executable = {
+            sections: [],
+            symboles: [],
+            relocations: []
+        }
+        
+        # Collection des sections
+        POUR objet DANS objets {
+            POUR section DANS objet.sections {
+                executable.sections = DEPLOIEMENT 
+                    executable.sections 
+                    COPIER_SECTION section
+            }
+        }
+        
+        # Résolution des symboles
+        EXECUTION ResoudreSymboles executable objets
+        
+        # Application des relocations
+        EXECUTION AppliquerRelocations executable
+        
+        # Génération de l'exécutable
+        EXECUTION GenererExecutable executable configuration
+        
+        RETRAITE executable
+    }
+}
+
+MISSION ResoudreSymboles {
+    PARAMETRE executable
+    PARAMETRE objets
+    
+    ORDRE DE BATAILLE {
+        # Collection des symboles
+        FORMATION symboles = []
+        
+        POUR objet DANS objets {
+            POUR symbole DANS objet.symboles {
+                SI CIBLE EstSymboleGlobal symbole {
+                    symboles = DEPLOIEMENT symboles symbole
+                }
+            }
+        }
+        
+        # Résolution des références
+        POUR symbole DANS symboles {
+            EXECUTION ResoudreReference symbole executable
+        }
+    }
+}
+
+FIN BASE

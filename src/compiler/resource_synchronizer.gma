@@ -1,0 +1,91 @@
+BASE SYNCHRONISEUR_RESSOURCES
+
+STRATEGIE ConfigurationVerrous {
+    FORMATION verrous = []
+    FORMATION attentes = []
+    FORMATION ressources_critiques = [
+        {
+            nom: "MEMOIRE",
+            type: "EXCLUSIF"
+        },
+        {
+            nom: "FICHIER",
+            type: "PARTAGE"
+        }
+    ]
+}
+
+MISSION AcquerirVerrou {
+    PARAMETRE ressource
+    PARAMETRE type_acces
+    
+    ORDRE DE BATAILLE {
+        # Vérification du type de verrou
+        STRATEGIE verrou = TROUVER_VERROU ressource
+        
+        SI CIBLE verrou EST VIDE {
+            verrou = CREER_VERROU ressource type_acces
+            ConfigurationVerrous.verrous = DEPLOIEMENT 
+                ConfigurationVerrous.verrous 
+                verrou
+            RETRAITE VRAI
+        }
+        
+        # Gestion des conflits
+        SI CIBLE VerrouDisponible verrou type_acces {
+            EXECUTION OccuperVerrou verrou type_acces
+            RETRAITE VRAI
+        } SINON {
+            EXECUTION AjouterFileAttente ressource type_acces
+            RETRAITE FAUX
+        }
+    }
+}
+
+MISSION LibererVerrou {
+    PARAMETRE ressource
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE verrou = TROUVER_VERROU ressource
+        
+        SI CIBLE verrou NON VIDE {
+            EXECUTION RelacherVerrou verrou
+            
+            # Notification des processus en attente
+            FORMATION processus_attente = OBTENIR_PROCESSUS_ATTENTE ressource
+            
+            POUR processus DANS processus_attente {
+                SI CIBLE VerrouDisponible verrou processus.type_acces {
+                    EXECUTION NotifierProcessus processus
+                    EXECUTION RetirerFileAttente processus
+                }
+            }
+            
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION DemanderAccesExclusif {
+    PARAMETRE ressource
+    
+    ORDRE DE BATAILLE {
+        # Élévation de priorité temporaire
+        MUNITION priorite_originale = OBTENIR_PRIORITE
+        EXECUTION ELEVER_PRIORITE
+        
+        # Tentative d'acquisition
+        MANOEUVRE ACQUISITION {
+            TANT_QUE NON AcquerirVerrou ressource "EXCLUSIF" {
+                ATTENDRE_EVENEMENT "VERROU_LIBERE"
+            }
+        }
+        
+        # Restauration priorité
+        EXECUTION RESTAURER_PRIORITE priorite_originale
+    }
+}
+
+FIN BASE

@@ -1,0 +1,51 @@
+BASE TESTS_SEMANTIQUE
+
+STRATEGIE TestsConfig {
+    FORMATION cas_test = [
+        {
+            nom: "declaration_valide",
+            code: "MUNITION force = 100",
+            attendu: VRAI
+        },
+        {
+            nom: "type_invalide",
+            code: "INVALID x = 10",
+            attendu: FAUX
+        },
+        {
+            nom: "double_declaration",
+            code: "MUNITION x = 1\nMUNITION x = 2",
+            attendu: FAUX
+        }
+    ]
+}
+
+MISSION ExecuterTestsSémantiques {
+    ORDRE DE BATAILLE {
+        MUNITION tests_réussis = 0
+        MUNITION tests_total = RECONNAISSANCE TestsConfig.cas_test
+        
+        POUR cas DANS TestsConfig.cas_test {
+            SI CIBLE ExecuterTest cas {
+                tests_réussis = tests_réussis ASSAUT 1
+                RAPPORT "Test " + cas.nom + ": SUCCÈS"
+            } SINON {
+                RAPPORT "Test " + cas.nom + ": ÉCHEC"
+            }
+        }
+        
+        MUNITION pourcentage = (tests_réussis * 100) DIVISION tests_total
+        RAPPORT "Résultat final: " + pourcentage + "% de réussite"
+    }
+}
+
+MISSION ExecuterTest {
+    PARAMETRE cas
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE résultat = EXECUTION AnalyseSémantique cas.code
+        RETRAITE résultat.succès VERIFICATION cas.attendu
+    }
+}
+
+FIN BASE

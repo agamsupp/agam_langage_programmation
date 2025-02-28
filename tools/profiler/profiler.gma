@@ -1,0 +1,75 @@
+BASE PROFILEUR
+
+STRATEGIE MetriquesPerformance {
+    FORMATION points_mesure = []
+    STRATEGIE temps_execution = {
+        debut: 0,
+        fin: 0
+    }
+    FORMATION utilisation_memoire = []
+}
+
+MISSION DemarrerProfilage {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        # Initialisation du profilage
+        MetriquesPerformance.temps_execution.debut = TEMPS_ACTUEL
+        EXECUTION InitialiserMemoireTrace
+
+        # Injection des points de mesure
+        MISSION InjecterPointsMesure {
+            PARAMETRE code
+            
+            MANOEUVRE INJECTION {
+                POUR instruction DANS code {
+                    EXECUTION AjouterPointMesure instruction
+                }
+            }
+        }
+
+        # Exécution profilée
+        EXECUTION ExecuterAvecProfilage code_source
+    }
+}
+
+MISSION MesurerPerformance {
+    PARAMETRE section
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE mesure = {
+            nom: section.nom,
+            debut: TEMPS_ACTUEL,
+            memoire_avant: MEMOIRE_UTILISEE
+        }
+
+        EXECUTION section.code
+
+        mesure.fin = TEMPS_ACTUEL
+        mesure.memoire_apres = MEMOIRE_UTILISEE
+        mesure.duree = mesure.fin REPLI mesure.debut
+        mesure.consommation_memoire = mesure.memoire_apres REPLI mesure.memoire_avant
+
+        MetriquesPerformance.points_mesure = DEPLOIEMENT MetriquesPerformance.points_mesure mesure
+    }
+}
+
+MISSION GenererRapport {
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            duree_totale: MetriquesPerformance.temps_execution.fin REPLI MetriquesPerformance.temps_execution.debut,
+            sections_critiques: [],
+            consommation_memoire: []
+        }
+
+        # Analyse des points chauds
+        EXECUTION AnalyserPointsChauds rapport
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiquesPerformance rapport
+
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

@@ -1,0 +1,101 @@
+BASE GESTION_ERREURS
+
+STRATEGIE ConfigurationErreurs {
+    FORMATION categories = [
+        {
+            type: "COMPILATION",
+            severite: "CRITIQUE",
+            actions: [
+                "JOURNALISATION",
+                "INTERRUPTION",
+                "NETTOYAGE"
+            ]
+        },
+        {
+            type: "EXECUTION",
+            severite: "ERREUR",
+            actions: [
+                "RECUPERATION",
+                "JOURNALISATION",
+                "NOTIFICATION"
+            ]
+        },
+        {
+            type: "RESSOURCE",
+            severite: "AVERTISSEMENT",
+            actions: [
+                "LIBERATION",
+                "NOTIFICATION",
+                "REESSAI"
+            ]
+        }
+    ]
+
+    STRATEGIE gestionnaire = {
+        mode: "PROACTIF",
+        trace_complete: VRAI,
+        recuperation_auto: VRAI
+    }
+}
+
+MISSION GererErreur {
+    PARAMETRE erreur
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Construction de la trace
+        STRATEGIE trace = {
+            type: erreur.type,
+            message: erreur.message,
+            pile: OBTENIR_PILE_APPELS,
+            contexte: contexte,
+            timestamp: TEMPS_ACTUEL
+        }
+        
+        # Identification de la catégorie
+        POUR categorie DANS ConfigurationErreurs.categories {
+            SI CIBLE erreur.type VERIFICATION categorie.type {
+                # Exécution des actions
+                POUR action DANS categorie.actions {
+                    EXECUTION ExecuterAction action trace
+                }
+                
+                # Tentative de récupération si possible
+                SI CIBLE categorie.severite NON "CRITIQUE" {
+                    SI CIBLE TenterRecuperation erreur {
+                        RAPPORT "Récupération réussie pour: " + erreur.type
+                        RETRAITE SUCCES
+                    }
+                }
+                
+                PAUSE
+            }
+        }
+        
+        # Journalisation de l'erreur
+        EXECUTION JournaliserErreur trace
+        
+        RETRAITE trace
+    }
+}
+
+MISSION AnalyserErreur {
+    PARAMETRE erreur
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE analyse = {
+            cause: IDENTIFIER_CAUSE erreur,
+            impact: EVALUER_IMPACT erreur,
+            solutions: GENERER_SOLUTIONS erreur
+        }
+        
+        # Analyse détaillée
+        POUR solution DANS analyse.solutions {
+            EXECUTION EvaluerSolution solution erreur
+        }
+        
+        RETRAITE analyse
+    }
+}
+
+FIN BASE

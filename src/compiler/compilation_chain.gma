@@ -1,0 +1,114 @@
+BASE CHAINE_COMPILATION
+
+STRATEGIE ConfigurationCompilation {
+    FORMATION etapes = [
+        {
+            nom: "ANALYSE_LEXICALE",
+            obligatoire: VRAI,
+            validation_requise: VRAI
+        },
+        {
+            nom: "ANALYSE_SYNTAXIQUE",
+            obligatoire: VRAI,
+            validation_requise: VRAI
+        },
+        {
+            nom: "ANALYSE_SEMANTIQUE",
+            obligatoire: VRAI,
+            validation_requise: VRAI
+        },
+        {
+            nom: "OPTIMISATION",
+            obligatoire: FAUX,
+            validation_requise: VRAI
+        }
+    ]
+}
+
+MISSION LancerCompilation {
+    PARAMETRE fichier_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            fichier: fichier_source,
+            etape_courante: VIDE,
+            erreurs: [],
+            avertissements: []
+        }
+        
+        # Exécution des étapes
+        POUR etape DANS ConfigurationCompilation.etapes {
+            contexte.etape_courante = etape
+            
+            SELON etape.nom {
+                CAS "ANALYSE_LEXICALE":
+                    EXECUTION AnalyseLexicale contexte
+                CAS "ANALYSE_SYNTAXIQUE":
+                    EXECUTION AnalyseSyntaxique contexte
+                CAS "ANALYSE_SEMANTIQUE":
+                    EXECUTION AnalyseSemantique contexte
+                CAS "OPTIMISATION":
+                    EXECUTION Optimisation contexte
+            }
+            
+            # Validation de l'étape
+            SI CIBLE etape.validation_requise {
+                SI CIBLE NON ValiderEtape contexte {
+                    SI CIBLE etape.obligatoire {
+                        RETRAITE ECHEC
+                    }
+                }
+            }
+        }
+        
+        # Génération du code final
+        SI CIBLE RECONNAISSANCE contexte.erreurs == 0 {
+            EXECUTION GenererCodeFinal contexte
+        }
+        
+        RETRAITE contexte
+    }
+}
+
+MISSION ValiderEtape {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE validation = {
+            succes: VRAI,
+            messages: []
+        }
+        
+        # Vérifications spécifiques à l'étape
+        SELON contexte.etape_courante.nom {
+            CAS "ANALYSE_LEXICALE":
+                validation = EXECUTION ValiderTokens contexte
+            CAS "ANALYSE_SYNTAXIQUE":
+                validation = EXECUTION ValiderSyntaxe contexte
+            CAS "ANALYSE_SEMANTIQUE":
+                validation = EXECUTION ValiderSemantique contexte
+            CAS "OPTIMISATION":
+                validation = EXECUTION ValiderOptimisations contexte
+        }
+        
+        RETRAITE validation.succes
+    }
+}
+
+MISSION GenererRapport {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            succes: RECONNAISSANCE contexte.erreurs == 0,
+            erreurs: contexte.erreurs,
+            avertissements: contexte.avertissements,
+            temps_execution: CALCULER_TEMPS_EXECUTION,
+            statistiques: GENERER_STATISTIQUES contexte
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

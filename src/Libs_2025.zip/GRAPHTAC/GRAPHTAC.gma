@@ -1,0 +1,1312 @@
+BASE GRAPHTAC
+// GRAPHTAC : Bibliothèque Graphique et Tactique pour AGAM
+// Version 1.0
+
+// ===== STRUCTURE DE LA BIBLIOTHÈQUE =====
+STRATEGIE Configuration {
+    // Paramètres principaux
+    MUNITION version = "1.0"
+    MUNITION nom = "GRAPHTAC"
+    MUNITION description = "Bibliothèque Graphique et Tactique pour AGAM"
+    
+    // Paramètres d'affichage
+    MUNITION largeurEcran = 800
+    MUNITION hauteurEcran = 600
+    MUNITION couleurFond = "#000000"
+    MUNITION couleurPrincipale = "#00ff00"
+    MUNITION couleurSecondaire = "#005500"
+    MUNITION couleurAccent = "#00ffaa"
+    MUNITION couleurAlerte = "#ff0000"
+    MUNITION couleurInfo = "#0088ff"
+    
+    // Paramètres d'animation
+    MUNITION fpsMax = 60
+    MUNITION fpsAnimation = 30
+    MUNITION delaiTransition = 500
+    MUNITION delaiEffetTexte = 20
+    MUNITION delaiRafraichissement = 16 // ~60fps
+}
+
+STRATEGIE Ressources {
+    // Polices
+    FORMATION polices = [
+        "TerminalMonospace", 
+        "TacticalSans", 
+        "CommanderBold"
+    ]
+    
+    // Icônes de base
+    FORMATION icones = [
+        "alerte", "cible", "bouclier", "avion", "char", "soldat", 
+        "munition", "radar", "satellite", "radio", "explosion", "drapeau"
+    ]
+    
+    // Sons
+    FORMATION sons = [
+        "bip", "alarme", "transmission", "confirmation", "erreur", 
+        "missile", "explosion", "bouclier", "radar"
+    ]
+    
+    // Animations prédéfinies
+    FORMATION animations = [
+        "balayageRadar", "clignotement", "pulsation", "matrixPluie", 
+        "typographie", "fadeIn", "fadeOut", "glissement", "explosion"
+    ]
+}
+
+STRATEGIE Contexte {
+    // Contexte d'exécution graphique
+    MUNITION canvas = null
+    MUNITION contexteDessin = null
+    MUNITION largeur = 0
+    MUNITION hauteur = 0
+    
+    // Gestion des couches
+    FORMATION calques = []
+    MUNITION calqueActif = 0
+    
+    // Gestion des animations
+    FORMATION animations = []
+    MUNITION animationActuelle = null
+    MUNITION horodatageDebut = 0
+    MUNITION horodatageFramePrecedente = 0
+    MUNITION boucleAnimationId = null
+    
+    // Gestion du terminal
+    FORMATION lignesTerminal = []
+    MUNITION positionCurseur = {x: 0, y: 0}
+    MUNITION nbLignesVisibles = 25
+    MUNITION nbColonnesVisibles = 80
+    MUNITION tailleCaractere = 10
+    MUNITION styleTerminal = "standard" // standard, matrix, tactique
+}
+
+// ===== MISSIONS D'INITIALISATION =====
+MISSION Initialisation {
+    PARAMETRE element 
+    PARAMETRE options = {}
+    
+    ORDRE DE BATAILLE {
+        // Fusionner les options avec la configuration par défaut
+        SI CIBLE options.largeur {
+            Configuration.largeurEcran = options.largeur
+        }
+        
+        SI CIBLE options.hauteur {
+            Configuration.hauteurEcran = options.hauteur
+        }
+        
+        SI CIBLE options.couleurs {
+            POUR couleur DANS options.couleurs {
+                Configuration[couleur.nom] = couleur.valeur
+            }
+        }
+        
+        // Créer ou récupérer l'élément canvas
+        SI CIBLE TypeDe element VERIFICATION "string" {
+            Contexte.canvas = document.getElementById(element)
+        }
+        SINON {
+            Contexte.canvas = element
+        }
+        
+        // Configurer le canvas
+        Contexte.canvas.width = Configuration.largeurEcran
+        Contexte.canvas.height = Configuration.hauteurEcran
+        Contexte.largeur = Configuration.largeurEcran
+        Contexte.hauteur = Configuration.hauteurEcran
+        
+        // Obtenir le contexte de dessin
+        Contexte.contexteDessin = Contexte.canvas.getContext('2d')
+        
+        // Initialiser les calques
+        EXECUTION InitialiserCalques
+        
+        // Initialiser le terminal
+        EXECUTION InitialiserTerminal
+        
+        // Configurer la boucle d'animation
+        EXECUTION InitialiserBoucleAnimation
+        
+        RETRAITE true
+    }
+}
+
+MISSION InitialiserCalques {
+    ORDRE DE BATAILLE {
+        // Calque de fond (index 0)
+        DEPLOIEMENT {
+            nom: "fond",
+            visible: true,
+            contexte: document.createElement('canvas').getContext('2d')
+        } DANS Contexte.calques
+        
+        // Calque du terminal (index 1)
+        DEPLOIEMENT {
+            nom: "terminal",
+            visible: true,
+            contexte: document.createElement('canvas').getContext('2d')
+        } DANS Contexte.calques
+        
+        // Calque d'animations (index 2)
+        DEPLOIEMENT {
+            nom: "animations",
+            visible: true,
+            contexte: document.createElement('canvas').getContext('2d')
+        } DANS Contexte.calques
+        
+        // Calque d'interface (index 3)
+        DEPLOIEMENT {
+            nom: "interface",
+            visible: true,
+            contexte: document.createElement('canvas').getContext('2d')
+        } DANS Contexte.calques
+        
+        // Initialiser les dimensions de chaque calque
+        POUR calque DANS Contexte.calques {
+            calque.contexte.canvas.width = Contexte.largeur
+            calque.contexte.canvas.height = Contexte.hauteur
+        }
+    }
+}
+
+MISSION InitialiserTerminal {
+    ORDRE DE BATAILLE {
+        // Initialiser l'affichage du terminal
+        MUNITION nbLignes = Contexte.nbLignesVisibles
+        
+        MUNITION i = 0
+        MANOEUVRE i < nbLignes {
+            DEPLOIEMENT "" DANS Contexte.lignesTerminal
+            MUNITION i = i + 1
+        }
+        
+        // Définir le style du terminal
+        EXECUTION DefinirStyleTerminal "standard"
+    }
+}
+
+MISSION InitialiserBoucleAnimation {
+    ORDRE DE BATAILLE {
+        // Configurer la fonction de boucle d'animation
+        Contexte.horodatageDebut = ObtiendreDateActuelle()
+        Contexte.horodatageFramePrecedente = Contexte.horodatageDebut
+        
+        // Démarrer la boucle d'animation
+        EXECUTION DemarrerBoucleAnimation
+    }
+}
+
+// ===== MISSIONS DE RENDU =====
+MISSION DemarrerBoucleAnimation {
+    ORDRE DE BATAILLE {
+        // Utiliser la fonction requestAnimationFrame pour la boucle d'animation
+        Contexte.boucleAnimationId = requestAnimationFrame(EXECUTION BoucleAnimation)
+    }
+}
+
+MISSION BoucleAnimation {
+    PARAMETRE horodatage
+    
+    ORDRE DE BATAILLE {
+        // Calculer le delta temps
+        MUNITION deltaTemps = horodatage - Contexte.horodatageFramePrecedente
+        Contexte.horodatageFramePrecedente = horodatage
+        
+        // Effacer le canvas principal
+        Contexte.contexteDessin.clearRect(0, 0, Contexte.largeur, Contexte.hauteur)
+        
+        // Mettre à jour les animations
+        EXECUTION MettreAJourAnimations deltaTemps
+        
+        // Dessiner tous les calques
+        EXECUTION DessinerCalques
+        
+        // Continuer la boucle
+        Contexte.boucleAnimationId = requestAnimationFrame(EXECUTION BoucleAnimation)
+    }
+}
+
+MISSION MettreAJourAnimations {
+    PARAMETRE deltaTemps
+    
+    ORDRE DE BATAILLE {
+        MUNITION animationsTerminees = []
+        
+        // Mettre à jour chaque animation active
+        MUNITION i = 0
+        MANOEUVRE i < RECONNAISSANCE Contexte.animations {
+            MUNITION animation = Contexte.animations[i]
+            
+            // Mettre à jour l'animation
+            animation.tempsEcoule = animation.tempsEcoule + deltaTemps
+            
+            // Vérifier si l'animation est terminée
+            SI CIBLE animation.tempsEcoule >= animation.duree && animation.duree > 0 {
+                SI CIBLE animation.boucle {
+                    animation.tempsEcoule = animation.tempsEcoule % animation.duree
+                }
+                SINON {
+                    DEPLOIEMENT i DANS animationsTerminees
+                }
+            }
+            
+            // Exécuter la fonction de mise à jour de l'animation
+            SI CIBLE animation.mettreAJour {
+                EXECUTION animation.mettreAJour animation.tempsEcoule animation.duree deltaTemps
+            }
+            
+            MUNITION i = i + 1
+        }
+        
+        // Supprimer les animations terminées (dans l'ordre décroissant)
+        animationsTerminees.sort(FUSION (a, b) => b - a)
+        
+        POUR index DANS animationsTerminees {
+            Contexte.animations.splice(index, 1)
+        }
+    }
+}
+
+MISSION DessinerCalques {
+    ORDRE DE BATAILLE {
+        // Dessiner chaque calque dans l'ordre (du fond vers l'avant)
+        MUNITION i = 0
+        MANOEUVRE i < RECONNAISSANCE Contexte.calques {
+            MUNITION calque = Contexte.calques[i]
+            
+            SI CIBLE calque.visible {
+                Contexte.contexteDessin.drawImage(calque.contexte.canvas, 0, 0)
+                
+                // Si c'est le calque du terminal, dessiner le curseur clignotant
+                SI CIBLE calque.nom VERIFICATION "terminal" {
+                    EXECUTION DessinerCurseurClignotant
+                }
+            }
+            
+            MUNITION i = i + 1
+        }
+    }
+}
+
+// ===== ANIMATIONS =====
+MISSION AjouterAnimation {
+    PARAMETRE typeAnimation
+    PARAMETRE options = {}
+    
+    ORDRE DE BATAILLE {
+        MUNITION animation = {
+            type: typeAnimation,
+            tempsEcoule: 0,
+            duree: options.duree || 1000,
+            boucle: options.boucle || false,
+            parametres: options.parametres || {},
+            mettreAJour: null,
+            dessiner: null
+        }
+        
+        // Définir la fonction de mise à jour en fonction du type d'animation
+        SELON typeAnimation {
+            CAS "balayageRadar":
+                EXECUTION ConfigurerAnimationRadar animation
+                PAUSE
+                
+            CAS "matrixPluie":
+                EXECUTION ConfigurerAnimationMatrix animation
+                PAUSE
+                
+            CAS "typographie":
+                EXECUTION ConfigurerAnimationTypographie animation
+                PAUSE
+                
+            CAS "clignotement":
+                EXECUTION ConfigurerAnimationClignotement animation
+                PAUSE
+                
+            CAS "pulsation":
+                EXECUTION ConfigurerAnimationPulsation animation
+                PAUSE
+                
+            DEFAUT:
+                RAPPORT "Animation non reconnue: " + typeAnimation
+                RETRAITE null
+                PAUSE
+        }
+        
+        // Ajouter l'animation à la liste
+        DEPLOIEMENT animation DANS Contexte.animations
+        
+        RETRAITE animation
+    }
+}
+
+MISSION ConfigurerAnimationMatrix {
+    PARAMETRE animation
+    
+    ORDRE DE BATAILLE {
+        // Configurer les paramètres de l'animation Matrix
+        SI CIBLE !animation.parametres.caracteres {
+            animation.parametres.caracteres = "アァカサタナハマヤャラワガザダバパABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        }
+        
+        SI CIBLE !animation.parametres.colonnes {
+            animation.parametres.colonnes = Math.floor(Contexte.largeur / 20)
+        }
+        
+        SI CIBLE !animation.parametres.gouttes {
+            animation.parametres.gouttes = []
+            MUNITION i = 0
+            MANOEUVRE i < animation.parametres.colonnes {
+                DEPLOIEMENT {
+                    x: i * 20,
+                    y: Math.random() * Contexte.hauteur,
+                    vitesse: 1 + Math.random() * 3,
+                    longueur: 5 + Math.floor(Math.random() * 15)
+                } DANS animation.parametres.gouttes
+                MUNITION i = i + 1
+            }
+        }
+        
+        // Configurer la fonction de mise à jour
+        animation.mettreAJour = FUSION (tempsEcoule, duree, deltaTemps) {
+            // Récupérer le contexte du calque d'animations
+            MUNITION ctx = Contexte.calques[2].contexte
+            
+            // Effacer le calque avec un fond semi-transparent
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)"
+            ctx.fillRect(0, 0, Contexte.largeur, Contexte.hauteur)
+            
+            // Dessiner les caractères
+            ctx.fillStyle = Configuration.couleurPrincipale
+            ctx.font = "20px monospace"
+            
+            MUNITION i = 0
+            MANOEUVRE i < RECONNAISSANCE animation.parametres.gouttes {
+                MUNITION goutte = animation.parametres.gouttes[i]
+                
+                // Choisir un caractère aléatoire
+                MUNITION index = Math.floor(Math.random() * animation.parametres.caracteres.length)
+                MUNITION caractere = animation.parametres.caracteres[index]
+                
+                // Dessiner le caractère
+                ctx.fillText(caractere, goutte.x, goutte.y)
+                
+                // Mettre à jour la position de la goutte
+                goutte.y = goutte.y + goutte.vitesse
+                
+                // Réinitialiser la goutte si elle sort de l'écran
+                SI CIBLE goutte.y > Contexte.hauteur {
+                    goutte.y = 0
+                }
+                
+                MUNITION i = i + 1
+            }
+        }
+    }
+}
+
+MISSION ConfigurerAnimationRadar {
+    PARAMETRE animation
+    
+    ORDRE DE BATAILLE {
+        // Configurer les paramètres de l'animation de radar
+        SI CIBLE !animation.parametres.centreX {
+            animation.parametres.centreX = Contexte.largeur / 2
+        }
+        
+        SI CIBLE !animation.parametres.centreY {
+            animation.parametres.centreY = Contexte.hauteur / 2
+        }
+        
+        SI CIBLE !animation.parametres.rayon {
+            animation.parametres.rayon = Math.min(Contexte.largeur, Contexte.hauteur) * 0.4
+        }
+        
+        SI CIBLE !animation.parametres.angle {
+            animation.parametres.angle = 0
+        }
+        
+        SI CIBLE !animation.parametres.vitesseRotation {
+            animation.parametres.vitesseRotation = 0.001 // radians par milliseconde
+        }
+        
+        SI CIBLE !animation.parametres.cibles {
+            animation.parametres.cibles = []
+            
+            // Générer quelques cibles aléatoires
+            MUNITION nbCibles = 5 + Math.floor(Math.random() * 10)
+            MUNITION i = 0
+            MANOEUVRE i < nbCibles {
+                MUNITION angle = Math.random() * Math.PI * 2
+                MUNITION distance = Math.random() * animation.parametres.rayon * 0.8
+                
+                DEPLOIEMENT {
+                    x: animation.parametres.centreX + Math.cos(angle) * distance,
+                    y: animation.parametres.centreY + Math.sin(angle) * distance,
+                    taille: 2 + Math.random() * 4,
+                    detecte: false,
+                    tempsDetection: 0
+                } DANS animation.parametres.cibles
+                
+                MUNITION i = i + 1
+            }
+        }
+        
+        // Configurer la fonction de mise à jour
+        animation.mettreAJour = FUSION (tempsEcoule, duree, deltaTemps) {
+            // Récupérer le contexte du calque d'animations
+            MUNITION ctx = Contexte.calques[2].contexte
+            
+            // Effacer le calque
+            ctx.clearRect(0, 0, Contexte.largeur, Contexte.hauteur)
+            
+            // Mettre à jour l'angle du radar
+            animation.parametres.angle = animation.parametres.angle + (animation.parametres.vitesseRotation * deltaTemps)
+            SI CIBLE animation.parametres.angle > Math.PI * 2 {
+                animation.parametres.angle = animation.parametres.angle - Math.PI * 2
+            }
+            
+            // Dessiner le cercle du radar
+            ctx.strokeStyle = Configuration.couleurSecondaire
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.arc(animation.parametres.centreX, animation.parametres.centreY, 
+                   animation.parametres.rayon, 0, Math.PI * 2)
+            ctx.stroke()
+            
+            // Dessiner les cercles concentriques
+            MUNITION i = 1
+            MANOEUVRE i <= 3 {
+                ctx.beginPath()
+                ctx.arc(animation.parametres.centreX, animation.parametres.centreY, 
+                       animation.parametres.rayon * (i / 3), 0, Math.PI * 2)
+                ctx.stroke()
+                MUNITION i = i + 1
+            }
+            
+            // Dessiner les lignes croisées
+            ctx.beginPath()
+            ctx.moveTo(animation.parametres.centreX - animation.parametres.rayon, 
+                      animation.parametres.centreY)
+            ctx.lineTo(animation.parametres.centreX + animation.parametres.rayon, 
+                      animation.parametres.centreY)
+            ctx.stroke()
+            
+            ctx.beginPath()
+            ctx.moveTo(animation.parametres.centreX, 
+                      animation.parametres.centreY - animation.parametres.rayon)
+            ctx.lineTo(animation.parametres.centreX, 
+                      animation.parametres.centreY + animation.parametres.rayon)
+            ctx.stroke()
+            
+            // Dessiner le balayage radar
+            ctx.beginPath()
+            ctx.moveTo(animation.parametres.centreX, animation.parametres.centreY)
+            ctx.lineTo(
+                animation.parametres.centreX + Math.cos(animation.parametres.angle) * animation.parametres.rayon,
+                animation.parametres.centreY + Math.sin(animation.parametres.angle) * animation.parametres.rayon
+            )
+            ctx.strokeStyle = Configuration.couleurAccent
+            ctx.stroke()
+            
+            // Dessiner un arc de balayage semi-transparent
+            ctx.beginPath()
+            ctx.arc(animation.parametres.centreX, animation.parametres.centreY, animation.parametres.rayon,
+                   animation.parametres.angle - 0.3, animation.parametres.angle, false)
+            ctx.lineTo(animation.parametres.centreX, animation.parametres.centreY)
+            ctx.fillStyle = "rgba(0, 255, 170, 0.2)"
+            ctx.fill()
+            
+            // Vérifier et dessiner les cibles
+            MUNITION i = 0
+            MANOEUVRE i < RECONNAISSANCE animation.parametres.cibles {
+                MUNITION cible = animation.parametres.cibles[i]
+                
+                // Calculer l'angle de la cible par rapport au centre
+                MUNITION cibleAngle = Math.atan2(
+                    cible.y - animation.parametres.centreY,
+                    cible.x - animation.parametres.centreX
+                )
+                SI CIBLE cibleAngle < 0 {
+                    MUNITION cibleAngle = cibleAngle + Math.PI * 2
+                }
+                
+                // Vérifier si la cible est dans le balayage actuel
+                MUNITION angleDiff = Math.abs(cibleAngle - animation.parametres.angle)
+                SI CIBLE angleDiff < 0.1 || angleDiff > Math.PI * 2 - 0.1 {
+                    cible.detecte = true
+                    cible.tempsDetection = 2000 // 2 secondes de visibilité
+                }
+                
+                // Décrémenter le temps de détection
+                SI CIBLE cible.detecte {
+                    cible.tempsDetection = cible.tempsDetection - deltaTemps
+                    SI CIBLE cible.tempsDetection <= 0 {
+                        cible.detecte = false
+                    }
+                }
+                
+                // Dessiner la cible si détectée
+                SI CIBLE cible.detecte {
+                    ctx.fillStyle = Configuration.couleurAlerte
+                    ctx.beginPath()
+                    ctx.arc(cible.x, cible.y, cible.taille, 0, Math.PI * 2)
+                    ctx.fill()
+                    
+                    // Dessiner un anneau autour de la cible
+                    ctx.strokeStyle = Configuration.couleurAlerte
+                    ctx.beginPath()
+                    ctx.arc(cible.x, cible.y, cible.taille + 5, 0, Math.PI * 2)
+                    ctx.stroke()
+                }
+                
+                MUNITION i = i + 1
+            }
+        }
+    }
+}
+
+MISSION ConfigurerAnimationTypographie {
+    PARAMETRE animation
+    
+    ORDRE DE BATAILLE {
+        // Configurer les paramètres de l'animation de typographie
+        SI CIBLE !animation.parametres.texte {
+            animation.parametres.texte = "SYSTÈME AGAM GRAPHTAC INITIALISATION..."
+        }
+        
+        SI CIBLE !animation.parametres.x {
+            animation.parametres.x = 50
+        }
+        
+        SI CIBLE !animation.parametres.y {
+            animation.parametres.y = 50
+        }
+        
+        SI CIBLE !animation.parametres.vitesse {
+            animation.parametres.vitesse = 10 // caractères par seconde
+        }
+        
+        SI CIBLE !animation.parametres.couleur {
+            animation.parametres.couleur = Configuration.couleurPrincipale
+        }
+        
+        SI CIBLE !animation.parametres.taille {
+            animation.parametres.taille = 20
+        }
+        
+        SI CIBLE !animation.parametres.police {
+            animation.parametres.police = "monospace"
+        }
+        
+        animation.parametres.positionActuelle = 0
+        
+        // Configurer la fonction de mise à jour
+        animation.mettreAJour = FUSION (tempsEcoule, duree, deltaTemps) {
+            // Récupérer le contexte du calque d'animations
+            MUNITION ctx = Contexte.calques[2].contexte
+            
+            // Effacer le calque
+            ctx.clearRect(0, 0, Contexte.largeur, Contexte.hauteur)
+            
+            // Calculer le nombre de caractères à afficher
+            MUNITION nbCaracteres = Math.min(
+                Math.floor(tempsEcoule / (1000 / animation.parametres.vitesse)),
+                animation.parametres.texte.length
+            )
+            
+            // Dessiner le texte
+            ctx.font = animation.parametres.taille + "px " + animation.parametres.police
+            ctx.fillStyle = animation.parametres.couleur
+            ctx.fillText(
+                animation.parametres.texte.substring(0, nbCaracteres),
+                animation.parametres.x,
+                animation.parametres.y
+            )
+            
+            // Dessiner un curseur clignotant
+            SI CIBLE nbCaracteres < animation.parametres.texte.length {
+                MUNITION tempsClignote = Math.floor(tempsEcoule / 500) % 2
+                SI CIBLE tempsClignote == 0 {
+                    MUNITION largeurCaractere = ctx.measureText(animation.parametres.texte.charAt(nbCaracteres)).width
+                    ctx.fillRect(
+                        animation.parametres.x + ctx.measureText(animation.parametres.texte.substring(0, nbCaracteres)).width,
+                        animation.parametres.y - animation.parametres.taille * 0.8,
+                        largeurCaractere,
+                        animation.parametres.taille
+                    )
+                }
+            }
+        }
+    }
+}
+
+MISSION ConfigurerAnimationClignotement {
+    PARAMETRE animation
+    
+    ORDRE DE BATAILLE {
+        // Configurer les paramètres de l'animation de clignotement
+        SI CIBLE !animation.parametres.element {
+            animation.parametres.element = {
+                x: 100,
+                y: 100,
+                largeur: 50,
+                hauteur: 50
+            }
+        }
+        
+        SI CIBLE !animation.parametres.couleur {
+            animation.parametres.couleur = Configuration.couleurAlerte
+        }
+        
+        SI CIBLE !animation.parametres.frequence {
+            animation.parametres.frequence = 2 // Hz (cycles par seconde)
+        }
+        
+        SI CIBLE !animation.parametres.opaciteMin {
+            animation.parametres.opaciteMin = 0.2
+        }
+        
+        SI CIBLE !animation.parametres.opaciteMax {
+            animation.parametres.opaciteMax = 1.0
+        }
+        
+        // Configurer la fonction de mise à jour
+        animation.mettreAJour = FUSION (tempsEcoule, duree, deltaTemps) {
+            // Récupérer le contexte du calque d'animations
+            MUNITION ctx = Contexte.calques[2].contexte
+            
+            // Effacer le calque à l'emplacement de l'élément
+            ctx.clearRect(
+                animation.parametres.element.x,
+                animation.parametres.element.y,
+                animation.parametres.element.largeur,
+                animation.parametres.element.hauteur
+            )
+            
+            // Calculer l'opacité actuelle
+            MUNITION cycle = (tempsEcoule / 1000) * animation.parametres.frequence
+            MUNITION phase = cycle - Math.floor(cycle) // 0-1
+            MUNITION opacite = animation.parametres.opaciteMin + 
+                              (animation.parametres.opaciteMax - animation.parametres.opaciteMin) * 
+                              (Math.sin(phase * Math.PI * 2) * 0.5 + 0.5)
+            
+            // Dessiner l'élément avec l'opacité calculée
+            MUNITION couleurRGB = HexToRGB(animation.parametres.couleur)
+            ctx.fillStyle = "rgba(" + couleurRGB.r + "," + couleurRGB.g + "," + couleurRGB.b + "," + opacite + ")"
+            ctx.fillRect(
+                animation.parametres.element.x,
+                animation.parametres.element.y,
+                animation.parametres.element.largeur,
+                animation.parametres.element.hauteur
+            )
+        }
+    }
+}
+
+MISSION ConfigurerAnimationPulsation {
+    PARAMETRE animation
+    
+    ORDRE DE BATAILLE {
+        // Configurer les paramètres de l'animation de pulsation
+        SI CIBLE !animation.parametres.x {
+            animation.parametres.x = Contexte.largeur / 2
+        }
+        
+        SI CIBLE !animation.parametres.y {
+            animation.parametres.y = Contexte.hauteur / 2
+        }
+        
+        SI CIBLE !animation.parametres.rayonMin {
+            animation.parametres.rayonMin = 50
+        }
+        
+        SI CIBLE !animation.parametres.rayonMax {
+            animation.parametres.rayonMax = 100
+        }
+        
+        SI CIBLE !animation.parametres.couleur {
+            animation.parametres.couleur = Configuration.couleurAccent
+        }
+        
+        SI CIBLE !animation.parametres.frequence {
+            animation.parametres.frequence = 1 // Hz (cycles par seconde)
+        }
+        
+        SI CIBLE !animation.parametres.opaciteMax {
+            animation.parametres.opaciteMax = 0.5
+        }
+        
+        // Configurer la fonction de mise à jour
+        animation.mettreAJour = FUSION (tempsEcoule, duree, deltaTemps) {
+            // Récupérer le contexte du calque d'animations
+            MUNITION ctx = Contexte.calques[2].contexte
+            
+            // Effacer le calque
+            ctx.clearRect(0, 0, Contexte.largeur, Contexte.hauteur)
+            
+            // Calculer le rayon actuel
+            MUNITION cycle = (tempsEcoule / 1000) * animation.parametres.frequence
+            MUNITION phase = cycle - Math.floor(cycle) // 0-1
+            MUNITION rayon = animation.parametres.rayonMin + 
+                           (animation.parametres.rayonMax - animation.parametres.rayonMin) * 
+                           (Math.sin(phase * Math.PI * 2) * 0.5 + 0.5)
+            
+            // Calculer l'opacité (diminue avec le rayon)
+            MUNITION opacite = animation.parametres.opaciteMax * 
+                             (1 - (rayon - animation.parametres.rayonMin) / 
+                              (animation.parametres.rayonMax - animation.parametres.rayonMin))
+            
+            // Dessiner le cercle pulsant
+            MUNITION couleur
+
+            // Dessiner le cercle pulsant
+            MUNITION couleurRGB = HexToRGB(animation.parametres.couleur)
+            ctx.fillStyle = "rgba(" + couleurRGB.r + "," + couleurRGB.g + "," + couleurRGB.b + "," + opacite + ")"
+            ctx.beginPath()
+            ctx.arc(animation.parametres.x, animation.parametres.y, rayon, 0, Math.PI * 2)
+            ctx.fill()
+            
+            // Dessiner un contour
+            ctx.strokeStyle = animation.parametres.couleur
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.arc(animation.parametres.x, animation.parametres.y, rayon, 0, Math.PI * 2)
+            ctx.stroke()
+        }
+    }
+}
+
+// ===== FONCTIONS DE TERMINAL =====
+MISSION DefinirStyleTerminal {
+    PARAMETRE style
+    
+    ORDRE DE BATAILLE {
+        Contexte.styleTerminal = style
+        
+        // Configurer le style visuel du terminal
+        MUNITION calque = ObtenirCalque "terminal"
+        MUNITION ctx = calque.contexte
+        
+        // Effacer le calque
+        ctx.clearRect(0, 0, Contexte.largeur, Contexte.hauteur)
+        
+        // Définir le style de fond du terminal
+        SELON style {
+            CAS "standard":
+                // Fond noir uni
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"
+                ctx.fillRect(0, 0, Contexte.largeur, Contexte.hauteur)
+                
+                // Bordure verte
+                ctx.strokeStyle = Configuration.couleurPrincipale
+                ctx.lineWidth = 2
+                ctx.strokeRect(5, 5, Contexte.largeur - 10, Contexte.hauteur - 10)
+                PAUSE
+                
+            CAS "matrix":
+                // Fond noir semi-transparent
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)"
+                ctx.fillRect(0, 0, Contexte.largeur, Contexte.hauteur)
+                
+                // Ajouter l'animation Matrix en arrière-plan
+                EXECUTION AjouterAnimation "matrixPluie" {
+                    duree: 0,
+                    boucle: true,
+                    parametres: {
+                        opacite: 0.3
+                    }
+                }
+                PAUSE
+                
+            CAS "tactique":
+                // Fond avec effet radar
+                ctx.fillStyle = "rgba(0, 20, 0, 0.85)"
+                ctx.fillRect(0, 0, Contexte.largeur, Contexte.hauteur)
+                
+                // Ajouter des lignes horizontales
+                ctx.strokeStyle = "rgba(0, 100, 0, 0.5)"
+                ctx.lineWidth = 1
+                
+                MUNITION i = 0
+                MANOEUVRE i < 20 {
+                    ctx.beginPath()
+                    ctx.moveTo(0, i * 30)
+                    ctx.lineTo(Contexte.largeur, i * 30)
+                    ctx.stroke()
+                    MUNITION i = i + 1
+                }
+                
+                // Bordure avec effet technique
+                ctx.strokeStyle = Configuration.couleurAccent
+                ctx.lineWidth = 3
+                ctx.strokeRect(5, 5, Contexte.largeur - 10, Contexte.hauteur - 10)
+                
+                // Ajouter des coins technique
+                MUNITION coinTaille = 20
+                
+                // Coin supérieur gauche
+                ctx.beginPath()
+                ctx.moveTo(5, 25)
+                ctx.lineTo(5, 5)
+                ctx.lineTo(25, 5)
+                ctx.stroke()
+                
+                // Coin supérieur droit
+                ctx.beginPath()
+                ctx.moveTo(Contexte.largeur - 25, 5)
+                ctx.lineTo(Contexte.largeur - 5, 5)
+                ctx.lineTo(Contexte.largeur - 5, 25)
+                ctx.stroke()
+                
+                // Coin inférieur gauche
+                ctx.beginPath()
+                ctx.moveTo(5, Contexte.hauteur - 25)
+                ctx.lineTo(5, Contexte.hauteur - 5)
+                ctx.lineTo(25, Contexte.hauteur - 5)
+                ctx.stroke()
+                
+                // Coin inférieur droit
+                ctx.beginPath()
+                ctx.moveTo(Contexte.largeur - 25, Contexte.hauteur - 5)
+                ctx.lineTo(Contexte.largeur - 5, Contexte.hauteur - 5)
+                ctx.lineTo(Contexte.largeur - 5, Contexte.hauteur - 25)
+                ctx.stroke()
+                
+                // Texte en haut du terminal
+                ctx.fillStyle = Configuration.couleurAccent
+                ctx.font = "bold 14px monospace"
+                ctx.fillText("SYSTÈME AGAM GRAPHTAC v" + Configuration.version, 20, 20)
+                
+                // Ajouter l'animation radar
+                EXECUTION AjouterAnimation "balayageRadar" {
+                    duree: 0,
+                    boucle: true,
+                    parametres: {
+                        centreX: Contexte.largeur - 100,
+                        centreY: Contexte.hauteur - 100,
+                        rayon: 70
+                    }
+                }
+                PAUSE
+                
+            DEFAUT:
+                // Style par défaut
+                EXECUTION DefinirStyleTerminal "standard"
+                PAUSE
+        }
+        
+        // Redessiner le contenu du terminal
+        EXECUTION RafraichirTerminal
+    }
+}
+
+MISSION AfficherTexte {
+    PARAMETRE texte
+    PARAMETRE options = {}
+    
+    ORDRE DE BATAILLE {
+        // Paramètres par défaut
+        MUNITION style = options.style || "standard"
+        MUNITION animation = options.animation || "aucune"
+        MUNITION couleur = options.couleur || Configuration.couleurPrincipale
+        MUNITION delai = options.delai || 0
+        
+        // Ajouter le texte au terminal
+        DEPLOIEMENT texte DANS Contexte.lignesTerminal
+        
+        // Supprimer les lignes en excès
+        MANOEUVRE RECONNAISSANCE Contexte.lignesTerminal > Contexte.nbLignesVisibles {
+            Contexte.lignesTerminal.shift() // Supprimer la première ligne
+        }
+        
+        // Mettre à jour l'affichage du terminal
+        EXECUTION RafraichirTerminal
+        
+        // Ajouter une animation si demandée
+        SELON animation {
+            CAS "typographie":
+                EXECUTION AjouterAnimation "typographie" {
+                    duree: texte.length * 100,
+                    parametres: {
+                        texte: texte,
+                        x: 20,
+                        y: Contexte.hauteur - 40,
+                        couleur: couleur
+                    }
+                }
+                PAUSE
+                
+            CAS "clignotement":
+                EXECUTION AjouterAnimation "clignotement" {
+                    duree: 2000,
+                    parametres: {
+                        element: {
+                            x: 10,
+                            y: Contexte.hauteur - 70,
+                            largeur: Contexte.largeur - 20,
+                            hauteur: 25
+                        },
+                        couleur: couleur,
+                        frequence: 4
+                    }
+                }
+                PAUSE
+        }
+    }
+}
+
+MISSION RafraichirTerminal {
+    ORDRE DE BATAILLE {
+        // Récupérer le contexte du calque du terminal
+        MUNITION calque = ObtenirCalque "terminal"
+        MUNITION ctx = calque.contexte
+        
+        // Définir la hauteur de la zone de texte
+        MUNITION hauteurTexte = Contexte.hauteur - 100
+        MUNITION debutTexte = 50
+        
+        // Effacer la zone de texte
+        ctx.clearRect(10, debutTexte, Contexte.largeur - 20, hauteurTexte)
+        
+        // Définir le style de texte
+        ctx.font = Contexte.tailleCaractere + "pt monospace"
+        ctx.fillStyle = Configuration.couleurPrincipale
+        
+        // Dessiner chaque ligne de texte
+        MUNITION ligneTaille = Contexte.tailleCaractere * 1.5
+        MUNITION i = 0
+        MANOEUVRE i < RECONNAISSANCE Contexte.lignesTerminal {
+            MUNITION ligne = Contexte.lignesTerminal[i]
+            MUNITION y = debutTexte + (i + 1) * ligneTaille
+            
+            // Définir la couleur en fonction du contenu
+            SI CIBLE ligne.startsWith("Erreur:") {
+                ctx.fillStyle = Configuration.couleurAlerte
+            }
+            SINON SI CIBLE ligne.startsWith(">") {
+                ctx.fillStyle = Configuration.couleurAccent
+            }
+            SINON SI CIBLE ligne.startsWith("✓") {
+                ctx.fillStyle = Configuration.couleurInfo
+            }
+            SINON {
+                ctx.fillStyle = Configuration.couleurPrincipale
+            }
+            
+            ctx.fillText(ligne, 20, y)
+            MUNITION i = i + 1
+        }
+        
+        // Dessiner le prompt en bas
+        ctx.fillStyle = Configuration.couleurAccent
+        ctx.fillText("> " + Contexte.promptActuel, 20, hauteurTexte + debutTexte + ligneTaille)
+    }
+}
+
+MISSION DessinerCurseurClignotant {
+    ORDRE DE BATAILLE {
+        // Récupérer le contexte du calque du terminal
+        MUNITION calque = ObtenirCalque "terminal"
+        MUNITION ctx = calque.contexte
+        
+        // Faire clignoter le curseur toutes les 500ms
+        MUNITION tempsActuel = ObtiendreDateActuelle()
+        MUNITION clignote = Math.floor(tempsActuel / 500) % 2
+        
+        SI CIBLE clignote == 0 {
+            // Calculer la position du curseur
+            MUNITION hauteurTexte = Contexte.hauteur - 100
+            MUNITION debutTexte = 50
+            MUNITION ligneTaille = Contexte.tailleCaractere * 1.5
+            MUNITION cursorY = hauteurTexte + debutTexte + ligneTaille - Contexte.tailleCaractere
+            
+            // Dessiner le curseur
+            ctx.fillStyle = Configuration.couleurAccent
+            ctx.fillRect(20 + Contexte.positionCurseur * Contexte.tailleCaractere * 0.6, 
+                        cursorY, Contexte.tailleCaractere * 0.6, Contexte.tailleCaractere)
+        }
+    }
+}
+
+// ===== INTERFACE UTILISATEUR =====
+MISSION CreerBouton {
+    PARAMETRE texte
+    PARAMETRE x
+    PARAMETRE y
+    PARAMETRE largeur
+    PARAMETRE hauteur
+    PARAMETRE action
+    PARAMETRE options = {}
+    
+    ORDRE DE BATAILLE {
+        // Récupérer le contexte du calque d'interface
+        MUNITION calque = ObtenirCalque "interface"
+        MUNITION ctx = calque.contexte
+        
+        // Paramètres par défaut
+        MUNITION couleurFond = options.couleurFond || Configuration.couleurSecondaire
+        MUNITION couleurTexte = options.couleurTexte || Configuration.couleurPrincipale
+        MUNITION couleurBordure = options.couleurBordure || Configuration.couleurAccent
+        MUNITION epaisseurBordure = options.epaisseurBordure || 2
+        MUNITION style = options.style || "standard"
+        
+        // Créer l'objet bouton
+        MUNITION bouton = {
+            texte: texte,
+            x: x,
+            y: y,
+            largeur: largeur,
+            hauteur: hauteur,
+            action: action,
+            options: options,
+            survol: false
+        }
+        
+        // Dessiner le bouton
+        EXECUTION DessinerBouton bouton
+        
+        // Ajouter au gestionnaire d'événements
+        EXECUTION AjouterEvenementBouton bouton
+        
+        RETRAITE bouton
+    }
+}
+
+MISSION DessinerBouton {
+    PARAMETRE bouton
+    
+    ORDRE DE BATAILLE {
+        // Récupérer le contexte du calque d'interface
+        MUNITION calque = ObtenirCalque "interface"
+        MUNITION ctx = calque.contexte
+        
+        // Effacer la zone du bouton
+        ctx.clearRect(bouton.x - 2, bouton.y - 2, bouton.largeur + 4, bouton.hauteur + 4)
+        
+        // Style du bouton
+        SELON bouton.options.style || "standard" {
+            CAS "standard":
+                // Fond du bouton
+                ctx.fillStyle = bouton.options.couleurFond || Configuration.couleurSecondaire
+                ctx.fillRect(bouton.x, bouton.y, bouton.largeur, bouton.hauteur)
+                
+                // Bordure du bouton
+                ctx.strokeStyle = bouton.options.couleurBordure || Configuration.couleurAccent
+                ctx.lineWidth = bouton.options.epaisseurBordure || 2
+                ctx.strokeRect(bouton.x, bouton.y, bouton.largeur, bouton.hauteur)
+                PAUSE
+                
+            CAS "tactique":
+                // Fond du bouton avec dégradé
+                MUNITION gradient = ctx.createLinearGradient(bouton.x, bouton.y, bouton.x, bouton.y + bouton.hauteur)
+                gradient.addColorStop(0, "rgba(0, 40, 0, 0.8)")
+                gradient.addColorStop(1, "rgba(0, 60, 0, 0.8)")
+                ctx.fillStyle = gradient
+                ctx.fillRect(bouton.x, bouton.y, bouton.largeur, bouton.hauteur)
+                
+                // Bordure techno
+                ctx.strokeStyle = bouton.options.couleurBordure || Configuration.couleurAccent
+                ctx.lineWidth = bouton.options.epaisseurBordure || 2
+                
+                // Coins techniques (angles)
+                MUNITION coinTaille = 10
+                
+                // Coin supérieur gauche
+                ctx.beginPath()
+                ctx.moveTo(bouton.x, bouton.y + coinTaille)
+                ctx.lineTo(bouton.x, bouton.y)
+                ctx.lineTo(bouton.x + coinTaille, bouton.y)
+                ctx.stroke()
+                
+                // Coin supérieur droit
+                ctx.beginPath()
+                ctx.moveTo(bouton.x + bouton.largeur - coinTaille, bouton.y)
+                ctx.lineTo(bouton.x + bouton.largeur, bouton.y)
+                ctx.lineTo(bouton.x + bouton.largeur, bouton.y + coinTaille)
+                ctx.stroke()
+                
+                // Coin inférieur gauche
+                ctx.beginPath()
+                ctx.moveTo(bouton.x, bouton.y + bouton.hauteur - coinTaille)
+                ctx.lineTo(bouton.x, bouton.y + bouton.hauteur)
+                ctx.lineTo(bouton.x + coinTaille, bouton.y + bouton.hauteur)
+                ctx.stroke()
+                
+                // Coin inférieur droit
+                ctx.beginPath()
+                ctx.moveTo(bouton.x + bouton.largeur - coinTaille, bouton.y + bouton.hauteur)
+                ctx.lineTo(bouton.x + bouton.largeur, bouton.y + bouton.hauteur)
+                ctx.lineTo(bouton.x + bouton.largeur, bouton.y + bouton.hauteur - coinTaille)
+                ctx.stroke()
+                PAUSE
+                
+            DEFAUT:
+                // Style par défaut
+                EXECUTION DessinerBouton bouton
+                PAUSE
+        }
+        
+        // Effet de survol
+        SI CIBLE bouton.survol {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.1)"
+            ctx.fillRect(bouton.x, bouton.y, bouton.largeur, bouton.hauteur)
+        }
+        
+        // Texte du bouton
+        ctx.fillStyle = bouton.options.couleurTexte || Configuration.couleurPrincipale
+        ctx.font = "14px monospace"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(bouton.texte, bouton.x + bouton.largeur / 2, bouton.y + bouton.hauteur / 2)
+    }
+}
+
+MISSION AjouterEvenementBouton {
+    PARAMETRE bouton
+    
+    ORDRE DE BATAILLE {
+        // Ajouter les gestionnaires d'événements pour ce bouton
+        Contexte.canvas.addEventListener("mousemove", EXECUTION (e) {
+            MUNITION rect = Contexte.canvas.getBoundingClientRect()
+            MUNITION mouseX = e.clientX - rect.left
+            MUNITION mouseY = e.clientY - rect.top
+            
+            // Vérifier si la souris est sur le bouton
+            MUNITION surBouton = 
+                mouseX >= bouton.x && 
+                mouseX <= bouton.x + bouton.largeur &&
+                mouseY >= bouton.y && 
+                mouseY <= bouton.y + bouton.hauteur
+            
+            // Mettre à jour l'état de survol
+            SI CIBLE surBouton != bouton.survol {
+                bouton.survol = surBouton
+                EXECUTION DessinerBouton bouton
+            }
+        })
+        
+        Contexte.canvas.addEventListener("click", EXECUTION (e) {
+            MUNITION rect = Contexte.canvas.getBoundingClientRect()
+            MUNITION mouseX = e.clientX - rect.left
+            MUNITION mouseY = e.clientY - rect.top
+            
+            // Vérifier si le clic est sur le bouton
+            SI CIBLE mouseX >= bouton.x && 
+                   mouseX <= bouton.x + bouton.largeur &&
+                   mouseY >= bouton.y && 
+                   mouseY <= bouton.y + bouton.hauteur {
+                // Exécuter l'action du bouton
+                bouton.action()
+            }
+        })
+    }
+}
+
+// ===== UTILITAIRES =====
+MISSION ObtenirCalque {
+    PARAMETRE nom
+    
+    ORDRE DE BATAILLE {
+        POUR calque DANS Contexte.calques {
+            SI CIBLE calque.nom VERIFICATION nom {
+                RETRAITE calque
+            }
+        }
+        
+        RETRAITE null
+    }
+}
+
+MISSION HexToRGB {
+    PARAMETRE hex
+    
+    ORDRE DE BATAILLE {
+        // Convertir une couleur hex (#RRGGBB) en valeurs RGB
+        MUNITION result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+        
+        SI CIBLE !result {
+            RETRAITE {r: 0, g: 255, b: 0} // Valeur par défaut (vert)
+        }
+        
+        RETRAITE {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        }
+    }
+}
+
+MISSION ObtiendreDateActuelle {
+    ORDRE DE BATAILLE {
+        RETRAITE Date.now()
+    }
+}
+
+MISSION NombreEspaces {
+    PARAMETRE nombre
+    
+    ORDRE DE BATAILLE {
+        MUNITION espaces = ""
+        
+        MUNITION i = 0
+        MANOEUVRE i < nombre {
+            MUNITION espaces = espaces + " "
+            MUNITION i = i + 1
+        }
+        
+        RETRAITE espaces
+    }
+}
+
+MISSION ConvertirNombre {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        RETRAITE parseInt(texte) || 0
+    }
+}
+
+MISSION Aleatoire {
+    PARAMETRE max
+    
+    ORDRE DE BATAILLE {
+        RETRAITE Math.floor(Math.random() * max)
+    }
+}
+
+MISSION Delai {
+    PARAMETRE secondes
+    
+    ORDRE DE BATAILLE {
+        // Cette fonction simulera un délai (dans un vrai système, ce serait un sleep/wait)
+        // En JavaScript, nous utilisons setTimeout qui est asynchrone
+        setTimeout(FUSION () {}, secondes * 1000)
+    }
+}
+
+// ===== MODULE EXPORTÉ =====
+RETRAITE {
+    // Fonctions principales
+    initialiser: Initialisation,
+    definirStyle: DefinirStyleTerminal,
+    afficherTexte: AfficherTexte,
+    
+    // Animations
+    ajouterAnimation: AjouterAnimation,
+    
+    // Interface utilisateur
+    creerBouton: CreerBouton,
+    
+    // Utilitaires
+    aleatoire: Aleatoire,
+    delai: Delai,
+    
+    // Configuration
+    configuration: Configuration,
+    
+    // Accès aux contextes
+    obtenirContexte: FUSION () { RETRAITE Contexte }
+}
+
+FIN BASE

@@ -1,0 +1,2114 @@
+BASE SYSTEME_AUDIT_CODE
+
+STRATEGIE ConfigurationAudit {
+    FORMATION aspects = [
+        {
+            type: "SECURITE",
+            regles: [
+                "INJECTION",
+                "BUFFER_OVERFLOW",
+                "VALIDATION_ENTREES",
+                "AUTHENTICITE"
+            ],
+            severite: "CRITIQUE"
+        },
+        {
+            type: "CONFORMITE",
+            regles: [
+                "STANDARDS",
+                "CONVENTIONS",
+                "LICENCES",
+                "DOCUMENTATION"
+            ],
+            severite: "HAUTE"
+        },
+        {
+            type: "ARCHITECTURE",
+            regles: [
+                "COUPLAGE",
+                "COHERENCE",
+                "MODULARITE",
+                "EXTENSIBILITE"
+            ],
+            severite: "MOYENNE"
+        }
+    ]
+
+    STRATEGIE parametres = {
+        profondeur: "COMPLETE",
+        rapports: "DETAILLES",
+        mesures_correctives: VRAI
+    }
+}
+
+MISSION AuditCode {
+    PARAMETRE base_code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            aspects: [],
+            vulnerabilites: [],
+            mesures: []
+        }
+        
+        # Phase 1: Audit de sécurité
+        POUR regle DANS ConfigurationAudit.aspects[0].regles {
+            EXECUTION AuditerSecurite base_code regle rapport
+        }
+        
+        # Phase 2: Audit de conformité
+        POUR regle DANS ConfigurationAudit.aspects[1].regles {
+            EXECUTION AuditerConformite base_code regle rapport
+        }
+        
+        # Phase 3: Audit d'architecture
+        POUR regle DANS ConfigurationAudit.aspects[2].regles {
+            EXECUTION AuditerArchitecture base_code regle rapport
+        }
+        
+        # Classification des problèmes
+        EXECUTION ClassifierProblemes rapport
+        
+        # Génération des recommandations
+        SI CIBLE ConfigurationAudit.parametres.mesures_correctives {
+            EXECUTION GenererRecommandations rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION DetecterVulnerabilites {
+    PARAMETRE code
+    PARAMETRE modele_vulnerabilite
+    
+    ORDRE DE BATAILLE {
+        FORMATION vulnerabilites = []
+        
+        # Analyse basée sur des patterns
+        POUR pattern DANS modele_vulnerabilite.patterns {
+            FORMATION occurrences = RECHERCHER_PATTERN code pattern
+            
+            POUR occurrence DANS occurrences {
+                SI CIBLE EstVulnerabilite occurrence modele_vulnerabilite {
+                    vulnerabilites = DEPLOIEMENT vulnerabilites {
+                        type: modele_vulnerabilite.type,
+                        localisation: occurrence.position,
+                        severite: modele_vulnerabilite.severite,
+                        description: modele_vulnerabilite.description
+                    }
+                }
+            }
+        }
+        
+        RETRAITE vulnerabilites
+    }
+}
+
+FIN BASE
+
+BASE SYSTEME_AUDIT_CODE_UTILS
+
+# 
+# Utilitaires pour le système d'audit de code
+# Ce module complète le système d'audit déjà défini
+#
+
+STRATEGIE ConfigurationAuditUtils {
+    max_profondeur_analyse: 10,
+    max_items_rapport: 1000,
+    max_taille_fichier_kb: 10240, # 10 MB
+    ignorer_commentaires: FAUX,
+    formats_rapport: ["TXT", "HTML", "JSON"],
+    format_rapport_defaut: "HTML",
+    niveau_log: "STANDARD"  # MINIMAL, STANDARD, VERBOSE
+}
+
+MISSION InitialiserAuditUtils {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation des utilitaires d'audit de code AGAM"
+        
+        # Configurer le système avec les options par défaut
+        STRATEGIE config = ConfigurationAuditUtils
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet de configuration des utilitaires
+        STRATEGIE audit_utils = {
+            configuration: config,
+            cache_fichiers: {},
+            cache_analyses: {},
+            compteur_audits: 0
+        }
+        
+        RAPPORT "Utilitaires d'audit de code initialisés"
+        
+        RETRAITE audit_utils
+    }
+}
+
+MISSION AnalyserFichier {
+    PARAMETRE chemin_fichier
+    PARAMETRE aspects_audit
+    PARAMETRE options_audit
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Analyse du fichier: " + chemin_fichier
+        
+        # Vérifier si les aspects d'audit sont spécifiés
+        SI CIBLE aspects_audit == NULE OU RECONNAISSANCE aspects_audit == 0 {
+            RAPPORT "ERREUR: Aucun aspect d'audit spécifié"
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Aucun aspect d'audit spécifié",
+                resultats: NULE
+            }
+        }
+        
+        # Initialiser les options par défaut
+        STRATEGIE options = {
+            ignorer_commentaires: ConfigurationAuditUtils.ignorer_commentaires,
+            max_problemes: ConfigurationAuditUtils.max_items_rapport,
+            inclure_contexte: VRAI,
+            lignes_contexte: 2
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options_audit != NULE {
+            POUR cle DANS CLES(options_audit) {
+                options[cle] = options_audit[cle]
+            }
+        }
+        
+        # Lire le contenu du fichier
+        STRATEGIE contenu = EXECUTION LireFichier chemin_fichier
+        
+        SI CIBLE contenu == NULE {
+            RAPPORT "ERREUR: Impossible de lire le fichier: " + chemin_fichier
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Impossible de lire le fichier",
+                resultats: NULE
+            }
+        }
+        
+        # Vérifier la taille du fichier
+        SI CIBLE RECONNAISSANCE contenu > ConfigurationAuditUtils.max_taille_fichier_kb * 1024 {
+            RAPPORT "ERREUR: Taille du fichier supérieure à la limite (" + ConfigurationAuditUtils.max_taille_fichier_kb + " KB)"
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Taille du fichier trop importante",
+                resultats: NULE
+            }
+        }
+        
+        # Analyser la syntaxe du fichier
+        STRATEGIE syntaxe = EXECUTION AnalyserSyntaxeAGAM contenu
+        
+        SI CIBLE syntaxe == NULE OU syntaxe.erreurs ET RECONNAISSANCE syntaxe.erreurs > 0 {
+            RAPPORT "ERREUR: Erreurs de syntaxe dans le fichier: " + chemin_fichier
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Erreurs de syntaxe",
+                erreurs_syntaxe: syntaxe.erreurs,
+                resultats: NULE
+            }
+        }
+        
+        # Résultats d'audit pour chaque aspect
+        FORMATION resultats = []
+        
+        # Exécuter l'audit pour chaque
+
+        BASE SYSTEME_AUDIT_CODE_UTILS
+
+# 
+# Utilitaires pour le système d'audit de code
+# Ce module complète le système d'audit déjà défini
+#
+
+STRATEGIE ConfigurationAuditUtils {
+    max_profondeur_analyse: 10,
+    max_items_rapport: 1000,
+    max_taille_fichier_kb: 10240, # 10 MB
+    ignorer_commentaires: FAUX,
+    formats_rapport: ["TXT", "HTML", "JSON"],
+    format_rapport_defaut: "HTML",
+    niveau_log: "STANDARD"  # MINIMAL, STANDARD, VERBOSE
+}
+
+MISSION InitialiserAuditUtils {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation des utilitaires d'audit de code AGAM"
+        
+        # Configurer le système avec les options par défaut
+        STRATEGIE config = ConfigurationAuditUtils
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet de configuration des utilitaires
+        STRATEGIE audit_utils = {
+            configuration: config,
+            cache_fichiers: {},
+            cache_analyses: {},
+            compteur_audits: 0
+        }
+        
+        RAPPORT "Utilitaires d'audit de code initialisés"
+        
+        RETRAITE audit_utils
+    }
+}
+
+MISSION AnalyserFichier {
+    PARAMETRE chemin_fichier
+    PARAMETRE aspects_audit
+    PARAMETRE options_audit
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Analyse du fichier: " + chemin_fichier
+        
+        # Vérifier si les aspects d'audit sont spécifiés
+        SI CIBLE aspects_audit == NULE OU RECONNAISSANCE aspects_audit == 0 {
+            RAPPORT "ERREUR: Aucun aspect d'audit spécifié"
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Aucun aspect d'audit spécifié",
+                resultats: NULE
+            }
+        }
+        
+        # Initialiser les options par défaut
+        STRATEGIE options = {
+            ignorer_commentaires: ConfigurationAuditUtils.ignorer_commentaires,
+            max_problemes: ConfigurationAuditUtils.max_items_rapport,
+            inclure_contexte: VRAI,
+            lignes_contexte: 2
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options_audit != NULE {
+            POUR cle DANS CLES(options_audit) {
+                options[cle] = options_audit[cle]
+            }
+        }
+        
+        # Lire le contenu du fichier
+        STRATEGIE contenu = EXECUTION LireFichier chemin_fichier
+        
+        SI CIBLE contenu == NULE {
+            RAPPORT "ERREUR: Impossible de lire le fichier: " + chemin_fichier
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Impossible de lire le fichier",
+                resultats: NULE
+            }
+        }
+        
+        # Vérifier la taille du fichier
+        SI CIBLE RECONNAISSANCE contenu > ConfigurationAuditUtils.max_taille_fichier_kb * 1024 {
+            RAPPORT "ERREUR: Taille du fichier supérieure à la limite (" + ConfigurationAuditUtils.max_taille_fichier_kb + " KB)"
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Taille du fichier trop importante",
+                resultats: NULE
+            }
+        }
+        
+        # Analyser la syntaxe du fichier
+        STRATEGIE syntaxe = EXECUTION AnalyserSyntaxeAGAM contenu
+        
+        SI CIBLE syntaxe == NULE OU syntaxe.erreurs ET RECONNAISSANCE syntaxe.erreurs > 0 {
+            RAPPORT "ERREUR: Erreurs de syntaxe dans le fichier: " + chemin_fichier
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Erreurs de syntaxe",
+                erreurs_syntaxe: syntaxe.erreurs,
+                resultats: NULE
+            }
+        }
+        
+        # Résultats d'audit pour chaque aspect
+        FORMATION resultats = []
+        
+        # Exécuter l'audit pour chaque aspect
+        POUR aspect DANS aspects_audit {
+            # Sélectionner l'auditeur approprié selon le type d'aspect
+            STRATEGIE resultat_aspect = NULE
+            
+            SI CIBLE aspect.type == "SECURITE" {
+                resultat_aspect = EXECUTION AuditerSecurite syntaxe aspect options
+            } SINON SI CIBLE aspect.type == "CONFORMITE" {
+                resultat_aspect = EXECUTION AuditerConformite syntaxe aspect options
+            } SINON SI CIBLE aspect.type == "ARCHITECTURE" {
+                resultat_aspect = EXECUTION AuditerArchitecture syntaxe aspect options
+            } SINON {
+                RAPPORT "AVERTISSEMENT: Type d'aspect non supporté: " + aspect.type
+                CONTINUER
+            }
+            
+            # Ajouter les résultats si disponibles
+            SI CIBLE resultat_aspect != NULE {
+                resultats = DEPLOIEMENT resultats resultat_aspect
+            }
+        }
+        
+        # Compter les problèmes par sévérité
+        STRATEGIE problemes_par_severite = {
+            CRITIQUE: 0,
+            HAUTE: 0,
+            MOYENNE: 0,
+            BASSE: 0
+        }
+        
+        POUR resultat DANS resultats {
+            POUR probleme DANS resultat.problemes {
+                problemes_par_severite[probleme.severite] = problemes_par_severite[probleme.severite] + 1
+            }
+        }
+        
+        RAPPORT "Analyse terminée: " + 
+               (problemes_par_severite.CRITIQUE + problemes_par_severite.HAUTE + 
+                problemes_par_severite.MOYENNE + problemes_par_severite.BASSE) + 
+               " problèmes trouvés"
+        
+        RETRAITE {
+            succes: VRAI,
+            fichier: chemin_fichier,
+            resultats: resultats,
+            statistiques: {
+                problemes_critiques: problemes_par_severite.CRITIQUE,
+                problemes_hauts: problemes_par_severite.HAUTE,
+                problemes_moyens: problemes_par_severite.MOYENNE,
+                problemes_bas: problemes_par_severite.BASSE
+            }
+        }
+    }
+}
+
+MISSION AuditerSecurite {
+    PARAMETRE syntaxe
+    PARAMETRE aspect
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Audit de sécurité en cours"
+        
+        # Résultat de l'audit pour cet aspect
+        STRATEGIE resultat = {
+            type: "SECURITE",
+            problemes: []
+        }
+        
+        # Vérifier les règles de sécurité spécifiées
+        POUR regle DANS aspect.regles {
+            RAPPORT "Vérification de la règle de sécurité: " + regle
+            
+            # Sélectionner le détecteur approprié selon la règle
+            FORMATION problemes_regle = []
+            
+            SI CIBLE regle == "INJECTION" {
+                problemes_regle = EXECUTION DetecterVulnerabilitesInjection syntaxe
+            } SINON SI CIBLE regle == "BUFFER_OVERFLOW" {
+                problemes_regle = EXECUTION DetecterVulnerabilitesBufferOverflow syntaxe
+            } SINON SI CIBLE regle == "VALIDATION_ENTREES" {
+                problemes_regle = EXECUTION DetecterVulnerabilitesValidationEntrees syntaxe
+            } SINON SI CIBLE regle == "AUTHENTICITE" {
+                problemes_regle = EXECUTION DetecterVulnerabilitesAuthenticite syntaxe
+            } SINON {
+                RAPPORT "AVERTISSEMENT: Règle de sécurité non supportée: " + regle
+                CONTINUER
+            }
+            
+            # Ajouter les problèmes détectés
+            POUR probleme DANS problemes_regle {
+                # Enrichir avec les informations de contexte
+                probleme.regle = regle
+                probleme.type = "SECURITE"
+                
+                # Ajouter le contexte du code si configuré
+                SI CIBLE options.inclure_contexte {
+                    probleme.contexte = EXECUTION ExtraireContexte syntaxe.contenu probleme.position options.lignes_contexte
+                }
+                
+                resultat.problemes = DEPLOIEMENT resultat.problemes probleme
+                
+                # Vérifier la limite de problèmes
+                SI CIBLE RECONNAISSANCE resultat.problemes >= options.max_problemes {
+                    RAPPORT "AVERTISSEMENT: Limite de problèmes atteinte (" + options.max_problemes + ")"
+                    RUPTURE
+                }
+            }
+        }
+        
+        RAPPORT "Audit de sécurité terminé: " + RECONNAISSANCE resultat.problemes + " problèmes trouvés"
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION DetecterVulnerabilitesInjection {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Rechercher les patterns d'injection dans le code
+        FORMATION patterns = [
+            {
+                pattern: "SURVEILLANCE\\s*\\([^)]*\\$",
+                description: "Possible injection: Utilisation directe d'entrée utilisateur dans une fonction de surveillance",
+                severite: "CRITIQUE"
+            },
+            {
+                pattern: "FUSION\\s*\\([^)]*SURVEILLANCE",
+                description: "Possible injection: Fusion d'entrée utilisateur sans validation préalable",
+                severite: "CRITIQUE"
+            },
+            {
+                pattern: "EXECUTION\\s*\\([^)]*SURVEILLANCE",
+                description: "Possible injection de code: Exécution d'entrée utilisateur sans validation",
+                severite: "CRITIQUE"
+            }
+        ]
+        
+        # Parcourir chaque base et mission pour rechercher ces patterns
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                POUR pattern DANS patterns {
+                    FORMATION occurrences = EXECUTION RechercherPattern mission.code pattern.pattern
+                    
+                    POUR occurrence DANS occurrences {
+                        # Vérifier si ce n'est pas un faux positif
+                        SI CIBLE !EXECUTION EstFauxPositifInjection occurrence mission.code {
+                            STRATEGIE probleme = {
+                                description: pattern.description,
+                                severite: pattern.severite,
+                                position: {
+                                    ligne: CalculerLigne mission.position.ligne occurrence.index mission.code,
+                                    colonne: CalculerColonne occurrence.index mission.code
+                                },
+                                code: occurrence.texte
+                            }
+                            
+                            problemes = DEPLOIEMENT problemes probleme
+                        }
+                    }
+                }
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION EstFauxPositifInjection {
+    PARAMETRE occurrence
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si l'occurrence est précédée d'une validation
+        MUNITION index_debut = MAX(0, occurrence.index - 100)
+        MUNITION contexte_avant = SOUS_CHAINE code index_debut (occurrence.index - index_debut)
+        
+        # Patterns de validation couramment utilisés
+        FORMATION patterns_validation = [
+            "VERIFICATION\\s*\\([^)]*\\)",
+            "VALIDATION\\s*\\([^)]*\\)",
+            "ASSAINIR\\s*\\([^)]*\\)",
+            "FILTRER\\s*\\([^)]*\\)"
+        ]
+        
+        POUR pattern DANS patterns_validation {
+            SI CIBLE EXECUTION ContientPattern contexte_avant pattern {
+                RETRAITE VRAI  # C'est probablement un faux positif
+            }
+        }
+        
+        RETRAITE FAUX  # Ce n'est pas un faux positif
+    }
+}
+
+MISSION DetecterVulnerabilitesBufferOverflow {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Rechercher les patterns de débordement de tampon dans le code
+        FORMATION patterns = [
+            {
+                pattern: "FORMATION\\s*[^\\{]*\\{[^\\}]*\\}\\s*SANS\\s*VERIFICATION",
+                description: "Possible débordement de tampon: Définition de tableau sans vérification de limites",
+                severite: "HAUTE"
+            },
+            {
+                pattern: "COPIE\\s*SANS\\s*LIMITE",
+                description: "Possible débordement de tampon: Copie sans vérification de limites",
+                severite: "CRITIQUE"
+            },
+            {
+                pattern: "INSERTION\\s*[^\\(]*\\([^)]*\\)\\s*SANS\\s*VERIFICATION",
+                description: "Possible débordement de tampon: Insertion sans vérification de limites",
+                severite: "HAUTE"
+            }
+        ]
+        
+        # Parcourir chaque base et mission pour rechercher ces patterns
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                POUR pattern DANS patterns {
+                    FORMATION occurrences = EXECUTION RechercherPattern mission.code pattern.pattern
+                    
+                    POUR occurrence DANS occurrences {
+                        STRATEGIE probleme = {
+                            description: pattern.description,
+                            severite: pattern.severite,
+                            position: {
+                                ligne: CalculerLigne mission.position.ligne occurrence.index mission.code,
+                                colonne: CalculerColonne occurrence.index mission.code
+                            },
+                            code: occurrence.texte
+                        }
+                        
+                        problemes = DEPLOIEMENT problemes probleme
+                    }
+                }
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION DetecterVulnerabilitesValidationEntrees {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Rechercher les patterns de validation d'entrées manquantes
+        FORMATION patterns = [
+            {
+                pattern: "SURVEILLANCE\\s*[^\\{]*\\{[^\\}]*\\}\\s*SANS\\s*VALIDATION",
+                description: "Validation d'entrée manquante: Surveillance d'entrée sans validation",
+                severite: "HAUTE"
+            },
+            {
+                pattern: "EXTRACTION\\s*[^\\(]*\\([^)]*\\)\\s*SANS\\s*VALIDATION",
+                description: "Validation d'entrée manquante: Extraction de données sans validation",
+                severite: "MOYENNE"
+            }
+        ]
+        
+        # Parcourir chaque base et mission pour rechercher ces patterns
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                POUR pattern DANS patterns {
+                    FORMATION occurrences = EXECUTION RechercherPattern mission.code pattern.pattern
+                    
+                    POUR occurrence DANS occurrences {
+                        STRATEGIE probleme = {
+                            description: pattern.description,
+                            severite: pattern.severite,
+                            position: {
+                                ligne: CalculerLigne mission.position.ligne occurrence.index mission.code,
+                                colonne: CalculerColonne occurrence.index mission.code
+                            },
+                            code: occurrence.texte
+                        }
+                        
+                        problemes = DEPLOIEMENT problemes probleme
+                    }
+                }
+                
+                # Détecter également les patterns de paramètres non validés
+                SI CIBLE mission.parametres ET RECONNAISSANCE mission.parametres > 0 {
+                    STRATEGIE parametres_valides = EXECUTION VerifierValidationParametres mission
+                    
+                    POUR parametre DANS mission.parametres {
+                        SI CIBLE !EXECUTION ContientElement parametres_valides parametre.nom {
+                            STRATEGIE probleme = {
+                                description: "Paramètre non validé: Le paramètre '" + parametre.nom + "' n'est pas validé avant utilisation",
+                                severite: "MOYENNE",
+                                position: parametre.position,
+                                code: "PARAMETRE " + parametre.nom
+                            }
+                            
+                            problemes = DEPLOIEMENT problemes probleme
+                        }
+                    }
+                }
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION VerifierValidationParametres {
+    PARAMETRE mission
+    
+    ORDRE DE BATAILLE {
+        FORMATION parametres_valides = []
+        
+        # Rechercher les validations de paramètres dans le code de la mission
+        POUR parametre DANS mission.parametres {
+            STRATEGIE pattern = "VALIDATION\\s*[^\\(]*\\([^)]*" + parametre.nom
+            FORMATION occurrences = EXECUTION RechercherPattern mission.code pattern
+            
+            SI CIBLE RECONNAISSANCE occurrences > 0 {
+                parametres_valides = DEPLOIEMENT parametres_valides parametre.nom
+                CONTINUER
+            }
+            
+            # Rechercher également les vérifications
+            pattern = "VERIFICATION\\s*[^\\(]*\\([^)]*" + parametre.nom
+            occurrences = EXECUTION RechercherPattern mission.code pattern
+            
+            SI CIBLE RECONNAISSANCE occurrences > 0 {
+                parametres_valides = DEPLOIEMENT parametres_valides parametre.nom
+            }
+        }
+        
+        RETRAITE parametres_valides
+    }
+}
+
+MISSION DetecterVulnerabilitesAuthenticite {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Rechercher les patterns d'authentification faibles
+        FORMATION patterns = [
+            {
+                pattern: "AUTORISATION\\s*SANS\\s*VERIFICATION",
+                description: "Vulnérabilité d'authenticité: Autorisation sans vérification d'identité",
+                severite: "CRITIQUE"
+            },
+            {
+                pattern: "ACCES\\s*DIRECT\\s*[^\\(]*\\([^)]*\\)",
+                description: "Vulnérabilité d'authenticité: Accès direct sans contrôle d'autorisation",
+                severite: "HAUTE"
+            }
+        ]
+        
+        # Parcourir chaque base et mission pour rechercher ces patterns
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                POUR pattern DANS patterns {
+                    FORMATION occurrences = EXECUTION RechercherPattern mission.code pattern.pattern
+                    
+                    POUR occurrence DANS occurrences {
+                        STRATEGIE probleme = {
+                            description: pattern.description,
+                            severite: pattern.severite,
+                            position: {
+                                ligne: CalculerLigne mission.position.ligne occurrence.index mission.code,
+                                colonne: CalculerColonne occurrence.index mission.code
+                            },
+                            code: occurrence.texte
+                        }
+                        
+                        problemes = DEPLOIEMENT problemes probleme
+                    }
+                }
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION RechercherPattern {
+    PARAMETRE texte
+    PARAMETRE pattern
+    
+    ORDRE DE BATAILLE {
+        # Cette mission simule la recherche d'un pattern (regex) dans un texte
+        # Dans une implémentation réelle, ceci utiliserait une bibliothèque regex
+        
+        # Pour cette version simplifiée, retourner une occurrence fictive
+        FORMATION resultats = [
+            {
+                texte: "SURVEILLANCE(entree_utilisateur)",
+                index: 100,
+                longueur: 32
+            }
+        ]
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION ContientPattern {
+    PARAMETRE texte
+    PARAMETRE pattern
+    
+    ORDRE DE BATAILLE {
+        # Cette mission vérifie si un texte contient un pattern (regex)
+        # Dans une implémentation réelle, ceci utiliserait une bibliothèque regex
+        
+        # Pour cette version simplifiée, retourner FAUX
+        RETRAITE FAUX
+    }
+}
+
+MISSION CalculerLigne {
+    PARAMETRE ligne_debut
+    PARAMETRE index
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Calculer le numéro de ligne à partir de l'index dans le texte
+        # En comptant les sauts de ligne jusqu'à l'index
+        
+        # Pour cette version simplifiée, retourner une ligne fictive
+        RETRAITE ligne_debut + 5
+    }
+}
+
+MISSION CalculerColonne {
+    PARAMETRE index
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Calculer la colonne à partir de l'index dans le texte
+        # En recherchant le dernier saut de ligne avant l'index
+        
+        # Pour cette version simplifiée, retourner une colonne fictive
+        RETRAITE 10
+    }
+}
+
+MISSION ExtraireContexte {
+    PARAMETRE contenu
+    PARAMETRE position
+    PARAMETRE lignes_contexte
+    
+    ORDRE DE BATAILLE {
+        # Extraire le contexte (lignes autour) d'une position dans le texte
+        
+        # Pour cette version simplifiée, retourner un contexte fictif
+        RETRAITE "Ligne précédente\nLigne avec le problème\nLigne suivante"
+    }
+}
+
+MISSION AuditerConformite {
+    PARAMETRE syntaxe
+    PARAMETRE aspect
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Audit de conformité en cours"
+        
+        # Résultat de l'audit pour cet aspect
+        STRATEGIE resultat = {
+            type: "CONFORMITE",
+            problemes: []
+        }
+        
+        # Vérifier les règles de conformité spécifiées
+        POUR regle DANS aspect.regles {
+            RAPPORT "Vérification de la règle de conformité: " + regle
+            
+            # Sélectionner le détecteur approprié selon la règle
+            FORMATION problemes_regle = []
+            
+            SI CIBLE regle == "STANDARDS" {
+                problemes_regle = EXECUTION VerifierStandards syntaxe
+            } SINON SI CIBLE regle == "CONVENTIONS" {
+                problemes_regle = EXECUTION VerifierConventions syntaxe
+            } SINON SI CIBLE regle == "LICENCES" {
+                problemes_regle = EXECUTION VerifierLicences syntaxe
+            } SINON SI CIBLE regle == "DOCUMENTATION" {
+                problemes_regle = EXECUTION VerifierDocumentation syntaxe
+            } SINON {
+                RAPPORT "AVERTISSEMENT: Règle de conformité non supportée: " + regle
+                CONTINUER
+            }
+            
+            # Ajouter les problèmes détectés
+            POUR probleme DANS problemes_regle {
+                # Enrichir avec les informations de contexte
+                probleme.regle = regle
+                probleme.type = "CONFORMITE"
+                
+                # Ajouter le contexte du code si configuré
+                SI CIBLE options.inclure_contexte {
+                    probleme.contexte = EXECUTION ExtraireContexte syntaxe.contenu probleme.position options.lignes_contexte
+                }
+                
+                resultat.problemes = DEPLOIEMENT resultat.problemes probleme
+                
+                # Vérifier la limite de problèmes
+                SI CIBLE RECONNAISSANCE resultat.problemes >= options.max_problemes {
+                    RAPPORT "AVERTISSEMENT: Limite de problèmes atteinte (" + options.max_problemes + ")"
+                    RUPTURE
+                }
+            }
+        }
+        
+        RAPPORT "Audit de conformité terminé: " + RECONNAISSANCE resultat.problemes + " problèmes trouvés"
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION VerifierStandards {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Vérifier le respect des standards de nommage
+        
+        # Vérifier les noms de missions (doivent commencer par une majuscule)
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                SI CIBLE !EXECUTION CommenceParMajuscule mission.nom {
+                    STRATEGIE probleme = {
+                        description: "Non-respect des standards: Le nom de mission '" + mission.nom + "' ne commence pas par une majuscule",
+                        severite: "MOYENNE",
+                        position: mission.position,
+                        code: "MISSION " + mission.nom
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+            }
+            
+            # Vérifier les noms de stratégies (doivent commencer par une majuscule)
+            POUR strategie DANS base.strategies {
+                SI CIBLE !EXECUTION CommenceParMajuscule strategie.nom {
+                    STRATEGIE probleme = {
+                        description: "Non-respect des standards: Le nom de stratégie '" + strategie.nom + "' ne commence pas par une majuscule",
+                        severite: "BASSE",
+                        position: strategie.position,
+                        code: "STRATEGIE " + strategie.nom
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+            }
+            
+            # Vérifier les noms de bases (doivent être en majuscules)
+            SI CIBLE !EXECUTION EstEnMajuscules base.nom {
+                STRATEGIE probleme = {
+                    description: "Non-respect des standards: Le nom de base '" + base.nom + "' n'est pas en majuscules",
+                    severite: "MOYENNE",
+                    position: base.position,
+                    code: "BASE " + base.nom
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION CommenceParMajuscule {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le texte commence par une lettre majuscule
+        
+        # Pour cette version simplifiée, supposer que c'est le cas
+        RETRAITE VRAI
+    }
+}
+
+MISSION EstEnMajuscules {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le texte est entièrement en majuscules
+        
+        # Pour cette version simplifiée, supposer que c'est le cas
+        RETRAITE VRAI
+    }
+}
+
+MISSION VerifierConventions {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Vérifier le respect des conventions de codage
+        
+        # Vérifier l'indentation (doit être cohérente)
+        STRATEGIE indentation = EXECUTION DetecterIndentation syntaxe.contenu
+        
+        SI CIBLE indentation.coherente == FAUX {
+            STRATEGIE probleme = {
+                description: "Non-respect des conventions: Indentation incohérente (" + indentation.message + ")",
+                severite: "BASSE",
+                position: {
+                    ligne: indentation.ligne,
+                    colonne: 1
+                },
+                code: "Indentation incohérente"
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        # Vérifier la longueur des lignes (maximum recommandé: 100 caractères)
+        FORMATION lignes_longues = EXECUTION DetecterLignesLongues syntaxe.contenu 100
+        
+        POUR ligne DANS lignes_longues {
+            STRATEGIE probleme = {
+                description: "Non-respect des conventions: Ligne trop longue (" + ligne.longueur + " caractères, maximum recommandé: 100)",
+                severite: "BASSE",
+                position: {
+                    ligne: ligne.numero,
+                    colonne: 1
+                },
+                code: ligne.contenu
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        # Vérifier l'espacement autour des opérateurs
+        FORMATION problemes_espacement = EXECUTION VerifierEspacementOperateurs syntaxe.contenu
+        
+        POUR probleme_espacement DANS problemes_espacement {
+            problemes = DEPLOIEMENT problemes probleme_espacement
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION DetecterIndentation {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Détecter l'indentation utilisée dans le code
+        # et vérifier sa cohérence
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        RETRAITE {
+            type: "ESPACES",
+            taille: 4,
+            coherente: VRAI,
+            message: "",
+            ligne: 0
+        }
+    }
+}
+
+MISSION DetecterLignesLongues {
+    PARAMETRE contenu
+    PARAMETRE longueur_max
+    
+    ORDRE DE BATAILLE {
+        # Détecter les lignes qui dépassent la longueur maximale
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION lignes_longues = [
+            {
+                numero: 42,
+                longueur: 120,
+                contenu: "Une très longue ligne de code qui dépasse largement la limite recommandée de 100 caractères et qui devrait être fractionnée"
+            }
+        ]
+        
+        RETRAITE lignes_longues
+    }
+}
+
+MISSION VerifierEspacementOperateurs {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'espacement autour des opérateurs
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION problemes = [
+            {
+                description: "Non-respect des conventions: Espacement manquant autour
+
+                MISSION VerifierEspacementOperateurs {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'espacement autour des opérateurs
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION problemes = [
+            {
+                description: "Non-respect des conventions: Espacement manquant autour de l'opérateur '+'",
+                severite: "BASSE",
+                position: {
+                    ligne: 25,
+                    colonne: 15
+                },
+                code: "x=a+b"
+            }
+        ]
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION VerifierLicences {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Vérifier la présence d'en-têtes de licence
+        SI CIBLE !syntaxe.commentaires_fichier OU !EXECUTION ContientInfosLicence syntaxe.commentaires_fichier {
+            STRATEGIE probleme = {
+                description: "Licence manquante: Aucune information de licence trouvée dans le fichier",
+                severite: "HAUTE",
+                position: {
+                    ligne: 1,
+                    colonne: 1
+                },
+                code: "En-tête de fichier"
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION ContientInfosLicence {
+    PARAMETRE commentaires
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si les commentaires contiennent des informations de licence
+        
+        # Rechercher des mots-clés liés aux licences
+        FORMATION mots_cles = ["licence", "license", "copyright", "©", "(c)", "droits", "rights", "reserved", "MIT", "GPL", "Apache"]
+        
+        POUR mot_cle DANS mots_cles {
+            SI CIBLE EXECUTION ContientMotInsensible commentaires mot_cle {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION ContientMotInsensible {
+    PARAMETRE texte
+    PARAMETRE mot
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le texte contient le mot (insensible à la casse)
+        
+        # Pour cette version simplifiée, retourner FAUX
+        RETRAITE FAUX
+    }
+}
+
+MISSION VerifierDocumentation {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Vérifier la documentation des bases, missions et stratégies
+        
+        POUR base DANS syntaxe.bases {
+            # Vérifier la documentation de la base
+            SI CIBLE !base.commentaires OU RECONNAISSANCE base.commentaires == 0 {
+                STRATEGIE probleme = {
+                    description: "Documentation manquante: La base '" + base.nom + "' n'est pas documentée",
+                    severite: "MOYENNE",
+                    position: base.position,
+                    code: "BASE " + base.nom
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+            
+            # Vérifier la documentation des missions
+            POUR mission DANS base.missions {
+                SI CIBLE !mission.commentaires OU RECONNAISSANCE mission.commentaires == 0 {
+                    STRATEGIE probleme = {
+                        description: "Documentation manquante: La mission '" + mission.nom + "' n'est pas documentée",
+                        severite: "MOYENNE",
+                        position: mission.position,
+                        code: "MISSION " + mission.nom
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+                
+                # Vérifier la documentation des paramètres
+                SI CIBLE mission.parametres ET RECONNAISSANCE mission.parametres > 0 {
+                    POUR parametre DANS mission.parametres {
+                        SI CIBLE !EXECUTION ParametreDocumente mission.commentaires parametre {
+                            STRATEGIE probleme = {
+                                description: "Documentation manquante: Le paramètre '" + parametre.nom + "' de la mission '" + mission.nom + "' n'est pas documenté",
+                                severite: "BASSE",
+                                position: parametre.position OU mission.position,
+                                code: "PARAMETRE " + parametre.nom
+                            }
+                            
+                            problemes = DEPLOIEMENT problemes probleme
+                        }
+                    }
+                }
+            }
+            
+            # Vérifier la documentation des stratégies
+            POUR strategie DANS base.strategies {
+                SI CIBLE !strategie.commentaires OU RECONNAISSANCE strategie.commentaires == 0 {
+                    STRATEGIE probleme = {
+                        description: "Documentation manquante: La stratégie '" + strategie.nom + "' n'est pas documentée",
+                        severite: "BASSE",
+                        position: strategie.position,
+                        code: "STRATEGIE " + strategie.nom
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION ParametreDocumente {
+    PARAMETRE commentaires
+    PARAMETRE parametre
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le paramètre est documenté dans les commentaires
+        
+        # Rechercher des patterns comme @param, @parametre, etc. suivi du nom du paramètre
+        FORMATION patterns = [
+            "@param\\s+" + parametre.nom,
+            "@parametre\\s+" + parametre.nom,
+            "Paramètre\\s+" + parametre.nom,
+            "Parametre\\s+" + parametre.nom,
+            parametre.nom + "\\s*:"
+        ]
+        
+        POUR pattern DANS patterns {
+            SI CIBLE EXECUTION ContientPattern commentaires pattern {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION AuditerArchitecture {
+    PARAMETRE syntaxe
+    PARAMETRE aspect
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Audit d'architecture en cours"
+        
+        # Résultat de l'audit pour cet aspect
+        STRATEGIE resultat = {
+            type: "ARCHITECTURE",
+            problemes: []
+        }
+        
+        # Vérifier les règles d'architecture spécifiées
+        POUR regle DANS aspect.regles {
+            RAPPORT "Vérification de la règle d'architecture: " + regle
+            
+            # Sélectionner l'analyseur approprié selon la règle
+            FORMATION problemes_regle = []
+            
+            SI CIBLE regle == "COUPLAGE" {
+                problemes_regle = EXECUTION AnalyserCouplage syntaxe
+            } SINON SI CIBLE regle == "COHERENCE" {
+                problemes_regle = EXECUTION AnalyserCoherence syntaxe
+            } SINON SI CIBLE regle == "MODULARITE" {
+                problemes_regle = EXECUTION AnalyserModularite syntaxe
+            } SINON SI CIBLE regle == "EXTENSIBILITE" {
+                problemes_regle = EXECUTION AnalyserExtensibilite syntaxe
+            } SINON {
+                RAPPORT "AVERTISSEMENT: Règle d'architecture non supportée: " + regle
+                CONTINUER
+            }
+            
+            # Ajouter les problèmes détectés
+            POUR probleme DANS problemes_regle {
+                # Enrichir avec les informations de contexte
+                probleme.regle = regle
+                probleme.type = "ARCHITECTURE"
+                
+                # Ajouter le contexte du code si configuré
+                SI CIBLE options.inclure_contexte {
+                    probleme.contexte = EXECUTION ExtraireContexte syntaxe.contenu probleme.position options.lignes_contexte
+                }
+                
+                resultat.problemes = DEPLOIEMENT resultat.problemes probleme
+                
+                # Vérifier la limite de problèmes
+                SI CIBLE RECONNAISSANCE resultat.problemes >= options.max_problemes {
+                    RAPPORT "AVERTISSEMENT: Limite de problèmes atteinte (" + options.max_problemes + ")"
+                    RUPTURE
+                }
+            }
+        }
+        
+        RAPPORT "Audit d'architecture terminé: " + RECONNAISSANCE resultat.problemes + " problèmes trouvés"
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION AnalyserCouplage {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Construire le graphe de dépendances
+        STRATEGIE graphe = EXECUTION ConstruireGrapheDependances syntaxe
+        
+        # Analyser le couplage entre missions
+        POUR mission DANS graphe.missions {
+            # Vérifier le nombre de dépendances sortantes (fan-out)
+            SI CIBLE RECONNAISSANCE mission.dependances > 5 {
+                STRATEGIE probleme = {
+                    description: "Couplage excessif: La mission '" + mission.nom + "' dépend de " + RECONNAISSANCE mission.dependances + " autres missions (maximum recommandé: 5)",
+                    severite: "MOYENNE",
+                    position: mission.position,
+                    code: "MISSION " + mission.nom
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+            
+            # Vérifier le nombre de dépendances entrantes (fan-in)
+            SI CIBLE RECONNAISSANCE mission.utilisations > 10 {
+                STRATEGIE probleme = {
+                    description: "Centralisation excessive: La mission '" + mission.nom + "' est utilisée par " + RECONNAISSANCE mission.utilisations + " autres missions, suggérant une centralisation excessive",
+                    severite: "BASSE",
+                    position: mission.position,
+                    code: "MISSION " + mission.nom
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+        }
+        
+        # Détecter les dépendances circulaires
+        POUR cycle DANS graphe.cycles {
+            STRATEGIE probleme = {
+                description: "Dépendance circulaire: Le cycle de dépendance suivant a été détecté: " + JOINDRE cycle " -> ",
+                severite: "HAUTE",
+                position: graphe.missions[cycle[0]].position,
+                code: "Dépendance circulaire"
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION ConstruireGrapheDependances {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        # Construire un graphe de dépendances entre les missions
+        
+        # Structure pour stocker le graphe
+        STRATEGIE graphe = {
+            missions: {},
+            cycles: []
+        }
+        
+        # Collecter toutes les missions et initialiser leurs dépendances
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                graphe.missions[mission.nom] = {
+                    nom: mission.nom,
+                    base: base.nom,
+                    position: mission.position,
+                    dependances: [],  # Missions dont cette mission dépend
+                    utilisations: []  # Missions qui dépendent de cette mission
+                }
+            }
+        }
+        
+        # Analyser les dépendances
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                # Rechercher les appels à d'autres missions dans le code
+                FORMATION appels = EXECUTION ExtraireAppelsMissions mission.code
+                
+                POUR appel DANS appels {
+                    # Ajouter la dépendance
+                    SI CIBLE graphe.missions[mission.nom] ET graphe.missions[appel] {
+                        graphe.missions[mission.nom].dependances = DEPLOIEMENT graphe.missions[mission.nom].dependances appel
+                        graphe.missions[appel].utilisations = DEPLOIEMENT graphe.missions[appel].utilisations mission.nom
+                    }
+                }
+            }
+        }
+        
+        # Détecter les cycles de dépendances
+        graphe.cycles = EXECUTION DetecterCyclesDependances graphe.missions
+        
+        RETRAITE graphe
+    }
+}
+
+MISSION ExtraireAppelsMissions {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Extraire les appels à d'autres missions dans le code
+        
+        # Rechercher les patterns comme EXECUTION NomMission
+        FORMATION appels = []
+        
+        # Pattern pour les appels de missions
+        STRATEGIE pattern = "EXECUTION\\s+([A-Za-z][A-Za-z0-9_]*)"
+        
+        # Rechercher toutes les occurrences du pattern
+        FORMATION occurrences = EXECUTION RechercherPattern code pattern
+        
+        POUR occurrence DANS occurrences {
+            appels = DEPLOIEMENT appels occurrence.captures[1]
+        }
+        
+        RETRAITE appels
+    }
+}
+
+MISSION DetecterCyclesDependances {
+    PARAMETRE missions
+    
+    ORDRE DE BATAILLE {
+        # Détecter les cycles de dépendances dans le graphe
+        
+        # Pour cette version simplifiée, retourner un cycle fictif
+        FORMATION cycles = [
+            ["MissionA", "MissionB", "MissionC", "MissionA"]
+        ]
+        
+        RETRAITE cycles
+    }
+}
+
+MISSION AnalyserCoherence {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Vérifier la cohérence de l'organisation des bases
+        
+        # Vérifier les bases imbriquées (déconseillé)
+        FORMATION bases_imbriquees = EXECUTION DetecterBasesImbriquees syntaxe.contenu
+        
+        POUR imbrication DANS bases_imbriquees {
+            STRATEGIE probleme = {
+                description: "Cohérence architecturale: Base imbriquée détectée ('" + imbrication.externe + "' contient '" + imbrication.interne + "')",
+                severite: "HAUTE",
+                position: imbrication.position,
+                code: "BASE dans BASE"
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        # Vérifier la cohérence de responsabilité des bases
+        POUR base DANS syntaxe.bases {
+            # Analyser la responsabilité de la base
+            STRATEGIE analyse = EXECUTION AnalyserResponsabilitesBase base
+            
+            SI CIBLE analyse.coherence < 0.7 {  # Seuil arbitraire de cohérence
+                STRATEGIE probleme = {
+                    description: "Cohérence architecturale: La base '" + base.nom + "' a des responsabilités mixtes ou peu claires (score de cohérence: " + analyse.coherence + ")",
+                    severite: "MOYENNE",
+                    position: base.position,
+                    code: "BASE " + base.nom,
+                    details: analyse.details
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION DetecterBasesImbriquees {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Détecter les bases imbriquées dans le code
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION imbrications = [
+            {
+                externe: "BASE_EXTERNE",
+                interne: "BASE_INTERNE",
+                position: {
+                    ligne: 50,
+                    colonne: 1
+                }
+            }
+        ]
+        
+        RETRAITE imbrications
+    }
+}
+
+MISSION AnalyserResponsabilitesBase {
+    PARAMETRE base
+    
+    ORDRE DE BATAILLE {
+        # Analyser la cohérence des responsabilités d'une base
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        RETRAITE {
+            coherence: 0.85,  # Score entre 0 et 1
+            domaines: ["Sécurité", "Authentification"],
+            details: "Base cohérente avec des responsabilités bien définies"
+        }
+    }
+}
+
+MISSION AnalyserModularite {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Analyser la modularité du code
+        
+        # Vérifier la taille des missions (lignes de code)
+        POUR base DANS syntaxe.bases {
+            POUR mission DANS base.missions {
+                MUNITION lignes = EXECUTION CompterLignesCode mission.code
+                
+                # Vérifier si la mission est trop grande
+                SI CIBLE lignes > 100 {  # Seuil arbitraire
+                    STRATEGIE probleme = {
+                        description: "Modularité insuffisante: La mission '" + mission.nom + "' est trop longue (" + lignes + " lignes, maximum recommandé: 100)",
+                        severite: mission.severite == "CRITIQUE" ? "HAUTE" : "MOYENNE",
+                        position: mission.position,
+                        code: "MISSION " + mission.nom + " (trop longue)"
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+                
+                # Vérifier la complexité cyclomatique
+                MUNITION complexite = EXECUTION CalculerComplexiteCyclomatique mission.code
+                
+                SI CIBLE complexite > 15 {  # Seuil arbitraire
+                    STRATEGIE probleme = {
+                        description: "Modularité insuffisante: La mission '" + mission.nom + "' a une complexité cyclomatique excessive (" + complexite + ", maximum recommandé: 15)",
+                        severite: "HAUTE",
+                        position: mission.position,
+                        code: "MISSION " + mission.nom + " (complexité élevée)"
+                    }
+                    
+                    problemes = DEPLOIEMENT problemes probleme
+                }
+            }
+            
+            # Vérifier le nombre de missions par base
+            SI CIBLE RECONNAISSANCE base.missions > 30 {  # Seuil arbitraire
+                STRATEGIE probleme = {
+                    description: "Modularité insuffisante: La base '" + base.nom + "' contient trop de missions (" + RECONNAISSANCE base.missions + ", maximum recommandé: 30)",
+                    severite: "MOYENNE",
+                    position: base.position,
+                    code: "BASE " + base.nom + " (trop de missions)"
+                }
+                
+                problemes = DEPLOIEMENT problemes probleme
+            }
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION CompterLignesCode {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Compter les lignes de code non vides et non commentaires
+        
+        # Pour cette version simplifiée, retourner une valeur fictive
+        RETRAITE 120  # Nombre fictif de lignes
+    }
+}
+
+MISSION CalculerComplexiteCyclomatique {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Calculer la complexité cyclomatique (nombre de chemins d'exécution)
+        # En comptant les instructions de contrôle comme SI, TANT QUE, POUR, etc.
+        
+        # Pour cette version simplifiée, retourner une valeur fictive
+        RETRAITE 18  # Complexité fictive
+    }
+}
+
+MISSION AnalyserExtensibilite {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        FORMATION problemes = []
+        
+        # Analyser l'extensibilité du code
+        
+        # Vérifier l'utilisation de valeurs codées en dur
+        FORMATION valeurs_en_dur = EXECUTION DetecterValeursEnDur syntaxe
+        
+        POUR valeur DANS valeurs_en_dur {
+            STRATEGIE probleme = {
+                description: "Extensibilité limitée: Valeur codée en dur '" + valeur.valeur + "' détectée",
+                severite: "BASSE",
+                position: valeur.position,
+                code: valeur.contexte
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        # Vérifier l'imbrication excessive de boucles et conditions
+        FORMATION imbrications = EXECUTION DetecterImbricationsExcessives syntaxe
+        
+        POUR imbrication DANS imbrications {
+            STRATEGIE probleme = {
+                description: "Extensibilité limitée: Imbrication excessive de niveau " + imbrication.niveau + " détectée (maximum recommandé: 3)",
+                severite: "MOYENNE",
+                position: imbrication.position,
+                code: imbrication.contexte
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        # Vérifier l'utilisation de noms génériques
+        FORMATION noms_generiques = EXECUTION DetecterNomsGeneriques syntaxe
+        
+        POUR nom DANS noms_generiques {
+            STRATEGIE probleme = {
+                description: "Extensibilité limitée: Nom générique '" + nom.nom + "' détecté pour " + nom.type,
+                severite: "BASSE",
+                position: nom.position,
+                code: nom.contexte
+            }
+            
+            problemes = DEPLOIEMENT problemes probleme
+        }
+        
+        RETRAITE problemes
+    }
+}
+
+MISSION DetecterValeursEnDur {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        # Détecter les valeurs codées en dur dans le code
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION valeurs = [
+            {
+                valeur: "42",
+                position: {
+                    ligne: 85,
+                    colonne: 20
+                },
+                contexte: "resultat = 42  # Valeur magique"
+            }
+        ]
+        
+        RETRAITE valeurs
+    }
+}
+
+MISSION DetecterImbricationsExcessives {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        # Détecter les imbrications excessives de boucles et conditions
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION imbrications = [
+            {
+                niveau: 5,
+                type: "CONDITION",
+                position: {
+                    ligne: 100,
+                    colonne: 5
+                },
+                contexte: "SI CIBLE ... { SI CIBLE ... { SI CIBLE ... { SI CIBLE ... { SI CIBLE ... {"
+            }
+        ]
+        
+        RETRAITE imbrications
+    }
+}
+
+MISSION DetecterNomsGeneriques {
+    PARAMETRE syntaxe
+    
+    ORDRE DE BATAILLE {
+        # Détecter les noms génériques qui limitent la clarté et l'extensibilité
+        
+        # Pour cette version simplifiée, retourner un résultat fictif
+        FORMATION noms = [
+            {
+                nom: "data",
+                type: "MUNITION",
+                position: {
+                    ligne: 120,
+                    colonne: 15
+                },
+                contexte: "MUNITION data = ..."
+            }
+        ]
+        
+        RETRAITE noms
+    }
+}
+
+MISSION GenererRapportAudit {
+    PARAMETRE resultats_audit
+    PARAMETRE format
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération du rapport d'audit"
+        
+        # Vérifier le format demandé
+        SI CIBLE !EXECUTION ContientElement ConfigurationAuditUtils.formats_rapport format {
+            RAPPORT "AVERTISSEMENT: Format de rapport non supporté: " + format + ". Utilisation du format par défaut: " + ConfigurationAuditUtils.format_rapport_defaut
+            format = ConfigurationAuditUtils.format_rapport_defaut
+        }
+        
+        # Options par défaut
+        STRATEGIE options_rapport = {
+            inclure_contexte: VRAI,
+            inclure_statistiques: VRAI,
+            titre: "Rapport d'Audit de Code AGAM",
+            description: "Résultats de l'audit de qualité de code",
+            fichier_sortie: "rapport_audit_" + ObtenirDateHeure() + "." + format.toLowerCase()
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_rapport[cle] = options[cle]
+            }
+        }
+        
+        # Structure des données du rapport
+        STRATEGIE donnees_rapport = {
+            meta: {
+                titre: options_rapport.titre,
+                description: options_rapport.description,
+                date: ObtenirDateHeure(),
+                version: "1.0"
+            },
+            resultats: resultats_audit,
+            sections: [],
+            statistiques: {},
+            erreurs: [],
+            avertissements: []
+        }
+        
+        # Organiser les résultats en sections
+        STRATEGIE sections_par_type = {
+            SECURITE: [],
+            CONFORMITE: [],
+            ARCHITECTURE: []
+        }
+        
+        # Collecter les problèmes par type
+        POUR resultat DANS resultats_audit.resultats {
+            SI CIBLE sections_par_type[resultat.type] {
+                sections_par_type[resultat.type] = DEPLOIEMENT sections_par_type[resultat.type] resultat.problemes
+            }
+        }
+        
+        # Créer les sections du rapport
+        SI CIBLE RECONNAISSANCE sections_par_type.SECURITE > 0 {
+            donnees_rapport.sections = DEPLOIEMENT donnees_rapport.sections {
+                titre: "Problèmes de Sécurité",
+                items: EXECUTION ConvertirProblemeItem sections_par_type.SECURITE options_rapport
+            }
+        }
+        
+        SI CIBLE RECONNAISSANCE sections_par_type.CONFORMITE > 0 {
+            donnees_rapport.sections = DEPLOIEMENT donnees_rapport.sections {
+                titre: "Problèmes de Conformité",
+                items: EXECUTION ConvertirProblemeItem sections_par_type.CONFORMITE options_rapport
+            }
+        }
+        
+        SI CIBLE RECONNAISSANCE sections_par_type.ARCHITECTURE > 0 {
+            donnees_rapport.sections = DEPLOIEMENT donnees_rapport.sections {
+                titre: "Problèmes d'Architecture",
+                items: EXECUTION ConvertirProblemeItem sections_par_type.ARCHITECTURE options_rapport
+            }
+        }
+        
+        # Générer des statistiques
+        donnees_rapport.statistiques = EXECUTION GenererStatistiquesAudit resultats_audit
+        
+        # Utiliser le générateur de rapports avancé pour créer le rapport
+        STRATEGIE generateur = EXECUTION InitialiserGenerateurRapports {
+            format_par_defaut: format,
+            theme_par_defaut: "militaire"
+        }
+        
+        STRATEGIE rapport = EXECUTION GenererRapport generateur donnees_rapport options_rapport
+        
+        SI CIBLE rapport == NULE OU !rapport.succes {
+            RAPPORT "ERREUR: Échec de la génération du rapport"
+            RETRAITE NULE
+        }
+        
+        RAPPORT "Rapport d'audit généré avec succès: " + rapport.fichier
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION ConvertirProblemeItem {
+    PARAMETRE problemes
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        FORMATION items = []
+        
+        POUR probleme DANS problemes {
+            STRATEGIE item = {
+                titre: probleme.description,
+                type: "TEXTE",
+                severite: probleme.severite,
+                categorie: probleme.regle,
+                contenu: ""
+            }
+            
+            # Ajouter l'information de localisation
+            item.contenu = "Localisation: Ligne " + probleme.position.ligne + ", Colonne " + probleme.position.colonne + "\n"
+            
+            # Ajouter le code problématique
+            SI CIBLE probleme.code {
+                item.contenu = item.contenu + "Code: " + probleme.code + "\n"
+            }
+            
+            # Ajouter le contexte si disponible et configuré
+            SI CIBLE options.inclure_contexte ET probleme.contexte {
+                item.contenu = item.contenu + "Contexte:\n" + probleme.contexte + "\n"
+            }
+            
+            # Ajouter les détails si disponibles
+            SI CIBLE probleme.details {
+                item.contenu = item.contenu + "Détails: " + probleme.details + "\n"
+            }
+            
+            items = DEPLOIEMENT items item
+        }
+        
+        RETRAITE items
+    }
+}
+
+MISSION GenererStatistiquesAudit {
+    PARAMETRE resultats_audit
+    
+    ORDRE DE BATAILLE {
+        # Générer des statistiques à partir des résultats d'audit
+        
+        STRATEGIE stats = {
+            nombre_fichiers: 1,  # Par défaut pour un seul fichier
+            nombre_problemes: {
+                total: resultats_audit.statistiques.problemes_critiques + 
+                       resultats_audit.statistiques.problemes_hauts + 
+                       resultats_audit.statistiques.problemes_moyens + 
+                       resultats_audit.statistiques.problemes_bas,
+                critiques: resultats_audit.statistiques.problemes_critiques,
+                hauts: resultats_audit.statistiques.problemes_hauts,
+                moyens: resultats_audit.statistiques.problemes_moyens,
+                bas: resultats_audit.statistiques.problemes_bas
+            },
+            categories: {}
+        }
+        
+        # Compter les problèmes par catégorie
+        POUR resultat DANS resultats_audit.resultats {
+            POUR probleme DANS resultat.problemes {
+                SI CIBLE stats.categories[probleme.regle] {
+                    stats.categories[probleme.regle] = stats.categories[probleme.regle] + 1
+                } SINON {
+                    stats.categories[probleme.regle] = 1
+                }
+            }
+        }
+
+        BASE TESTS_PERFORMANCE_BASE
+
+STRATEGIE ConfigurationBenchmark {
+    iterations_default: 1000,
+    iterations_detaillees: 10000,
+    iterations_courtes: 100,
+    repetitions: 5,
+    warmup_iterations: 100,
+    seuil_regression: 10,  # Pourcentage d'augmentation considéré comme une régression
+    formats_sortie: ["CONSOLE", "JSON", "CSV", "HTML"],
+    format_defaut: "CONSOLE",
+    niveaux_detail: ["MINIMAL", "STANDARD", "DETAILLE"],
+    niveau_defaut: "STANDARD",
+    exclure_outliers: VRAI,
+    collecte_memoire: VRAI,
+    collecter_perf_systeme: VRAI,
+    afficher_graphiques: VRAI,
+    enregistrer_historique: VRAI
+}
+
+STRATEGIE BenchmarkSuites {
+    # Suites de tests de performance prédéfinies
+    operations_base: {
+        description: "Tests de performance des opérations de base",
+        tests: [
+            {
+                nom: "addition_entiers",
+                description: "Addition d'entiers",
+                fonction: AdditionnerEntiers,
+                parametres: [1000000, 2000000],
+                iterations: 10000,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "concatenation_chaines",
+                description: "Concaténation de chaînes",
+                fonction: ConcatenerChaines,
+                parametres: ["AGAM", " est ", "un langage ", "de programmation"],
+                iterations: 10000,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "boucle_iteration",
+                description: "Itération de boucle simple",
+                fonction: BoucleIterationSimple,
+                parametres: [1000],
+                iterations: 1000,
+                mesures: ["temps"]
+            }
+        ]
+    },
+    operations_collections: {
+        description: "Tests de performance des opérations sur collections",
+        tests: [
+            {
+                nom: "creation_liste",
+                description: "Création d'une liste",
+                fonction: CreerListeTest,
+                parametres: [10000],
+                iterations: 100,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "acces_liste",
+                description: "Accès aux éléments d'une liste",
+                fonction: AccesListeTest,
+                parametres: [10000, 1000],
+                iterations: 100,
+                mesures: ["temps"]
+            },
+            {
+                nom: "tri_liste",
+                description: "Tri d'une liste",
+                fonction: TriListeTest,
+                parametres: [1000],
+                iterations: 100,
+                mesures: ["temps", "memoire"]
+            }
+        ]
+    },
+    operations_fichiers: {
+        description: "Tests de performance des opérations sur fichiers",
+        tests: [
+            {
+                nom: "lecture_fichier",
+                description: "Lecture d'un fichier",
+                fonction: LectureFichierTest,
+                parametres: ["test_data.txt", 100],
+                iterations: 50,
+                mesures: ["temps"]
+            },
+            {
+                nom: "ecriture_fichier",
+                description: "Écriture dans un fichier",
+                fonction: EcritureFichierTest,
+                parametres: ["test_output.txt", 1000],
+                iterations: 50,
+                mesures: ["temps"]
+            }
+        ]
+    }
+}
+
+MISSION InitialiserBenchmark {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du système de benchmark"
+        
+        # Configurer le benchmark avec les options par défaut
+        STRATEGIE config = ConfigurationBenchmark
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet benchmark
+        STRATEGIE benchmark = {
+            configuration: config,
+            suites: BenchmarkSuites,
+            resultats: {},
+            historique: {},
+            compteur_executions: 0
+        }
+        
+        # Initialiser l'environnement de test
+        EXECUTION InitialiserEnvironnementTest benchmark
+        
+        RAPPORT "Système de benchmark initialisé"
+        
+        RETRAITE benchmark
+    }
+}
+
+MISSION InitialiserEnvironnementTest {
+    PARAMETRE benchmark
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'environnement de test"
+        
+        # Vérifier l'existence des répertoires de données
+        SI CIBLE !RepertoireExiste "./test_data" {
+            EXECUTION CreerRepertoire "./test_data"
+        }
+        
+        SI CIBLE !RepertoireExiste "./test_results" {
+            EXECUTION CreerRepertoire "./test_results"
+        }
+        
+        # Générer des données de test si nécessaire
+        SI CIBLE !FichierExiste "./test_data/test_data.txt" {
+            EXECUTION GenererFichierTest "./test_data/test_data.txt" 1000
+        }
+        
+        # Charger l'historique des résultats si disponible
+        SI CIBLE FichierExiste "./test_results/benchmark_history.json" {
+            STRATEGIE historique = EXECUTION LireFichierJSON "./test_results/benchmark_history.json"
+            
+            SI CIBLE historique != NULE {
+                benchmark.historique = historique
+            }
+        }
+        
+        RAPPORT "Environnement de test initialisé"
+        
+        RETRAITE benchmark
+    }
+}
+
+MISSION ExecuterBenchmarkSuite {
+    PARAMETRE benchmark
+    PARAMETRE nom_suite
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si la suite existe
+        SI CIBLE !benchmark.suites[nom_suite] {
+            RAPPORT "ERREUR: Suite de benchmark non trouvée: " + nom_suite
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Suite non trouvée: " + nom_suite
+            }
+        }
+        
+        STRATEGIE suite = benchmark.suites[nom_suite]
+        RAPPORT "Exécution de la suite de benchmark: " + nom_suite + " - " + suite.description
+        
+        # Options par défaut
+        STRATEGIE options_test = {
+            format: benchmark.configuration.format_defaut,
+            niveau_detail: benchmark.configuration.niveau_defaut,
+            exclure_outliers: benchmark.configuration.exclure_outliers,
+            enregistrer_resultats: VRAI,
+            fichier_sortie: "./test_results/benchmark_" + nom_suite + "_" + ObtenirDateHeure() + "." + 
+                           benchmark.configuration.format_defaut.toLowerCase()
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_test[cle] = options[cle]
+            }
+        }
+        
+        # Résultats de la suite
+        STRATEGIE resultats_suite = {
+            nom: nom_suite,
+            description: suite.description,
+            timestamp: ObtenirDateHeure(),
+            tests: [],
+            stats: {
+                temps_total: 0,
+                tests_executes: 0,
+                tests_reussis: 0,
+                tests_echoues: 0,
+                regressions: 0
+            }
+        }
+        
+        # Exécuter chaque test de la suite
+        POUR test DANS suite.tests {
+            RAPPORT "Exécution du test: " + test.nom + " - " + test.description
+            
+            # Phase d'échauffement (warmup)
+            SI CIBLE benchmark.configuration.warmup_iterations > 0 {
+                RAPPORT "Phase d'échauffement avec " + benchmark.configuration.warmup_iterations + " itérations"
+                EXECUTION Executer

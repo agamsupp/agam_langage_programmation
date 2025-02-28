@@ -1,0 +1,78 @@
+BASE COMPILATEUR_INCREMENTAL
+
+STRATEGIE ConfigurationIncrementale {
+    FORMATION cache = {
+        type: "HIERARCHIQUE",
+        niveaux: [
+            {
+                nom: "MEMOIRE",
+                taille: 256,      # MB
+                persistance: FAUX
+            },
+            {
+                nom: "DISQUE",
+                taille: 1024,     # MB
+                persistance: VRAI
+            }
+        ]
+    }
+
+    STRATEGIE dependances = {
+        analyse: "PROFONDE",
+        validation: "STRICTE",
+        cache: "ACTIF"
+    }
+}
+
+MISSION CompilationIncrementale {
+    PARAMETRE fichiers_modifies
+    
+    ORDRE DE BATAILLE {
+        # Analyse des dépendances
+        STRATEGIE graphe = {
+            noeuds: [],
+            dependances: [],
+            modifies: fichiers_modifies
+        }
+        
+        # Construction du graphe de dépendances
+        EXECUTION ConstruireGrapheDependances graphe
+        
+        # Identification des unités à recompiler
+        FORMATION unites_compilation = EXECUTION IdentifierUnitesAffectees graphe
+        
+        # Compilation des unités affectées
+        POUR unite DANS unites_compilation {
+            SI CIBLE RecompilationNecessaire unite {
+                EXECUTION CompilerUnite unite
+                EXECUTION MettreAJourCache unite
+            }
+        }
+        
+        # Mise à jour des dépendances
+        EXECUTION MettreAJourDependances graphe
+    }
+}
+
+MISSION GererCache {
+    PARAMETRE unite
+    PARAMETRE operation
+    
+    ORDRE DE BATAILLE {
+        POUR niveau DANS ConfigurationIncrementale.cache.niveaux {
+            SELON operation {
+                CAS "LECTURE":
+                    SI CIBLE EntreePresente niveau unite {
+                        RETRAITE LireCache niveau unite
+                    }
+                CAS "ECRITURE":
+                    EXECUTION EcrireCache niveau unite
+                    SI CIBLE niveau.persistance {
+                        EXECUTION PersisterCache niveau
+                    }
+            }
+        }
+    }
+}
+
+FIN BASE

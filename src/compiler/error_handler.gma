@@ -1,0 +1,67 @@
+BASE GESTIONNAIRE_ERREURS
+
+STRATEGIE CatalogueErreurs {
+    FORMATION erreurs_syntaxe = [
+        {code: "E001", message: "BASE manquante en début de fichier"},
+        {code: "E002", message: "ORDRE DE BATAILLE mal formé"},
+        {code: "E003", message: "FIN BASE manquante"}
+    ]
+    
+    FORMATION erreurs_semantique = [
+        {code: "E101", message: "Variable non déclarée"},
+        {code: "E102", message: "Type incompatible"},
+        {code: "E103", message: "MISSION non définie"}
+    ]
+    
+    FORMATION erreurs_execution = [
+        {code: "E201", message: "Débordement de MUNITION"},
+        {code: "E202", message: "FORMATION vide"},
+        {code: "E203", message: "Division par zéro"}
+    ]
+}
+
+MISSION SignalerErreur {
+    PARAMETRE code
+    PARAMETRE ligne
+    PARAMETRE colonne
+    
+    ORDRE DE BATAILLE {
+        POUR catalogue DANS [
+            CatalogueErreurs.erreurs_syntaxe,
+            CatalogueErreurs.erreurs_semantique,
+            CatalogueErreurs.erreurs_execution
+        ] {
+            POUR erreur DANS catalogue {
+                SI CIBLE erreur.code VERIFICATION code {
+                    RAPPORT "[ERREUR " + code + "] Ligne " + ligne + ", Colonne " + colonne
+                    RAPPORT "Description: " + erreur.message
+                    RETRAITE
+                }
+            }
+        }
+    }
+}
+
+MISSION GérerException {
+    PARAMETRE exception
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE trace = {
+            message: exception.message,
+            pile: exception.pile,
+            contexte: exception.contexte
+        }
+        
+        JOURNAL trace
+        
+        SI CIBLE exception.critique {
+            RAPPORT "ERREUR CRITIQUE: Arrêt immédiat"
+            ARRETER_EXECUTION
+        } SINON {
+            RAPPORT "AVERTISSEMENT: Continuité possible"
+            CONTINUER_EXECUTION
+        }
+    }
+}
+
+FIN BASE

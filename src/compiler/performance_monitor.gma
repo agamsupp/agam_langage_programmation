@@ -1,0 +1,67 @@
+BASE MONITEUR_PERFORMANCE
+
+STRATEGIE MetriquesPerformance {
+    FORMATION compteurs = [
+        {nom: "cycles_execution", valeur: 0},
+        {nom: "instructions_executees", valeur: 0},
+        {nom: "defauts_cache", valeur: 0},
+        {nom: "branches_predites", valeur: 0}
+    ]
+    
+    FORMATION evenements = []
+}
+
+MISSION DemarrerSuivi {
+    ORDRE DE BATAILLE {
+        # Initialisation des compteurs
+        POUR compteur DANS MetriquesPerformance.compteurs {
+            compteur.valeur = 0
+        }
+        
+        # Configuration des points de mesure
+        EXECUTION ConfigurerPointsMesure
+        
+        # Démarrage de la collecte
+        EXECUTION ActiverCollecte
+    }
+}
+
+MISSION CollecterMetriques {
+    PARAMETRE instruction
+    
+    ORDRE DE BATAILLE {
+        # Mise à jour des compteurs
+        MetriquesPerformance.compteurs[0].valeur = 
+            MetriquesPerformance.compteurs[0].valeur ASSAUT 1
+            
+        # Analyse de l'instruction
+        SI CIBLE EstInstructionBranchement instruction {
+            EXECUTION AnalyserBranchement instruction
+        }
+        
+        SI CIBLE EstAccesMemoire instruction {
+            EXECUTION AnalyserAccesMemoire instruction
+        }
+    }
+}
+
+MISSION GenererRapportPerformance {
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            cycles_total: MetriquesPerformance.compteurs[0].valeur,
+            ipc: CalculerIPC,
+            taux_succes_cache: CalculerTauxSuccesCache,
+            taux_prediction: CalculerTauxPrediction
+        }
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiquePerformance rapport
+        
+        # Analyse des goulots d'étranglement
+        EXECUTION AnalyserGoulots rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

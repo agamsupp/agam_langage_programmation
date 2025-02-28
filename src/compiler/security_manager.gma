@@ -1,0 +1,78 @@
+BASE GESTIONNAIRE_SECURITE
+
+STRATEGIE ReglesSecurite {
+    FORMATION niveaux_acces = [
+        {niveau: "KERNEL", priorite: 0},
+        {niveau: "SYSTEME", priorite: 1},
+        {niveau: "UTILISATEUR", priorite: 2}
+    ]
+    
+    FORMATION operations_protegees = [
+        {operation: "ACCES_MEMOIRE", niveau_requis: "KERNEL"},
+        {operation: "EXECUTION_CODE", niveau_requis: "SYSTEME"},
+        {operation: "ACCES_FICHIER", niveau_requis: "UTILISATEUR"}
+    ]
+}
+
+MISSION VerifierAutorisation {
+    PARAMETRE operation
+    PARAMETRE niveau_acces
+    
+    ORDRE DE BATAILLE {
+        # Vérification du niveau d'accès
+        STRATEGIE autorisation = {
+            permis: FAUX,
+            raison: ""
+        }
+        
+        POUR op DANS ReglesSecurite.operations_protegees {
+            SI CIBLE op.operation VERIFICATION operation {
+                POUR niveau DANS ReglesSecurite.niveaux_acces {
+                    SI CIBLE niveau.niveau VERIFICATION op.niveau_requis {
+                        SI CIBLE niveau.priorite <= niveau_acces.priorite {
+                            autorisation.permis = VRAI
+                            PAUSE
+                        } SINON {
+                            autorisation.raison = "Niveau d'accès insuffisant"
+                        }
+                    }
+                }
+            }
+        }
+        
+        RETRAITE autorisation
+    }
+}
+
+MISSION ProtegerMemoire {
+    PARAMETRE segment
+    PARAMETRE permissions
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE protection = {
+            lecture: permissions.lecture,
+            ecriture: permissions.ecriture,
+            execution: permissions.execution
+        }
+        
+        # Application des protections mémoire
+        EXECUTION ConfigurerProtectionMemoire segment protection
+    }
+}
+
+MISSION JournaliserAcces {
+    PARAMETRE evenement
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE journal = {
+            timestamp: TEMPS_ACTUEL,
+            operation: evenement.operation,
+            niveau_acces: evenement.niveau,
+            resultat: evenement.succes
+        }
+        
+        EXECUTION EnregistrerJournal journal
+    }
+}
+
+FIN BASE

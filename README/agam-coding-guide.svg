@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <!-- Fond de style terminal avec effet Matrix -->
+  <rect width="800" height="600" fill="#0a1215" />
+  <g fill-opacity="0.07">
+    <text font-family="Courier New" font-size="12" fill="#00ff00" x="30" y="40">BASE MANOEUVRE SURVEILLANCE QG</text>
+    <text font-family="Courier New" font-size="12" fill="#00ff00" x="50" y="570">AGAM RAPPORT FUSION DEPLOIEMENT</text>
+    <text font-family="Courier New" font-size="12" fill="#00ff00" x="700" y="470">RETRAITE ASSAUT REPLI</text>
+  </g>
+  
+  <!-- Titre principal -->
+  <text font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#0f0" x="400" y="40" text-anchor="middle">Guide de Programmation en AGAM</text>
+  
+  <!-- Sous-titre -->
+  <text font-family="Arial, sans-serif" font-size="16" font-style="italic" fill="#0f0" x="400" y="65" text-anchor="middle">Langage de Programmation à Métaphore Militaire</text>
+  
+  <!-- Interface de l'éditeur -->
+  <rect x="50" y="90" width="700" height="460" rx="5" ry="5" fill="#0a1215" stroke="#333" stroke-width="2" />
+  
+  <!-- Barre de titre de l'éditeur -->
+  <rect x="50" y="90" width="700" height="30" rx="5" ry="5" fill="#333" />
+  <text font-family="Arial, sans-serif" font-size="14" fill="#fff" x="400" y="110" text-anchor="middle">AGAM Terminal - Calculatrice.agam</text>
+  
+  <!-- Zone de code de l'éditeur -->
+  <rect x="60" y="130" width="680" height="370" rx="3" ry="3" fill="#0f1419" stroke="#333" stroke-width="1" />
+  
+  <!-- Code AGAM avec mise en évidence syntaxique -->
+  <g font-family="Courier New" font-size="14">
+    <!-- Mots-clés -->
+    <text fill="#ff5f87" x="70" y="150">BASE</text>
+    <text fill="#ffffff" x="105" y="150">CALCULATRICE</text>
+    
+    <text fill="#ffaf00" x="90" y="175">RAPPORT</text>
+    <text fill="#00d7ff" x="155" y="175">"QG opérationnel : Calculatrice AGAM 2025"</text>
+    
+    <text fill="#ffaf00" x="90" y="200">STRATEGIE</text>
+    <text fill="#ffffff" x="160" y="200">historique</text>
+    <text fill="#87d700" x="230" y="200">=</text>
+    <text fill="#ffaf00" x="240" y="200">STRATEGIE COMPLEXE</text>
+    
+    <text fill="#ff5f87" x="90" y="225">MANOEUVRE</text>
+    
+    <text fill="#ffaf00" x="110" y="250">SURVEILLANCE</text>
+    <text fill="#ffffff" x="210" y="250">choix</text>
+    <text fill="#00d7ff" x="250" y="250">"Opération (1=Add, 2=Sous, 3=Puissance, 0=Quitter) : "</text>
+    
+    <text fill="#ff5f87" x="110" y="275">SI CIBLE</text>
+    <text fill="#ffffff" x="170" y="275">choix</text>
+    <text fill="#87d700" x="210" y="275">=</text>
+    <text fill="#d787ff" x="220" y="275">0</text>
+    
+    <text fill="#ffaf00" x="130" y="300">RAVITAILLEMENT</text>
+    <text fill="#00d7ff" x="250" y="300">"historique.txt"</text>
+    <text fill="#ffffff" x="350" y="300">historique</text>
+    
+    <text fill="#ffaf00" x="130" y="325">RAPPORT</text>
+    <text fill="#00d7ff" x="200" y="325">"Rapport sauvegardé. Fin."</text>
+    
+    <text fill="#ffaf00" x="130" y="350">RETRAITE</text>
+    
+    <text fill="#ff5f87" x="110" y="375">FIN CIBLE</text>
+    
+    <text fill="#ffaf00" x="110" y="400">SURVEILLANCE</text>
+    <text fill="#ffffff" x="210" y="400">x</text>
+    <text fill="#00d7ff" x="220" y="400">"Nombre 1 : "</text>
+    
+    <text fill="#ffaf00" x="110" y="425">MUNITION</text>
+    <text fill="#ffffff" x="180" y="425">resultat</text>
+    
+    <text fill="#ffaf00" x="110" y="450">CHAIN DE COMMANDE</text>
+    <text fill="#ffffff" x="280" y="450">choix</text>
+    
+    <text fill="#ff5f87" x="110" y="475">FIN MANOEUVRE</text>
+    
+    <text fill="#ff5f87" x="70" y="500">FIN BASE</text>
+  </g>
+  
+  <!-- Barre d'état de l'éditeur -->
+  <rect x="60" y="510" width="680" height="30" rx="3" ry="3" fill="#333" />
+  <text font-family="Arial, sans-serif" font-size="12" fill="#0f0" x="370" y="530" text-anchor="middle">Prêt à l'exécution - Système AGAM 2.1.3</text>
+  
+  <!-- Notes explicatives -->
+  <g>
+    <!-- Flèche pointant vers BASE -->
+    <line x1="30" y1="150" x2="65" y2="150" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="11" fill="#0f0" x="25" y="145" text-anchor="end">Début du programme</text>
+    
+    <!-- Flèche pointant vers MANOEUVRE -->
+    <line x1="30" y1="225" x2="85" y2="225" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="11" fill="#0f0" x="25" y="220" text-anchor="end">Boucle principale</text>
+    
+    <!-- Flèche pointant vers SURVEILLANCE -->
+    <line x1="30" y1="250" x2="105" y2="250" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="11" fill="#0f0" x="25" y="245" text-anchor="end">Entrée utilisateur</text>
+    
+    <!-- Flèche pointant vers SI CIBLE -->
+    <line x1="30" y1="275" x2="105" y2="275" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="11" fill="#0f0" x="25" y="270" text-anchor="end">Condition</text>
+    
+    <!-- Flèche pointant vers CHAIN DE COMMANDE -->
+    <line x1="30" y1="450" x2="105" y2="450" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="11" fill="#0f0" x="25" y="445" text-anchor="end">Structure switch/case</text>
+  </g>
+  
+  <!-- Légende des couleurs -->
+  <g>
+    <rect x="160" y="530" width="480" height="60" rx="5" ry="5" fill="rgba(0,0,0,0.7)" stroke="#0f0" stroke-width="1" />
+    <text font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#fff" x="400" y="547" text-anchor="middle">Légende des commandes AGAM</text>
+    
+    <circle cx="180" cy="565" r="5" fill="#ff5f87" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="190" y="569">Structure</text>
+    
+    <circle cx="260" cy="565" r="5" fill="#ffaf00" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="270" y="569">Commandes</text>
+    
+    <circle cx="350" cy="565" r="5" fill="#ffffff" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="360" y="569">Variables</text>
+    
+    <circle cx="430" cy="565" r="5" fill="#00d7ff" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="440" y="569">Chaînes</text>
+    
+    <circle cx="500" cy="565" r="5" fill="#d787ff" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="510" y="569">Nombres</text>
+    
+    <circle cx="570" cy="565" r="5" fill="#87d700" />
+    <text font-family="Arial, sans-serif" font-size="12" fill="#fff" x="580" y="569">Opérateurs</text>
+  </g>
+</svg>

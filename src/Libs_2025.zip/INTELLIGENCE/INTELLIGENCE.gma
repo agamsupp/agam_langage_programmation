@@ -1,0 +1,20 @@
+// Bibliothèque INTELLIGENCE - Analyse et IA
+// Inclusion : INCLURE "INTELLIGENCE"
+
+MISSION RECONNAISSANCE AVANCEE donnees
+    // Analyse statistique de 'donnees'
+    STRATEGIE stats
+    DEPLOIEMENT stats "moyenne" [calcul moyenne]
+    DEPLOIEMENT stats "max" [calcul max]
+    RETRAITE stats
+FIN MISSION
+
+MISSION PREDICTION modele entree
+    // Prédiction via modèle IA
+    RETRAITE [logique IA standard]
+FIN MISSION
+
+MISSION SIMULATION scenario
+    // Simule 'scenario'
+    RETRAITE [logique simulation standard]
+FIN MISSION

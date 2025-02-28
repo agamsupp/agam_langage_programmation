@@ -1,0 +1,121 @@
+BASE GENERATEUR_CODE
+
+STRATEGIE InstructionsNatives {
+    FORMATION operations = [
+        {
+            nom: "ASSAUT",
+            code_natif: "ADD",
+            registres_requis: 2
+        },
+        {
+            nom: "REPLI",
+            code_natif: "SUB",
+            registres_requis: 2
+        },
+        {
+            nom: "DEPLOIEMENT",
+            code_natif: "PUSH",
+            registres_requis: 1
+        }
+    ]
+}
+
+MISSION GenererCodeNatif {
+    PARAMETRE arbre_syntaxique
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_natif = []
+        
+        # Génération des sections
+        EXECUTION GenererSectionDonnees
+        EXECUTION GenererSectionCode arbre_syntaxique
+        
+        # Optimisation bas niveau
+        SI CIBLE NIVEAU_OPTIMISATION > 0 {
+            code_natif = EXECUTION OptimiserCodeNatif code_natif
+        }
+        
+        RETRAITE code_natif
+    }
+}
+
+MISSION GenererSectionDonnees {
+    ORDRE DE BATAILLE {
+        FORMATION section_donnees = []
+        
+        # Variables globales
+        MANOEUVRE GLOBALES {
+            POUR variable DANS VARIABLES_GLOBALES {
+                section_donnees = DEPLOIEMENT section_donnees {
+                    type: variable.type,
+                    nom: variable.nom,
+                    taille: TAILLE_TYPE variable.type
+                }
+            }
+        }
+        
+        # Constantes
+        MANOEUVRE CONSTANTES {
+            POUR constante DANS CONSTANTES {
+                section_donnees = DEPLOIEMENT section_donnees {
+                    type: "CONSTANT",
+                    valeur: constante.valeur
+                }
+            }
+        }
+        
+        RETRAITE section_donnees
+    }
+}
+
+MISSION GenererSectionCode {
+    PARAMETRE arbre
+    
+    ORDRE DE BATAILLE {
+        FORMATION section_code = []
+        
+        # En-tête fonction
+        MANOEUVRE PROLOGUE {
+            section_code = DEPLOIEMENT section_code [
+                "PUSH EBP",
+                "MOV EBP, ESP"
+            ]
+        }
+        
+        # Corps fonction
+        POUR noeud DANS arbre.noeuds {
+            FORMATION instructions = EXECUTION TraduireNoeud noeud
+            section_code = DEPLOIEMENT section_code instructions
+        }
+        
+        # Épilogue fonction
+        MANOEUVRE EPILOGUE {
+            section_code = DEPLOIEMENT section_code [
+                "MOV ESP, EBP",
+                "POP EBP",
+                "RET"
+            ]
+        }
+        
+        RETRAITE section_code
+    }
+}
+
+MISSION TraduireNoeud {
+    PARAMETRE noeud
+    
+    ORDRE DE BATAILLE {
+        SELON noeud.type {
+            CAS "MISSION":
+                RETRAITE EXECUTION GenererCodeMission noeud
+            CAS "ORDRE":
+                RETRAITE EXECUTION GenererCodeOrdre noeud
+            CAS "MANOEUVRE":
+                RETRAITE EXECUTION GenererCodeBoucle noeud
+            DEFAUT:
+                RAPPORT "Type de nœud non supporté: " + noeud.type
+        }
+    }
+}
+
+FIN BASE

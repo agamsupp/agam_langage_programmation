@@ -1,0 +1,1043 @@
+BASE GENERATEUR_RAPPORTS_AVANCE
+
+STRATEGIE ConfigurationRapports {
+    formats_sortie: ["TXT", "HTML", "PDF", "JSON", "XML"],
+    format_par_defaut: "HTML",
+    dir_modeles: "templates/reports/",
+    themes: {
+        clair: {
+            couleur_texte: "#333333",
+            couleur_fond: "#FFFFFF",
+            couleur_entete: "#4A86E8",
+            couleur_accent: "#6AA84F",
+            couleur_erreur: "#CC0000",
+            couleur_avertissement: "#E69138",
+            couleur_info: "#3C78D8"
+        },
+        sombre: {
+            couleur_texte: "#E8E8E8",
+            couleur_fond: "#2F2F2F",
+            couleur_entete: "#6D9EEB",
+            couleur_accent: "#93C47D",
+            couleur_erreur: "#EA9999",
+            couleur_avertissement: "#F9CB9C",
+            couleur_info: "#A4C2F4"
+        },
+        militaire: {
+            couleur_texte: "#CCCCCC",
+            couleur_fond: "#1C2833",
+            couleur_entete: "#5D8AA8",
+            couleur_accent: "#4F5D2F",
+            couleur_erreur: "#8B0000",
+            couleur_avertissement: "#B8860B",
+            couleur_info: "#336699"
+        }
+    },
+    theme_par_defaut: "militaire",
+    inclure_timestamp: VRAI,
+    niveau_detail: "STANDARD",  # MINIMAL, STANDARD, COMPLET
+    comprimer_grands_rapports: VRAI,
+    seuil_compression_kb: 1024,  # 1 MB
+    signature_numerique: VRAI
+}
+
+STRATEGIE TemplatesRapports {
+    HTML: {
+        entete: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{titre}</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: {couleur_fond};
+            color: {couleur_texte};
+            margin: 0;
+            padding: 20px;
+        }
+        .rapport-header {
+            background-color: {couleur_entete};
+            color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .rapport-section {
+            margin-bottom: 20px;
+        }
+        .rapport-section-title {
+            color: {couleur_entete};
+            border-bottom: 1px solid {couleur_entete};
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .rapport-item {
+            margin-bottom: 10px;
+        }
+        .rapport-item-title {
+            font-weight: bold;
+            color: {couleur_accent};
+        }
+        .rapport-error {
+            color: {couleur_erreur};
+        }
+        .rapport-warning {
+            color: {couleur_avertissement};
+        }
+        .rapport-info {
+            color: {couleur_info};
+        }
+        .rapport-summary {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: {couleur_entete};
+            color: white;
+        }
+        .code {
+            font-family: 'Courier New', monospace;
+            background-color: rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid {couleur_accent};
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: {couleur_entete};
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="rapport-header">
+        <h1>{titre}</h1>
+        <p>{description}</p>
+        <p>Généré le: {date}</p>
+    </div>`,
+        pied: `
+    <div class="rapport-summary">
+        <h2>Résumé</h2>
+        <p>{resume}</p>
+    </div>
+    <footer>
+        <p>Rapport généré par le Générateur de Rapports Avancé AGAM - {version}</p>
+        <p>{signature}</p>
+    </footer>
+</body>
+</html>`,
+        section: `
+    <div class="rapport-section">
+        <h2 class="rapport-section-title">{titre}</h2>
+        <div class="rapport-section-content">
+            {contenu}
+        </div>
+    </div>`,
+        item: `
+        <div class="rapport-item">
+            <div class="rapport-item-title">{titre}</div>
+            <div class="rapport-item-content">{contenu}</div>
+        </div>`,
+        tableau: `
+        <table>
+            <thead>
+                <tr>
+                    {entetes}
+                </tr>
+            </thead>
+            <tbody>
+                {lignes}
+            </tbody>
+        </table>`,
+        entete_tableau: `<th>{contenu}</th>`,
+        ligne_tableau: `
+                <tr>
+                    {cellules}
+                </tr>`,
+        cellule_tableau: `<td>{contenu}</td>`,
+        code: `
+        <div class="code">{code}</div>`,
+        erreur: `
+        <div class="rapport-error">{message}</div>`,
+        avertissement: `
+        <div class="rapport-warning">{message}</div>`,
+        info: `
+        <div class="rapport-info">{message}</div>`,
+        lien: `<a href="{url}" target="_blank">{texte}</a>`,
+        image: `<img src="{url}" alt="{alt}" style="max-width: 100%;">`
+    },
+    TXT: {
+        entete: `=====================================================
+RAPPORT: {titre}
+=====================================================
+{description}
+Généré le: {date}
+
+`,
+        pied: `
+=====================================================
+RÉSUMÉ:
+{resume}
+=====================================================
+Rapport généré par le Générateur de Rapports Avancé AGAM - {version}
+{signature}
+`,
+        section: `
+-----------------------------------------------------
+{titre}
+-----------------------------------------------------
+{contenu}
+`,
+        item: `* {titre}:
+  {contenu}
+`,
+        tableau: `
+{titre}:
++{separateurs}+
+|{entetes}|
++{separateurs}+
+{lignes}
++{separateurs}+
+`,
+        ligne_tableau: `|{cellules}|`,
+        code: `
+CODE:
+-----------------------------------------------------
+{code}
+-----------------------------------------------------
+`,
+        erreur: `ERREUR: {message}`,
+        avertissement: `AVERTISSEMENT: {message}`,
+        info: `INFO: {message}`,
+        lien: `{texte} ({url})`,
+        image: `[IMAGE: {alt}]`
+    }
+}
+
+MISSION InitialiserGenerateurRapports {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du générateur de rapports avancé AGAM"
+        
+        # Configurer le générateur avec les options par défaut
+        STRATEGIE config = ConfigurationRapports
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet générateur
+        STRATEGIE generateur = {
+            configuration: config,
+            templates: TemplatesRapports,
+            theme_actif: config.themes[config.theme_par_defaut],
+            historique_rapports: [],
+            compteur_rapports: 0
+        }
+        
+        # Charger les modèles personnalisés si disponibles
+        EXECUTION ChargerModelesPersonnalises generateur
+        
+        RAPPORT "Générateur de rapports initialisé avec le thème: " + config.theme_par_defaut
+        
+        RETRAITE generateur
+    }
+}
+
+MISSION ChargerModelesPersonnalises {
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Chargement des modèles personnalisés"
+        
+        # Vérifier si le répertoire des modèles existe
+        SI CIBLE !EXECUTION RepertoireExiste generateur.configuration.dir_modeles {
+            RAPPORT "Le répertoire des modèles n'existe pas, utilisation des modèles par défaut"
+            RETRAITE generateur
+        }
+        
+        # Dans une implémentation réelle, on chercherait et chargerait
+        # les fichiers de modèles personnalisés
+        
+        RAPPORT "Modèles personnalisés chargés avec succès"
+        
+        RETRAITE generateur
+    }
+}
+
+MISSION GenererRapport {
+    PARAMETRE generateur
+    PARAMETRE donnees
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération d'un rapport avancé"
+        
+        # Initialiser les options par défaut
+        STRATEGIE options_rapport = {
+            titre: "Rapport AGAM",
+            description: "Rapport généré automatiquement",
+            format: generateur.configuration.format_par_defaut,
+            theme: generateur.configuration.theme_par_defaut,
+            niveau_detail: generateur.configuration.niveau_detail,
+            inclure_code: VRAI,
+            inclure_statistiques: VRAI,
+            fichier_sortie: "rapport_" + ObtenirDateHeure() + "." + generateur.configuration.format_par_defaut.toLowerCase()
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_rapport[cle] = options[cle]
+            }
+        }
+        
+        # Vérifier si le format de sortie est supporté
+        SI CIBLE !EXECUTION ContientElement generateur.configuration.formats_sortie options_rapport.format {
+            RAPPORT "AVERTISSEMENT: Format de sortie non supporté: " + options_rapport.format + ". Utilisation du format par défaut: " + generateur.configuration.format_par_defaut
+            options_rapport.format = generateur.configuration.format_par_defaut
+        }
+        
+        # Appliquer le thème
+        SI CIBLE options_rapport.theme != generateur.configuration.theme_par_defaut {
+            SI CIBLE generateur.configuration.themes[options_rapport.theme] {
+                generateur.theme_actif = generateur.configuration.themes[options_rapport.theme]
+            } SINON {
+                RAPPORT "AVERTISSEMENT: Thème non trouvé: " + options_rapport.theme + ". Utilisation du thème par défaut: " + generateur.configuration.theme_par_defaut
+                generateur.theme_actif = generateur.configuration.themes[generateur.configuration.theme_par_defaut]
+            }
+        }
+        
+        # Obtenir le template correspondant au format
+        STRATEGIE template = generateur.templates[options_rapport.format]
+        
+        SI CIBLE template == NULE {
+            RAPPORT "ERREUR: Template non trouvé pour le format: " + options_rapport.format
+            RETRAITE NULE
+        }
+        
+        # Traiter les données du rapport
+        STRATEGIE donnees_traitees = EXECUTION PreprocDonneesRapport donnees options_rapport generateur
+        
+        # Générer le contenu du rapport
+        STRATEGIE contenu = EXECUTION GenererContenuRapport donnees_traitees template generateur
+        
+        # Signer le rapport si configuré
+        SI CIBLE generateur.configuration.signature_numerique {
+            contenu = EXECUTION SignerRapport contenu generateur
+        }
+        
+        # Compresser le rapport si configuré et nécessaire
+        SI CIBLE generateur.configuration.comprimer_grands_rapports ET EXECUTION TailleContenu contenu > generateur.configuration.seuil_compression_kb * 1024 {
+            contenu = EXECUTION CompresserContenu contenu
+            options_rapport.fichier_sortie = options_rapport.fichier_sortie + ".gz"
+        }
+        
+        # Écrire le fichier de rapport
+        SI CIBLE !EXECUTION EcrireFichier options_rapport.fichier_sortie contenu {
+            RAPPORT "ERREUR: Échec de l'écriture du fichier de rapport: " + options_rapport.fichier_sortie
+            RETRAITE NULE
+        }
+        
+        # Mettre à jour l'historique des rapports
+        generateur.historique_rapports = DEPLOIEMENT generateur.historique_rapports {
+            id: generateur.compteur_rapports + 1,
+            titre: options_rapport.titre,
+            format: options_rapport.format,
+            date: ObtenirDateHeure(),
+            fichier: options_rapport.fichier_sortie
+        }
+        
+        generateur
+
+        # Incrémenter le compteur de rapports
+    generateur.compteur_rapports = generateur.compteur_rapports + 1
+    
+    RAPPORT "Rapport généré avec succès: " + options_rapport.fichier_sortie
+    
+    RETRAITE {
+        succes: VRAI,
+        fichier: options_rapport.fichier_sortie,
+        format: options_rapport.format,
+        taille: EXECUTION TailleContenu contenu,
+        id: generateur.compteur_rapports
+    }
+}
+
+MISSION PreprocDonneesRapport {
+    PARAMETRE donnees
+    PARAMETRE options
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Prétraitement des données du rapport"
+        
+        # Structure pour stocker les données traitées
+        STRATEGIE resultat = {
+            meta: {
+                titre: options.titre,
+                description: options.description,
+                date: ObtenirDateHeure(),
+                version: "1.0",
+                signature: ""
+            },
+            sections: [],
+            statistiques: {},
+            resume: "",
+            erreurs: [],
+            avertissements: []
+        }
+        
+        # Traiter les sections
+        SI CIBLE donnees.sections {
+            POUR section DANS donnees.sections {
+                STRATEGIE section_traitee = EXECUTION TraiterSection section options generateur
+                resultat.sections = DEPLOIEMENT resultat.sections section_traitee
+            }
+        }
+        
+        # Générer des statistiques si configuré
+        SI CIBLE options.inclure_statistiques {
+            resultat.statistiques = EXECUTION GenererStatistiques donnees
+        }
+        
+        # Générer un résumé automatique
+        resultat.resume = EXECUTION GenererResume donnees resultat.statistiques resultat.sections
+        
+        # Collecter les erreurs et avertissements
+        SI CIBLE donnees.erreurs {
+            resultat.erreurs = donnees.erreurs
+        }
+        
+        SI CIBLE donnees.avertissements {
+            resultat.avertissements = donnees.avertissements
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION TraiterSection {
+    PARAMETRE section
+    PARAMETRE options
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        # Structure pour la section traitée
+        STRATEGIE section_traitee = {
+            titre: section.titre,
+            items: []
+        }
+        
+        # Traiter les items de la section selon le niveau de détail
+        SI CIBLE section.items {
+            POUR item DANS section.items {
+                # Filtrer selon le niveau de détail
+                SI CIBLE item.niveau_detail ET options.niveau_detail == "MINIMAL" ET item.niveau_detail == "COMPLET" {
+                    # Ignorer les items détaillés en mode minimal
+                    CONTINUER
+                }
+                
+                # Traiter le contenu selon le type
+                SI CIBLE item.type == "CODE" ET !options.inclure_code {
+                    # Ignorer les blocs de code si configuré
+                    CONTINUER
+                }
+                
+                # Ajouter l'item traité
+                section_traitee.items = DEPLOIEMENT section_traitee.items item
+            }
+        }
+        
+        # Si la section n'a pas d'items après filtrage, retourner NULE
+        SI CIBLE RECONNAISSANCE section_traitee.items == 0 {
+            RETRAITE NULE
+        }
+        
+        RETRAITE section_traitee
+    }
+}
+
+MISSION GenererStatistiques {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération des statistiques du rapport"
+        
+        # Statistiques de base
+        STRATEGIE stats = {
+            nombre_sections: 0,
+            nombre_items: 0,
+            nombre_erreurs: 0,
+            nombre_avertissements: 0,
+            taille_code: 0,
+            categories: {}
+        }
+        
+        # Compter les sections
+        SI CIBLE donnees.sections {
+            stats.nombre_sections = RECONNAISSANCE donnees.sections
+            
+            # Compter les items dans chaque section
+            POUR section DANS donnees.sections {
+                SI CIBLE section.items {
+                    stats.nombre_items = stats.nombre_items + RECONNAISSANCE section.items
+                    
+                    # Compter le code
+                    POUR item DANS section.items {
+                        SI CIBLE item.type == "CODE" ET item.contenu {
+                            stats.taille_code = stats.taille_code + RECONNAISSANCE item.contenu
+                        }
+                        
+                        # Compter par catégorie
+                        SI CIBLE item.categorie {
+                            SI CIBLE stats.categories[item.categorie] {
+                                stats.categories[item.categorie] = stats.categories[item.categorie] + 1
+                            } SINON {
+                                stats.categories[item.categorie] = 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Compter les erreurs et avertissements
+        SI CIBLE donnees.erreurs {
+            stats.nombre_erreurs = RECONNAISSANCE donnees.erreurs
+        }
+        
+        SI CIBLE donnees.avertissements {
+            stats.nombre_avertissements = RECONNAISSANCE donnees.avertissements
+        }
+        
+        RETRAITE stats
+    }
+}
+
+MISSION GenererResume {
+    PARAMETRE donnees
+    PARAMETRE statistiques
+    PARAMETRE sections
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération du résumé du rapport"
+        
+        # Créer un résumé automatique
+        STRATEGIE resume = "Ce rapport contient " + statistiques.nombre_sections + " sections, " + 
+                         statistiques.nombre_items + " éléments, " + 
+                         statistiques.nombre_erreurs + " erreurs et " + 
+                         statistiques.nombre_avertissements + " avertissements."
+        
+        # Ajouter des détails sur les catégories principales
+        SI CIBLE statistiques.categories ET RECONNAISSANCE CLES(statistiques.categories) > 0 {
+            resume = resume + " Catégories principales: "
+            MUNITION premier = VRAI
+            
+            POUR categorie DANS CLES(statistiques.categories) {
+                SI CIBLE !premier {
+                    resume = resume + ", "
+                }
+                
+                resume = resume + categorie + " (" + statistiques.categories[categorie] + ")"
+                premier = FAUX
+            }
+            
+            resume = resume + "."
+        }
+        
+        # Ajouter des mentions spéciales pour les erreurs
+        SI CIBLE statistiques.nombre_erreurs > 0 {
+            resume = resume + " ATTENTION: Des erreurs ont été détectées et doivent être examinées."
+        }
+        
+        # Ajouter des détails personnalisés
+        SI CIBLE donnees.resume_personnalise {
+            resume = resume + "\n\n" + donnees.resume_personnalise
+        }
+        
+        RETRAITE resume
+    }
+}
+
+MISSION GenererContenuRapport {
+    PARAMETRE donnees
+    PARAMETRE template
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération du contenu du rapport"
+        
+        # Remplacer les variables dans l'en-tête
+        STRATEGIE contenu = template.entete
+            .remplacer("{titre}", donnees.meta.titre)
+            .remplacer("{description}", donnees.meta.description)
+            .remplacer("{date}", donnees.meta.date)
+        
+        # Remplacer les variables de couleur avec le thème actif
+        POUR cle DANS CLES(generateur.theme_actif) {
+            contenu = contenu.remplacer("{" + cle + "}", generateur.theme_actif[cle])
+        }
+        
+        # Ajouter les sections
+        POUR section DANS donnees.sections {
+            SI CIBLE section == NULE {
+                CONTINUER
+            }
+            
+            # Générer le contenu de la section
+            STRATEGIE contenu_section = EXECUTION GenererContenuSection section template generateur
+            
+            # Ajouter la section au rapport
+            contenu = contenu + template.section
+                .remplacer("{titre}", section.titre)
+                .remplacer("{contenu}", contenu_section)
+        }
+        
+        # Ajouter la section d'erreurs si nécessaire
+        SI CIBLE donnees.erreurs ET RECONNAISSANCE donnees.erreurs > 0 {
+            STRATEGIE contenu_erreurs = ""
+            
+            POUR erreur DANS donnees.erreurs {
+                contenu_erreurs = contenu_erreurs + template.erreur.remplacer("{message}", erreur)
+            }
+            
+            contenu = contenu + template.section
+                .remplacer("{titre}", "Erreurs")
+                .remplacer("{contenu}", contenu_erreurs)
+        }
+        
+        # Ajouter la section d'avertissements si nécessaire
+        SI CIBLE donnees.avertissements ET RECONNAISSANCE donnees.avertissements > 0 {
+            STRATEGIE contenu_avertissements = ""
+            
+            POUR avertissement DANS donnees.avertissements {
+                contenu_avertissements = contenu_avertissements + template.avertissement.remplacer("{message}", avertissement)
+            }
+            
+            contenu = contenu + template.section
+                .remplacer("{titre}", "Avertissements")
+                .remplacer("{contenu}", contenu_avertissements)
+        }
+        
+        # Ajouter la section des statistiques si nécessaire
+        SI CIBLE donnees.statistiques ET RECONNAISSANCE CLES(donnees.statistiques) > 0 {
+            STRATEGIE contenu_stats = EXECUTION GenererContenuStatistiques donnees.statistiques template
+            
+            contenu = contenu + template.section
+                .remplacer("{titre}", "Statistiques")
+                .remplacer("{contenu}", contenu_stats)
+        }
+        
+        # Ajouter le pied de page
+        contenu = contenu + template.pied
+            .remplacer("{resume}", donnees.resume)
+            .remplacer("{version}", "1.0")
+            .remplacer("{signature}", donnees.meta.signature)
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION GenererContenuSection {
+    PARAMETRE section
+    PARAMETRE template
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu_section = ""
+        
+        # Générer le contenu pour chaque item de la section
+        POUR item DANS section.items {
+            STRATEGIE contenu_item = EXECUTION GenererContenuItem item template generateur
+            contenu_section = contenu_section + contenu_item
+        }
+        
+        RETRAITE contenu_section
+    }
+}
+
+MISSION GenererContenuItem {
+    PARAMETRE item
+    PARAMETRE template
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu_item = ""
+        
+        # Traiter différemment selon le type d'item
+        SI CIBLE item.type == "TEXTE" {
+            # Item de texte simple
+            contenu_item = template.item
+                .remplacer("{titre}", item.titre OU "")
+                .remplacer("{contenu}", item.contenu OU "")
+        } SINON SI CIBLE item.type == "CODE" {
+            # Bloc de code
+            contenu_item = template.code
+                .remplacer("{code}", item.contenu OU "")
+        } SINON SI CIBLE item.type == "TABLEAU" {
+            # Tableau
+            contenu_item = EXECUTION GenererContenuTableau item template
+        } SINON SI CIBLE item.type == "ERREUR" {
+            # Message d'erreur
+            contenu_item = template.erreur
+                .remplacer("{message}", item.message OU item.contenu OU "Erreur non spécifiée")
+        } SINON SI CIBLE item.type == "AVERTISSEMENT" {
+            # Avertissement
+            contenu_item = template.avertissement
+                .remplacer("{message}", item.message OU item.contenu OU "Avertissement non spécifié")
+        } SINON SI CIBLE item.type == "INFO" {
+            # Information
+            contenu_item = template.info
+                .remplacer("{message}", item.message OU item.contenu OU "Information non spécifiée")
+        } SINON SI CIBLE item.type == "LIEN" {
+            # Lien hypertexte
+            contenu_item = template.lien
+                .remplacer("{url}", item.url OU "#")
+                .remplacer("{texte}", item.texte OU item.url OU "Lien")
+        } SINON SI CIBLE item.type == "IMAGE" {
+            # Image
+            contenu_item = template.image
+                .remplacer("{url}", item.url OU "")
+                .remplacer("{alt}", item.alt OU item.titre OU "Image")
+        } SINON {
+            # Type non reconnu, traiter comme texte
+            contenu_item = template.item
+                .remplacer("{titre}", item.titre OU "")
+                .remplacer("{contenu}", item.contenu OU "")
+        }
+        
+        RETRAITE contenu_item
+    }
+}
+
+MISSION GenererContenuTableau {
+    PARAMETRE item_tableau
+    PARAMETRE template
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si les données du tableau sont disponibles
+        SI CIBLE !item_tableau.donnees OU RECONNAISSANCE item_tableau.donnees == 0 {
+            RETRAITE "Tableau vide ou non spécifié"
+        }
+        
+        # Générer les en-têtes du tableau
+        STRATEGIE entetes = ""
+        STRATEGIE separateurs = ""
+        
+        SI CIBLE item_tableau.entetes {
+            POUR entete DANS item_tableau.entetes {
+                SI CIBLE template.entete_tableau {
+                    entetes = entetes + template.entete_tableau.remplacer("{contenu}", entete)
+                } SINON {
+                    entetes = entetes + entete + " | "
+                }
+                
+                # Générer les séparateurs pour le format texte
+                separateurs = separateurs + "------"
+            }
+        } SINON SI CIBLE RECONNAISSANCE item_tableau.donnees > 0 ET RECONNAISSANCE item_tableau.donnees[0] > 0 {
+            # Utiliser les clés de la première ligne comme en-têtes
+            POUR cle DANS CLES(item_tableau.donnees[0]) {
+                SI CIBLE template.entete_tableau {
+                    entetes = entetes + template.entete_tableau.remplacer("{contenu}", cle)
+                } SINON {
+                    entetes = entetes + cle + " | "
+                }
+                
+                # Générer les séparateurs pour le format texte
+                separateurs = separateurs + "------"
+            }
+        }
+        
+        # Générer les lignes du tableau
+        STRATEGIE lignes = ""
+        
+        POUR ligne DANS item_tableau.donnees {
+            STRATEGIE cellules = ""
+            
+            SI CIBLE TYPEDE ligne == "OBJET" {
+                # Ligne sous forme d'objet avec clés
+                POUR cle DANS CLES(ligne) {
+                    SI CIBLE template.cellule_tableau {
+                        cellules = cellules + template.cellule_tableau.remplacer("{contenu}", ligne[cle])
+                    } SINON {
+                        cellules = cellules + ligne[cle] + " | "
+                    }
+                }
+            } SINON SI CIBLE TYPEDE ligne == "FORMATION" {
+                # Ligne sous forme de tableau
+                POUR cellule DANS ligne {
+                    SI CIBLE template.cellule_tableau {
+                        cellules = cellules + template.cellule_tableau.remplacer("{contenu}", cellule)
+                    } SINON {
+                        cellules = cellules + cellule + " | "
+                    }
+                }
+            }
+            
+            SI CIBLE template.ligne_tableau {
+                lignes = lignes + template.ligne_tableau.remplacer("{cellules}", cellules)
+            } SINON {
+                lignes = lignes + "| " + cellules + "\n"
+            }
+        }
+        
+        # Générer le tableau complet
+        STRATEGIE tableau = template.tableau
+            .remplacer("{titre}", item_tableau.titre OU "")
+            .remplacer("{entetes}", entetes)
+            .remplacer("{separateurs}", separateurs)
+            .remplacer("{lignes}", lignes)
+        
+        RETRAITE tableau
+    }
+}
+
+MISSION GenererContenuStatistiques {
+    PARAMETRE statistiques
+    PARAMETRE template
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu = ""
+        
+        # Créer une table pour les statistiques générales
+        STRATEGIE donnees_stats = [
+            { element: "Nombre de sections", valeur: statistiques.nombre_sections },
+            { element: "Nombre d'items", valeur: statistiques.nombre_items },
+            { element: "Nombre d'erreurs", valeur: statistiques.nombre_erreurs },
+            { element: "Nombre d'avertissements", valeur: statistiques.nombre_avertissements },
+            { element: "Taille du code (caractères)", valeur: statistiques.taille_code }
+        ]
+        
+        # Créer les en-têtes
+        STRATEGIE entetes = ""
+        
+        SI CIBLE template.entete_tableau {
+            entetes = template.entete_tableau.remplacer("{contenu}", "Élément") + 
+                     template.entete_tableau.remplacer("{contenu}", "Valeur")
+        } SINON {
+            entetes = "Élément | Valeur"
+        }
+        
+        # Créer les lignes
+        STRATEGIE lignes = ""
+        
+        POUR stat DANS donnees_stats {
+            STRATEGIE cellules = ""
+            
+            SI CIBLE template.cellule_tableau {
+                cellules = template.cellule_tableau.remplacer("{contenu}", stat.element) + 
+                          template.cellule_tableau.remplacer("{contenu}", stat.valeur)
+            } SINON {
+                cellules = stat.element + " | " + stat.valeur
+            }
+            
+            SI CIBLE template.ligne_tableau {
+                lignes = lignes + template.ligne_tableau.remplacer("{cellules}", cellules)
+            } SINON {
+                lignes = lignes + "| " + cellules + "\n"
+            }
+        }
+        
+        # Générer le tableau
+        contenu = template.tableau
+            .remplacer("{titre}", "Statistiques générales")
+            .remplacer("{entetes}", entetes)
+            .remplacer("{separateurs}", "---------------")
+            .remplacer("{lignes}", lignes)
+        
+        # Ajouter un tableau pour les catégories si disponibles
+        SI CIBLE statistiques.categories ET RECONNAISSANCE CLES(statistiques.categories) > 0 {
+            STRATEGIE donnees_categories = []
+            
+            POUR categorie DANS CLES(statistiques.categories) {
+                donnees_categories = DEPLOIEMENT donnees_categories {
+                    categorie: categorie,
+                    nombre: statistiques.categories[categorie]
+                }
+            }
+            
+            # Créer les en-têtes
+            STRATEGIE entetes_cat = ""
+            
+            SI CIBLE template.entete_tableau {
+                entetes_cat = template.entete_tableau.remplacer("{contenu}", "Catégorie") + 
+                            template.entete_tableau.remplacer("{contenu}", "Nombre")
+            } SINON {
+                entetes_cat = "Catégorie | Nombre"
+            }
+            
+            # Créer les lignes
+            STRATEGIE lignes_cat = ""
+            
+            POUR cat DANS donnees_categories {
+                STRATEGIE cellules = ""
+                
+                SI CIBLE template.cellule_tableau {
+                    cellules = template.cellule_tableau.remplacer("{contenu}", cat.categorie) + 
+                              template.cellule_tableau.remplacer("{contenu}", cat.nombre)
+                } SINON {
+                    cellules = cat.categorie + " | " + cat.nombre
+                }
+                
+                SI CIBLE template.ligne_tableau {
+                    lignes_cat = lignes_cat + template.ligne_tableau.remplacer("{cellules}", cellules)
+                } SINON {
+                    lignes_cat = lignes_cat + "| " + cellules + "\n"
+                }
+            }
+            
+            # Ajouter le tableau des catégories
+            contenu = contenu + "\n\n" + template.tableau
+                .remplacer("{titre}", "Statistiques par catégorie")
+                .remplacer("{entetes}", entetes_cat)
+                .remplacer("{separateurs}", "---------------")
+                .remplacer("{lignes}", lignes_cat)
+        }
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION SignerRapport {
+    PARAMETRE contenu
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Signature numérique du rapport"
+        
+        # Dans une implémentation réelle, ceci génèrerait une signature cryptographique
+        
+        # Pour cette version simplifiée, générer une signature fictive
+        STRATEGIE signature = "Signé numériquement: AGAM-" + ObtenirDateHeure() + "-" + generateur.compteur_rapports
+        
+        # Remplacer les balises de signature dans le contenu
+        contenu = contenu.remplacer("{signature}", signature)
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION CompresserContenu {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Compression du contenu du rapport"
+        
+        # Dans une implémentation réelle, ceci utiliserait un algorithme de compression
+        
+        # Pour cette version simplifiée, retourner le contenu non compressé
+        RETRAITE contenu
+    }
+}
+
+MISSION TailleContenu {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Calculer la taille du contenu en octets
+        
+        # Pour cette version simplifiée, utiliser la longueur de la chaîne
+        RETRAITE RECONNAISSANCE contenu
+    }
+}
+
+MISSION ObtenirDateHeure {
+    ORDRE DE BATAILLE {
+        # Obtenir la date et l'heure actuelles formatées
+        
+        # Pour cette version simplifiée, retourner une date fixe
+        RETRAITE "2025-02-24-123456"
+    }
+}
+
+MISSION EcrireFichier {
+    PARAMETRE chemin_fichier
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Écriture du fichier: " + chemin_fichier
+        
+        # Dans une implémentation réelle, ceci écrirait dans un fichier
+        
+        # Pour cette version simplifiée, simuler une écriture réussie
+        RETRAITE VRAI
+    }
+}
+
+MISSION RepertoireExiste {
+    PARAMETRE chemin_repertoire
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci vérifierait l'existence du répertoire
+        
+        # Pour cette version simplifiée, retourner FAUX
+        RETRAITE FAUX
+    }
+}
+
+MISSION ContientElement {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR item DANS liste {
+            SI CIBLE item == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION CLES {
+    PARAMETRE objet
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci retournerait les clés de l'objet
+        
+        # Pour cette version simplifiée, retourner quelques clés fictives
+        RETRAITE ["cle1", "cle2", "cle3"]
+    }
+}
+
+MISSION TYPEDE {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci déterminerait le type de la valeur
+        
+        # Pour cette version simplifiée, approximer le type
+        SI CIBLE valeur == NULE {
+            RETRAITE "NULE"
+        } SINON SI CIBLE TYPEDE valeur == "object" {
+            RETRAITE "OBJET"
+        } SINON SI CIBLE TYPEDE valeur == "array" {
+            RETRAITE "FORMATION"
+        } SINON SI CIBLE TYPEDE valeur == "string" {
+            RETRAITE "CHAINE"
+        } SINON SI CIBLE TYPEDE valeur == "number" {
+            RETRAITE "NOMBRE"
+        } SINON SI CIBLE TYPEDE valeur == "boolean" {
+            RETRAITE "BOOLEEN"
+        } SINON {
+            RETRAITE "INCONNU"
+        }
+    }
+}
+
+FIN BASE

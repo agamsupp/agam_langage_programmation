@@ -1,0 +1,10 @@
+MISSION PremiereOffensive {
+    ORDRE DE BATAILLE {
+        RAPPORT "Base AGAM déployée avec succès"
+        
+        MUNITION forces = 100
+        SI CIBLE forces > 50 {
+            RAPPORT "Forces opérationnelles"
+        }
+    }
+}

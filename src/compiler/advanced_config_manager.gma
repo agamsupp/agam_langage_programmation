@@ -1,0 +1,97 @@
+BASE GESTIONNAIRE_CONFIG_AVANCE
+
+STRATEGIE ConfigurationAvancee {
+    FORMATION domaines = [
+        {
+            nom: "COMPILATEUR",
+            parametres: [
+                {cle: "NIVEAU_OPTIMISATION", defaut: 2},
+                {cle: "PARALLELISME", defaut: VRAI},
+                {cle: "CACHE_TAILLE", defaut: 1024}
+            ],
+            validation: VRAI
+        },
+        {
+            nom: "RUNTIME",
+            parametres: [
+                {cle: "TAILLE_PILE", defaut: 1024 * 1024},
+                {cle: "MAX_THREADS", defaut: 8},
+                {cle: "DEBUG_MODE", defaut: FAUX}
+            ],
+            validation: VRAI
+        }
+    ]
+
+    STRATEGIE stockage = {
+        format: "HIERARCHIQUE",
+        versionnage: VRAI,
+        cryptage: VRAI,
+        cache: VRAI
+    }
+}
+
+MISSION GererConfiguration {
+    ORDRE DE BATAILLE {
+        # Initialisation du gestionnaire
+        STRATEGIE gestionnaire = {
+            config_active: VIDE,
+            historique: [],
+            observateurs: []
+        }
+        
+        # Chargement de la configuration
+        EXECUTION ChargerConfiguration
+        
+        # Surveillance des modifications
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE GESTIONNAIRE_ACTIF {
+                SI CIBLE DetecterModification {
+                    EXECUTION TraiterModification
+                    
+                    # Notification des observateurs
+                    EXECUTION NotifierObservateurs
+                }
+                
+                # Validation périodique
+                SI CIBLE TEMPS_VALIDATION_ATTEINT {
+                    EXECUTION ValiderConfiguration
+                }
+                
+                ATTENDRE INTERVALLE_VERIFICATION
+            }
+        }
+    }
+}
+
+MISSION ModifierParametre {
+    PARAMETRE domaine
+    PARAMETRE cle
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Vérification du domaine
+        SI CIBLE NON DomaineTrouve domaine {
+            RETRAITE ERREUR_DOMAINE
+        }
+        
+        # Validation de la valeur
+        SI CIBLE ValidationActivee domaine {
+            SI CIBLE NON ValiderValeur domaine cle valeur {
+                RETRAITE ERREUR_VALIDATION
+            }
+        }
+        
+        # Application de la modification
+        EXECUTION SauvegarderEtatPrecedent
+        EXECUTION AppliquerModification domaine cle valeur
+        
+        # Mise à jour du cache si nécessaire
+        SI CIBLE ConfigurationAvancee.stockage.cache {
+            EXECUTION MettreAJourCache domaine cle
+        }
+        
+        RETRAITE SUCCES
+    }
+}
+
+FIN BASE

@@ -1,0 +1,92 @@
+BASE ANALYSEUR_DEPENDANCES
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION types_dependances = [
+        {
+            type: "DIRECTE",
+            priorite: 1,
+            analyse: "IMMEDIATE"
+        },
+        {
+            type: "INDIRECTE",
+            priorite: 2,
+            analyse: "RECURSIVE"
+        },
+        {
+            type: "CIRCULAIRE",
+            priorite: 3,
+            analyse: "COMPLETE"
+        }
+    ]
+
+    STRATEGIE regles = {
+        detection_cycles: VRAI,
+        profondeur_max: 10,
+        resolution_dynamique: VRAI
+    }
+}
+
+MISSION AnalyserDependances {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE graphe = {
+            noeuds: [],
+            arcs: [],
+            cycles: []
+        }
+        
+        # Construction du graphe
+        POUR type DANS ConfigurationAnalyse.types_dependances {
+            SELON type.type {
+                CAS "DIRECTE":
+                    EXECUTION AnalyserDependancesDirectes module graphe
+                CAS "INDIRECTE":
+                    EXECUTION AnalyserDependancesIndirectes module graphe
+                CAS "CIRCULAIRE":
+                    EXECUTION DetecterCycles graphe
+            }
+        }
+        
+        # Validation du graphe
+        SI CIBLE ValidationRequise graphe {
+            EXECUTION ValiderGrapheDependances graphe
+        }
+        
+        RETRAITE graphe
+    }
+}
+
+MISSION ResoudreDependances {
+    PARAMETRE graphe
+    
+    ORDRE DE BATAILLE {
+        FORMATION ordre = []
+        FORMATION visites = []
+        
+        # Tri topologique
+        MISSION VisiteProfondeur {
+            PARAMETRE noeud
+            
+            SI CIBLE noeud DANS visites {
+                RETRAITE
+            }
+            
+            visites = DEPLOIEMENT visites noeud
+            
+            POUR dependance DANS noeud.dependances {
+                EXECUTION VisiteProfondeur dependance
+            }
+            
+            ordre = DEPLOIEMENT ordre noeud
+        }
+        
+        POUR noeud DANS graphe.noeuds {
+            EXECUTION VisiteProfondeur noeud
+        }
+        
+        RETRAITE ordre
+    }
+}
+
+FIN BASE

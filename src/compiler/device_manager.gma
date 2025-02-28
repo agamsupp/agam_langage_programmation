@@ -1,0 +1,112 @@
+BASE GESTIONNAIRE_PERIPHERIQUES
+
+STRATEGIE ConfigurationPeripheriques {
+    FORMATION peripheriques = []
+    FORMATION pilotes = []
+    
+    FORMATION types_peripheriques = [
+        {
+            type: "STOCKAGE",
+            interface: ["LIRE", "ECRIRE", "MONTER", "DEMONTER"]
+        },
+        {
+            type: "RESEAU",
+            interface: ["ENVOYER", "RECEVOIR", "CONFIGURER"]
+        },
+        {
+            type: "ENTREE",
+            interface: ["LIRE", "CONFIGURER", "ACTIVER", "DESACTIVER"]
+        }
+    ]
+}
+
+MISSION InitialiserPeripherique {
+    PARAMETRE type
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Vérification du type
+        SI CIBLE NON TypePeripheriqueValide type {
+            RETRAITE ERREUR_TYPE
+        }
+        
+        # Création de l'instance
+        STRATEGIE peripherique = {
+            id: GENERER_ID,
+            type: type,
+            etat: "INACTIF",
+            configuration: configuration,
+            pilote: CHARGER_PILOTE type
+        }
+        
+        # Initialisation du pilote
+        SI CIBLE NON InitialiserPilote peripherique {
+            RETRAITE ERREUR_INITIALISATION
+        }
+        
+        # Enregistrement du périphérique
+        ConfigurationPeripheriques.peripheriques = DEPLOIEMENT 
+            ConfigurationPeripheriques.peripheriques 
+            peripherique
+            
+        RETRAITE peripherique
+    }
+}
+
+MISSION CommuniquerPeripherique {
+    PARAMETRE peripherique
+    PARAMETRE commande
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Vérification de l'état
+        SI CIBLE NON PeripheriqueActif peripherique {
+            RETRAITE ERREUR_ETAT
+        }
+        
+        # Validation de la commande
+        SI CIBLE NON CommandeValide peripherique commande {
+            RETRAITE ERREUR_COMMANDE
+        }
+        
+        # Exécution de la commande
+        STRATEGIE resultat = EXECUTION_PILOTE 
+            peripherique.pilote 
+            commande 
+            donnees
+            
+        # Gestion des erreurs
+        SI CIBLE resultat.erreur NON VIDE {
+            EXECUTION GererErreurPeripherique peripherique resultat.erreur
+        }
+        
+        RETRAITE resultat.donnees
+    }
+}
+
+MISSION DetecterPeripheriques {
+    ORDRE DE BATAILLE {
+        FORMATION nouveaux_peripheriques = []
+        
+        # Scan des bus
+        POUR bus DANS BUSES_SYSTEME {
+            FORMATION detectes = SCANNER_BUS bus
+            
+            POUR detecte DANS detectes {
+                SI CIBLE NON PeripheriqueExiste detecte {
+                    STRATEGIE nouveau = EXECUTION InitialiserPeripherique 
+                        detecte.type 
+                        detecte.configuration
+                        
+                    nouveaux_peripheriques = DEPLOIEMENT 
+                        nouveaux_peripheriques 
+                        nouveau
+                }
+            }
+        }
+        
+        RETRAITE nouveaux_peripheriques
+    }
+}
+
+FIN BASE

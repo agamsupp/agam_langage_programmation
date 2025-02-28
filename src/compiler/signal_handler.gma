@@ -1,0 +1,96 @@
+BASE GESTIONNAIRE_SIGNAUX
+
+STRATEGIE ConfigurationSignaux {
+    FORMATION signaux_systeme = [
+        {
+            code: "SIGNAL_ARRET",
+            priorite: "HAUTE",
+            bloquable: FAUX
+        },
+        {
+            code: "SIGNAL_INTERRUPTION",
+            priorite: "MOYENNE",
+            bloquable: VRAI
+        },
+        {
+            code: "SIGNAL_ERREUR",
+            priorite: "HAUTE",
+            bloquable: FAUX
+        }
+    ]
+
+    FORMATION gestionnaires = []
+    FORMATION signaux_en_attente = []
+}
+
+MISSION InitialiserGestionnaireSignaux {
+    ORDRE DE BATAILLE {
+        POUR signal DANS ConfigurationSignaux.signaux_systeme {
+            EXECUTION EnregistrerGestionnaireDefaut signal
+        }
+    }
+}
+
+MISSION EnregistrerGestionnaire {
+    PARAMETRE code_signal
+    PARAMETRE gestionnaire
+    
+    ORDRE DE BATAILLE {
+        # Vérification signal valide
+        SI CIBLE NON SignalValide code_signal {
+            RAPPORT "ERREUR: Signal invalide"
+            RETRAITE FAUX
+        }
+        
+        STRATEGIE nouveau_gestionnaire = {
+            signal: code_signal,
+            fonction: gestionnaire,
+            actif: VRAI
+        }
+        
+        ConfigurationSignaux.gestionnaires = DEPLOIEMENT 
+            ConfigurationSignaux.gestionnaires 
+            nouveau_gestionnaire
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION EnvoyerSignal {
+    PARAMETRE code_signal
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE signal = {
+            code: code_signal,
+            donnees: donnees,
+            timestamp: TEMPS_ACTUEL
+        }
+        
+        # Traitement immédiat si haute priorité
+        SI CIBLE EstSignalHautePriorite signal {
+            EXECUTION TraiterSignal signal
+        } SINON {
+            ConfigurationSignaux.signaux_en_attente = DEPLOIEMENT 
+                ConfigurationSignaux.signaux_en_attente 
+                signal
+        }
+    }
+}
+
+MISSION TraiterSignal {
+    PARAMETRE signal
+    
+    ORDRE DE BATAILLE {
+        POUR gestionnaire DANS ConfigurationSignaux.gestionnaires {
+            SI CIBLE gestionnaire.signal VERIFICATION signal.code {
+                SI CIBLE gestionnaire.actif {
+                    EXECUTION gestionnaire.fonction signal.donnees
+                    PAUSE
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

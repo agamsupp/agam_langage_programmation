@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AGAM",
+  "patterns": [
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#comments" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#variables" }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.agam",
+          "match": "\\b(BASE|FIN BASE|MANOEUVRE|FIN MANOEUVRE|SI CIBLE|FIN CIBLE|CHAIN DE COMMANDE|FIN COMMANDE|CAS|DEFAUT|RETRAITE)\\b"
+        },
+        {
+          "name": "keyword.other.agam",
+          "match": "\\b(RAPPORT|SURVEILLANCE|RAVITAILLEMENT|MUNITION|DEPLOIEMENT|FUSION|STRATEGIE)\\b"
+        },
+        {
+          "name": "entity.name.function.agam",
+          "match": "\\b(ASSAUT|REPLI|PUISSANCE DE FEU)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.agam",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.agam",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "comments": {
+      "name": "comment.line.double-slash.agam",
+      "match": "//.*$"
+    },
+    "numbers": {
+      "name": "constant.numeric.agam",
+      "match": "\\b[0-9]+(\\.([0-9])+)?\\b"
+    },
+    "operators": {
+      "name": "keyword.operator.agam",
+      "match": "=|\\+|\\-|\\*|\\/|\\^|<|>|<=|>=|=="
+    },
+    "variables": {
+      "name": "variable.other.agam",
+      "match": "\\b(?!(BASE|FIN BASE|MANOEUVRE|FIN MANOEUVRE|RAPPORT|SURVEILLANCE|SI CIBLE|FIN CIBLE|RAVITAILLEMENT|RETRAITE|MUNITION|CHAIN DE COMMANDE|FIN COMMANDE|CAS|DEFAUT|ASSAUT|REPLI|PUISSANCE DE FEU|DEPLOIEMENT|FUSION|STRATEGIE)\\b)[a-zA-Z][a-zA-Z0-9_]*\\b"
+    }
+  },
+  "scopeName": "source.agam"
+}

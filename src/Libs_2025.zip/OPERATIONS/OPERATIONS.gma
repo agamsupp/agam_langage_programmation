@@ -1,0 +1,19 @@
+// Bibliothèque OPERATIONS - Logique et interactivité
+// Inclusion : INCLURE "OPERATIONS"
+
+MISSION PATROUILLE evenement action
+    [lie 'action' à 'événement' dans le runtime]
+FIN MISSION
+
+MISSION RENFORT element propriete valeur
+    [met à jour 'propriete' de 'element' avec 'valeur']
+FIN MISSION
+
+MISSION ECOUTEUR element
+    [attend interaction sur 'element']
+    RETRAITE [valeur capturée]
+FIN MISSION
+
+MISSION HORLOGE intervalle action
+    [répète 'action' toutes les 'intervalle' secondes]
+FIN MISSION

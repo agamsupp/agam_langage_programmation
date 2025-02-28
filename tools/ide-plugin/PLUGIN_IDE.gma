@@ -1,0 +1,46 @@
+BASE PLUGIN_IDE
+
+STRATEGIE Configuration {
+    FORMATION mots_cles = [
+        {mot: "BASE", couleur: "#FF0000"},
+        {mot: "MISSION", couleur: "#00FF00"},
+        {mot: "ORDRE", couleur: "#0000FF"}
+    ]
+    
+    FORMATION snippets = [
+        {
+            nom: "nouvelle_mission",
+            template: "MISSION NomMission {\n    ORDRE DE BATAILLE {\n        \n    }\n}"
+        }
+    ]
+}
+
+MISSION SyntaxHighlighting {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        POUR mot_cle DANS Configuration.mots_cles {
+            # Application de la coloration syntaxique
+            texte = AppliquerCouleur texte mot_cle
+        }
+        RETRAITE texte
+    }
+}
+
+MISSION Autocompletion {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        FORMATION suggestions = []
+        
+        POUR snippet DANS Configuration.snippets {
+            SI CIBLE CorrespondContexte contexte snippet {
+                suggestions = DEPLOIEMENT suggestions snippet
+            }
+        }
+        
+        RETRAITE suggestions
+    }
+}
+
+FIN BASE

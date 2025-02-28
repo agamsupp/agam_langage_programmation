@@ -1,0 +1,298 @@
+BASE GESTIONNAIRE_PAQUETS_REGISTRE
+
+STRATEGIE ConfigurationRegistre {
+    url_serveur: "https://registry.agam-lang.org",
+    cache_local: "/var/cache/agam/packages",
+    intervalle_maj: 86400,  # 24 heures en secondes
+    protocole_prefere: "HTTPS",
+    authentification: VRAI,
+    signature_packages: VRAI,
+    niveau_log: "INFO"
+}
+
+MISSION RegistreInitialiser {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du registre de paquets AGAM"
+        
+        # Configurer le registre avec les options par défaut
+        STRATEGIE config = ConfigurationRegistre
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Vérifier l'existence du cache local
+        SI CIBLE !RepertoireExiste config.cache_local {
+            EXECUTION RepertoireCreer config.cache_local
+        }
+        
+        # Créer l'objet registre
+        STRATEGIE registre = {
+            configuration: config,
+            connecte: FAUX,
+            dernier_maj: 0,
+            paquets_locaux: [],
+            paquets_distants: []
+        }
+        
+        # Charger les informations des paquets locaux
+        EXECUTION ChargerPaquetsLocaux registre
+        
+        RAPPORT "Registre initialisé avec " + RECONNAISSANCE registre.paquets_locaux + " paquets locaux"
+        
+        RETRAITE registre
+    }
+}
+
+MISSION ChargerPaquetsLocaux {
+    PARAMETRE registre
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Chargement des paquets locaux"
+        
+        # Lister les paquets dans le cache local
+        FORMATION paquets = []
+        
+        # Dans un système réel, ceci scannerait le répertoire du cache
+        # et chargerait les métadonnées des paquets installés
+        
+        # Simulation de quelques paquets installés
+        paquets = DEPLOIEMENT paquets {
+            nom: "stdlib-collections",
+            version: "1.0.0",
+            chemin: registre.configuration.cache_local + "/stdlib-collections-1.0.0",
+            dependances: []
+        }
+        
+        paquets = DEPLOIEMENT paquets {
+            nom: "stdlib-io",
+            version: "1.0.0",
+            chemin: registre.configuration.cache_local + "/stdlib-io-1.0.0",
+            dependances: []
+        }
+        
+        registre.paquets_locaux = paquets
+        
+        RETRAITE registre
+    }
+}
+
+MISSION RegistreConnecter {
+    PARAMETRE registre
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Connexion au registre distant: " + registre.configuration.url_serveur
+        
+        # Simuler une connexion au serveur de registre
+        # Dans un système réel, ceci établirait une connexion HTTP/HTTPS
+        # et vérifierait la disponibilité du serveur
+        
+        # Simuler une connexion réussie
+        registre.connecte = VRAI
+        
+        # Mettre à jour les informations des paquets distants si nécessaire
+        SI CIBLE ObtenirTempsActuel() - registre.dernier_maj > registre.configuration.intervalle_maj {
+            EXECUTION MettreAJourPaquetsDistants registre
+        }
+        
+        RAPPORT "Connexion établie avec le registre distant"
+        
+        RETRAITE registre
+    }
+}
+
+MISSION MettreAJourPaquetsDistants {
+    PARAMETRE registre
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Mise à jour des informations des paquets distants"
+        
+        # Simuler une requête au serveur pour obtenir la liste des paquets
+        # Dans un système réel, ceci ferait une requête HTTP/HTTPS
+        # et analyserait la réponse JSON ou XML
+        
+        # Simulation de paquets distants
+        FORMATION paquets = [
+            {
+                nom: "stdlib-collections",
+                version: "1.1.0",
+                description: "Bibliothèque standard de collections AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 45600,
+                date_publication: "2025-02-20"
+            },
+            {
+                nom: "stdlib-io",
+                version: "1.0.2",
+                description: "Bibliothèque standard d'entrées/sorties AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 32400,
+                date_publication: "2025-02-18"
+            },
+            {
+                nom: "stdlib-network",
+                version: "1.0.0",
+                description: "Bibliothèque standard de réseau AGAM",
+                auteur: "Équipe AGAM",
+                dependances: ["stdlib-io >= 1.0.0"],
+                taille: 56800,
+                date_publication: "2025-02-22"
+            },
+            {
+                nom: "stdlib-concurrency",
+                version: "1.0.0",
+                description: "Bibliothèque standard de concurrence AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 38200,
+                date_publication: "2025-02-24"
+            }
+        ]
+        
+        registre.paquets_distants = paquets
+        registre.dernier_maj = ObtenirTempsActuel()
+        
+        RAPPORT "Informations de paquets mises à jour: " + RECONNAISSANCE paquets + " paquets distants"
+        
+        RETRAITE registre
+    }
+}
+
+MISSION RechercherPaquet {
+    PARAMETRE registre
+    PARAMETRE terme_recherche
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Recherche de paquets avec le terme: " + terme_recherche
+        
+        # Vérifier que le registre est connecté
+        SI CIBLE !registre.connecte {
+            EXECUTION RegistreConnecter registre
+        }
+        
+        # Rechercher dans les paquets distants
+        FORMATION resultats = []
+        
+        POUR paquet DANS registre.paquets_distants {
+            SI CIBLE paquet.nom CONTIENT terme_recherche OU paquet.description CONTIENT terme_recherche {
+                resultats = DEPLOIEMENT resultats paquet
+            }
+        }
+        
+        RAPPORT "Recherche terminée: " + RECONNAISSANCE resultats + " paquets trouvés"
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION ObtenirInfosPaquet {
+    PARAMETRE registre
+    PARAMETRE nom_paquet
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Récupération des informations pour le paquet: " + nom_paquet
+        
+        # Vérifier que le registre est connecté
+        SI CIBLE !registre.connecte {
+            EXECUTION RegistreConnecter registre
+        }
+        
+        # Rechercher dans les paquets distants
+        POUR paquet DANS registre.paquets_distants {
+            SI CIBLE paquet.nom == nom_paquet {
+                RAPPORT "Informations trouvées pour le paquet: " + nom_paquet
+                RETRAITE paquet
+            }
+        }
+        
+        RAPPORT "Paquet non trouvé: " + nom_paquet
+        RETRAITE NULE
+    }
+}
+
+MISSION ObtenirVersionsPaquet {
+    PARAMETRE registre
+    PARAMETRE nom_paquet
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Récupération des versions disponibles pour le paquet: " + nom_paquet
+        
+        # Vérifier que le registre est connecté
+        SI CIBLE !registre.connecte {
+            EXECUTION RegistreConnecter registre
+        }
+        
+        # Dans un système réel, ceci ferait une requête spécifique au serveur
+        # pour obtenir toutes les versions d'un paquet
+        
+        # Simulation de versions disponibles
+        FORMATION versions = []
+        
+        SI CIBLE nom_paquet == "stdlib-collections" {
+            versions = DEPLOIEMENT versions "1.0.0"
+            versions = DEPLOIEMENT versions "1.0.1"
+            versions = DEPLOIEMENT versions "1.1.0"
+        } SINON SI CIBLE nom_paquet == "stdlib-io" {
+            versions = DEPLOIEMENT versions "0.9.0"
+            versions = DEPLOIEMENT versions "1.0.0"
+            versions = DEPLOIEMENT versions "1.0.1"
+            versions = DEPLOIEMENT versions "1.0.2"
+        } SINON SI CIBLE nom_paquet == "stdlib-network" {
+            versions = DEPLOIEMENT versions "0.5.0"
+            versions = DEPLOIEMENT versions "1.0.0"
+        } SINON SI CIBLE nom_paquet == "stdlib-concurrency" {
+            versions = DEPLOIEMENT versions "1.0.0"
+        }
+        
+        RAPPORT "Versions disponibles: " + JOINDRE versions ", "
+        
+        RETRAITE versions
+    }
+}
+
+MISSION RepertoireExiste {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Simulation de vérification d'existence de répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        # Simuler que le répertoire du cache existe toujours
+        SI CIBLE chemin CONTIENT "/var/cache/agam" {
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION RepertoireCreer {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Simulation de création de répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Répertoire créé: " + chemin
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ObtenirTempsActuel {
+    ORDRE DE BATAILLE {
+        # Simulation d'obtention du temps actuel en secondes depuis l'époque
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RETRAITE 1708766400  # Valeur simulée pour le 24 février 2025
+    }
+}
+
+FIN BASE

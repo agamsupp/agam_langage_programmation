@@ -1,0 +1,509 @@
+BASE STDLIB_NETWORK
+
+# Bibliothèque standard d'AGAM - Module Network
+# Implémentation des opérations de communication réseau
+# Dossier de destination: src/stdlib/network.gma
+
+STRATEGIE ConfigurationReseau {
+    timeout_defaut: 30000,
+    tentatives_max: 3,
+    taille_tampon: 8192,
+    activation_ssl: VRAI,
+    compression: VRAI,
+    user_agent: "AGAM-Client/1.0",
+    log_niveau: "INFO"
+}
+
+#
+# Opérations HTTP
+#
+MISSION HTTPRequete {
+    PARAMETRE url
+    PARAMETRE methode
+    PARAMETRE entetes
+    PARAMETRE corps
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les paramètres obligatoires
+        SI CIBLE url == NULE OU url == "" {
+            RAPPORT "ERREUR: URL manquante pour la requête HTTP"
+            RETRAITE NULE
+        }
+        
+        # Définir la méthode par défaut si non spécifiée
+        SI CIBLE methode == NULE OU methode == "" {
+            methode = "GET"
+        }
+        
+        # Vérifier si la méthode est valide
+        FORMATION methodes_valides = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+        SI CIBLE !VerifierAppartenance methodes_valides methode {
+            RAPPORT "ERREUR: Méthode HTTP non valide: " + methode
+            RETRAITE NULE
+        }
+        
+        # Fusionner les options avec les valeurs par défaut
+        STRATEGIE options_finales = {
+            timeout: ConfigurationReseau.timeout_defaut,
+            tentatives_max: ConfigurationReseau.tentatives_max,
+            suivre_redirections: VRAI,
+            compression: ConfigurationReseau.compression,
+            ssl_verifier: ConfigurationReseau.activation_ssl
+        }
+        
+        SI CIBLE options != NULE {
+            options_finales = FusionnerOptions options_finales options
+        }
+        
+        # Préparer les entêtes par défaut
+        STRATEGIE entetes_defaut = {
+            "User-Agent": ConfigurationReseau.user_agent,
+            "Accept": "text/html,application/json,*/*"
+        }
+        
+        SI CIBLE entetes != NULE {
+            entetes_defaut = FusionnerOptions entetes_defaut entetes
+        }
+        
+        # Log de la requête
+        SI CIBLE ConfigurationReseau.log_niveau == "DEBUG" OU ConfigurationReseau.log_niveau == "INFO" {
+            RAPPORT "Envoi d'une requête " + methode + " à " + url
+        }
+        
+        # Exécuter la requête HTTP
+        # Dans un système réel, ceci utiliserait des bibliothèques HTTP
+        
+        # Simuler une réponse
+        STRATEGIE reponse = {
+            statut: 200,
+            corps: "Réponse simulée pour " + methode + " " + url,
+            entetes: {
+                "Content-Type": "text/plain",
+                "Server": "AGAM-Server/1.0"
+            }
+        }
+        
+        # Log de la réponse
+        SI CIBLE ConfigurationReseau.log_niveau == "DEBUG" {
+            RAPPORT "Réponse reçue: Statut " + reponse.statut
+        }
+        
+        RETRAITE reponse
+    }
+}
+
+MISSION HTTPGet {
+    PARAMETRE url
+    PARAMETRE entetes
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RETRAITE EXECUTION HTTPRequete url "GET" entetes NULE options
+    }
+}
+
+MISSION HTTPPost {
+    PARAMETRE url
+    PARAMETRE corps
+    PARAMETRE entetes
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RETRAITE EXECUTION HTTPRequete url "POST" entetes corps options
+    }
+}
+
+MISSION HTTPPut {
+    PARAMETRE url
+    PARAMETRE corps
+    PARAMETRE entetes
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RETRAITE EXECUTION HTTPRequete url "PUT" entetes corps options
+    }
+}
+
+MISSION HTTPDelete {
+    PARAMETRE url
+    PARAMETRE entetes
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RETRAITE EXECUTION HTTPRequete url "DELETE" entetes NULE options
+    }
+}
+
+MISSION HTTPDecode {
+    PARAMETRE reponse
+    PARAMETRE format
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si la réponse est valide
+        SI CIBLE reponse == NULE {
+            RAPPORT "ERREUR: Réponse HTTP invalide"
+            RETRAITE NULE
+        }
+        
+        # Déterminer le format si non spécifié
+        SI CIBLE format == NULE {
+            # Essayer de déterminer à partir des entêtes Content-Type
+            SI CIBLE reponse.entetes["Content-Type"] != NULE {
+                SI CIBLE reponse.entetes["Content-Type"] CONTIENT "application/json" {
+                    format = "JSON"
+                } SINON SI CIBLE reponse.entetes["Content-Type"] CONTIENT "text/xml" {
+                    format = "XML"
+                } SINON {
+                    format = "TEXTE"
+                }
+            } SINON {
+                format = "TEXTE"
+            }
+        }
+        
+        # Décoder selon le format
+        SI CIBLE format == "JSON" {
+            RETRAITE EXECUTION JSONDecoder reponse.corps
+        } SINON SI CIBLE format == "XML" {
+            RETRAITE EXECUTION XMLDecoder reponse.corps
+        } SINON {
+            RETRAITE reponse.corps
+        }
+    }
+}
+
+#
+# Opérations Socket
+#
+MISSION SocketCreer {
+    PARAMETRE type
+    
+    ORDRE DE BATAILLE {
+        # Vérifier le type de socket
+        FORMATION types_valides = ["TCP", "UDP"]
+        SI CIBLE !VerifierAppartenance types_valides type {
+            RAPPORT "ERREUR: Type de socket non valide: " + type
+            RETRAITE NULE
+        }
+        
+        # Créer un socket
+        STRATEGIE socket = {
+            type: type,
+            connecte: FAUX,
+            adresse: NULE,
+            port: 0,
+            tampon: []
+        }
+        
+        RETRAITE socket
+    }
+}
+
+MISSION SocketConnecter {
+    PARAMETRE socket
+    PARAMETRE adresse
+    PARAMETRE port
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les paramètres
+        SI CIBLE socket == NULE {
+            RAPPORT "ERREUR: Socket invalide"
+            RETRAITE FAUX
+        }
+        
+        SI CIBLE adresse == NULE OU adresse == "" {
+            RAPPORT "ERREUR: Adresse invalide"
+            RETRAITE FAUX
+        }
+        
+        SI CIBLE port < 0 OU port > 65535 {
+            RAPPORT "ERREUR: Port invalide: " + port
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le socket est déjà connecté
+        SI CIBLE socket.connecte {
+            RAPPORT "ERREUR: Socket déjà connecté"
+            RETRAITE FAUX
+        }
+        
+        # Simuler la connexion du socket
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        socket.connecte = VRAI
+        socket.adresse = adresse
+        socket.port = port
+        
+        RAPPORT "Socket connecté à " + adresse + ":" + port
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION SocketFermer {
+    PARAMETRE socket
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le socket est valide
+        SI CIBLE socket == NULE {
+            RAPPORT "ERREUR: Socket invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le socket est déjà fermé
+        SI CIBLE !socket.connecte {
+            RAPPORT "AVERTISSEMENT: Socket déjà fermé"
+            RETRAITE VRAI
+        }
+        
+        # Fermer le socket
+        socket.connecte = FAUX
+        
+        RAPPORT "Socket fermé"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION SocketEnvoyer {
+    PARAMETRE socket
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le socket est valide et connecté
+        SI CIBLE socket == NULE {
+            RAPPORT "ERREUR: Socket invalide"
+            RETRAITE 0
+        }
+        
+        SI CIBLE !socket.connecte {
+            RAPPORT "ERREUR: Socket non connecté"
+            RETRAITE 0
+        }
+        
+        # Simuler l'envoi des données
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        MUNITION taille = RECONNAISSANCE donnees
+        
+        RAPPORT "Données envoyées: " + taille + " octets"
+        
+        RETRAITE taille
+    }
+}
+
+MISSION SocketRecevoir {
+    PARAMETRE socket
+    PARAMETRE taille_max
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le socket est valide et connecté
+        SI CIBLE socket == NULE {
+            RAPPORT "ERREUR: Socket invalide"
+            RETRAITE NULE
+        }
+        
+        SI CIBLE !socket.connecte {
+            RAPPORT "ERREUR: Socket non connecté"
+            RETRAITE NULE
+        }
+        
+        # Utiliser la taille du tampon par défaut si non spécifiée
+        SI CIBLE taille_max == NULE OU taille_max <= 0 {
+            taille_max = ConfigurationReseau.taille_tampon
+        }
+        
+        # Simuler la réception des données
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, retourner des données fictives
+        STRATEGIE donnees = "Données reçues de " + socket.adresse + ":" + socket.port
+        
+        RAPPORT "Données reçues: " + RECONNAISSANCE donnees + " octets"
+        
+        RETRAITE donnees
+    }
+}
+
+#
+# Serveur Socket
+#
+MISSION ServeurCreer {
+    PARAMETRE type
+    
+    ORDRE DE BATAILLE {
+        # Vérifier le type de serveur
+        FORMATION types_valides = ["TCP", "UDP"]
+        SI CIBLE !VerifierAppartenance types_valides type {
+            RAPPORT "ERREUR: Type de serveur non valide: " + type
+            RETRAITE NULE
+        }
+        
+        # Créer un serveur
+        STRATEGIE serveur = {
+            type: type,
+            actif: FAUX,
+            port: 0,
+            clients: [],
+            gestionnaire_connexion: NULE
+        }
+        
+        RETRAITE serveur
+    }
+}
+
+MISSION ServeurDemarrer {
+    PARAMETRE serveur
+    PARAMETRE port
+    PARAMETRE gestionnaire_connexion
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les paramètres
+        SI CIBLE serveur == NULE {
+            RAPPORT "ERREUR: Serveur invalide"
+            RETRAITE FAUX
+        }
+        
+        SI CIBLE port < 0 OU port > 65535 {
+            RAPPORT "ERREUR: Port invalide: " + port
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le serveur est déjà actif
+        SI CIBLE serveur.actif {
+            RAPPORT "ERREUR: Serveur déjà actif"
+            RETRAITE FAUX
+        }
+        
+        # Configurer le serveur
+        serveur.port = port
+        serveur.actif = VRAI
+        
+        SI CIBLE gestionnaire_connexion != NULE {
+            serveur.gestionnaire_connexion = gestionnaire_connexion
+        }
+        
+        # Simuler le démarrage du serveur
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        RAPPORT "Serveur " + serveur.type + " démarré sur le port " + port
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ServeurArreter {
+    PARAMETRE serveur
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le serveur est valide
+        SI CIBLE serveur == NULE {
+            RAPPORT "ERREUR: Serveur invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le serveur est actif
+        SI CIBLE !serveur.actif {
+            RAPPORT "AVERTISSEMENT: Serveur déjà arrêté"
+            RETRAITE VRAI
+        }
+        
+        # Fermer toutes les connexions clients
+        POUR client DANS serveur.clients {
+            EXECUTION SocketFermer client
+        }
+        
+        # Arrêter le serveur
+        serveur.actif = FAUX
+        serveur.clients = []
+        
+        RAPPORT "Serveur arrêté"
+        
+        RETRAITE VRAI
+    }
+}
+
+#
+# Utilitaires
+#
+MISSION VerifierAppartenance {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR item DANS liste {
+            SI CIBLE item == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION FusionnerOptions {
+    PARAMETRE options_base
+    PARAMETRE options_nouvelles
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = options_base
+        
+        POUR cle DANS CLES(options_nouvelles) {
+            resultat[cle] = options_nouvelles[cle]
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION JSONDecoder {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Simuler le décodage JSON
+        # Dans un système réel, ceci utiliserait une bibliothèque JSON
+        
+        # Pour la simulation, retourner un objet fictif
+        STRATEGIE objet = {
+            succes: VRAI,
+            message: "Décodage JSON simulé",
+            donnees: {
+                valeur: 42,
+                nom: "exemple"
+            }
+        }
+        
+        RETRAITE objet
+    }
+}
+
+MISSION XMLDecoder {
+    PARAMETRE texte
+    
+    ORDRE DE BATAILLE {
+        # Simuler le décodage XML
+        # Dans un système réel, ceci utiliserait une bibliothèque XML
+        
+        # Pour la simulation, retourner un objet fictif
+        STRATEGIE objet = {
+            racine: {
+                attributs: {
+                    version: "1.0"
+                },
+                enfants: [
+                    {
+                        nom: "element",
+                        valeur: "exemple",
+                        attributs: {},
+                        enfants: []
+                    }
+                ]
+            }
+        }
+        
+        RETRAITE objet
+    }
+}
+
+FIN BASE

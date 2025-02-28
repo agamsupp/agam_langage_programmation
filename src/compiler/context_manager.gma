@@ -1,0 +1,84 @@
+BASE GESTIONNAIRE_CONTEXTE
+
+STRATEGIE ContexteExecution {
+    FORMATION pile_contextes = []
+    STRATEGIE contexte_courant = VIDE
+    
+    FORMATION etats_sauvegarde = [
+        "REGISTRES",
+        "PILE",
+        "POINTEURS",
+        "FLAGS"
+    ]
+}
+
+MISSION CreerContexte {
+    ORDRE DE BATAILLE {
+        STRATEGIE nouveau_contexte = {
+            id: GENERER_ID,
+            registres: COPIER_REGISTRES,
+            pile: NOUVELLE_PILE,
+            flags: COPIER_FLAGS,
+            etat: "ACTIF"
+        }
+        
+        SI CIBLE ContexteExecution.contexte_courant NON VIDE {
+            nouveau_contexte.parent = ContexteExecution.contexte_courant
+        }
+        
+        ContexteExecution.pile_contextes = DEPLOIEMENT 
+            ContexteExecution.pile_contextes 
+            nouveau_contexte
+            
+        ContexteExecution.contexte_courant = nouveau_contexte
+        
+        RETRAITE nouveau_contexte
+    }
+}
+
+MISSION SauvegarderContexte {
+    ORDRE DE BATAILLE {
+        STRATEGIE sauvegarde = {
+            contexte: ContexteExecution.contexte_courant,
+            timestamp: TEMPS_ACTUEL
+        }
+        
+        POUR etat DANS ContexteExecution.etats_sauvegarde {
+            SELON etat {
+                CAS "REGISTRES":
+                    sauvegarde.registres = COPIER_REGISTRES
+                CAS "PILE":
+                    sauvegarde.pile = COPIER_PILE
+                CAS "POINTEURS":
+                    sauvegarde.pointeurs = COPIER_POINTEURS
+                CAS "FLAGS":
+                    sauvegarde.flags = COPIER_FLAGS
+            }
+        }
+        
+        RETRAITE sauvegarde
+    }
+}
+
+MISSION RestaurerContexte {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        POUR etat DANS ContexteExecution.etats_sauvegarde {
+            SELON etat {
+                CAS "REGISTRES":
+                    EXECUTION RestaurerRegistres contexte.registres
+                CAS "PILE":
+                    EXECUTION RestaurerPile contexte.pile
+                CAS "POINTEURS":
+                    EXECUTION RestaurerPointeurs contexte.pointeurs
+                CAS "FLAGS":
+                    EXECUTION RestaurerFlags contexte.flags
+            }
+        }
+        
+        ContexteExecution.contexte_courant = contexte
+    }
+}
+
+FIN BASE

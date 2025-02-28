@@ -1,0 +1,70 @@
+BASE SYSTEME_LOGGING
+
+STRATEGIE ConfigurationLogs {
+    FORMATION niveaux = [
+        {nom: "DEBUG", priorite: 0},
+        {nom: "INFO", priorite: 1},
+        {nom: "AVERTISSEMENT", priorite: 2},
+        {nom: "ERREUR", priorite: 3},
+        {nom: "CRITIQUE", priorite: 4}
+    ]
+    
+    FORMATION destinations = [
+        {type: "CONSOLE", actif: VRAI},
+        {type: "FICHIER", chemin: "logs/agam.log", actif: VRAI},
+        {type: "RESEAU", adresse: "logs.agam.mil", actif: FAUX}
+    ]
+}
+
+MISSION EnregistrerLog {
+    PARAMETRE niveau
+    PARAMETRE message
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE entree_log = {
+            niveau: niveau,
+            message: message,
+            contexte: contexte,
+            timestamp: TEMPS_ACTUEL,
+            thread: THREAD_COURANT
+        }
+        
+        # Formatage du message
+        MISSION FormaterLog {
+            RETRAITE "[" + entree_log.timestamp + "] " +
+                     "[" + entree_log.niveau + "] " +
+                     "[Thread-" + entree_log.thread + "] " +
+                     entree_log.message
+        }
+        
+        # Envoi aux destinations
+        POUR destination DANS ConfigurationLogs.destinations {
+            SI CIBLE destination.actif {
+                SELON destination.type {
+                    CAS "CONSOLE":
+                        EXECUTION EcrireConsole EXECUTION FormaterLog
+                    CAS "FICHIER":
+                        EXECUTION EcrireFichier destination.chemin EXECUTION FormaterLog
+                    CAS "RESEAU":
+                        EXECUTION EnvoyerReseau destination.adresse EXECUTION FormaterLog
+                }
+            }
+        }
+    }
+}
+
+MISSION RotationLogs {
+    ORDRE DE BATAILLE {
+        POUR destination DANS ConfigurationLogs.destinations {
+            SI CIBLE destination.type VERIFICATION "FICHIER" {
+                SI CIBLE TailleFichier destination.chemin > TAILLE_MAX_LOG {
+                    EXECUTION ArchiverLog destination.chemin
+                    EXECUTION CreerNouveauLog destination.chemin
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

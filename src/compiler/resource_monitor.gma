@@ -1,0 +1,101 @@
+BASE MONITEUR_RESSOURCES
+
+STRATEGIE ConfigurationSurveillance {
+    FORMATION ressources = [
+        {
+            type: "CPU",
+            metriques: [
+                "UTILISATION",
+                "CHARGE",
+                "TEMPERATURE"
+            ],
+            intervalle: 100    # ms
+        },
+        {
+            type: "MEMOIRE",
+            metriques: [
+                "UTILISATION",
+                "FRAGMENTATION",
+                "PAGES_VIRTUELLES"
+            ],
+            intervalle: 250
+        },
+        {
+            type: "DISQUE",
+            metriques: [
+                "IOPS",
+                "LATENCE",
+                "ESPACE_LIBRE"
+            ],
+            intervalle: 500
+        }
+    ]
+
+    STRATEGIE seuils = {
+        critique: {
+            cpu: 90,         # pourcentage
+            memoire: 85,     # pourcentage
+            disque: 95       # pourcentage
+        },
+        avertissement: {
+            cpu: 75,
+            memoire: 70,
+            disque: 80
+        }
+    }
+}
+
+MISSION SurveillanceRessources {
+    ORDRE DE BATAILLE {
+        # Initialisation des sondes
+        POUR ressource DANS ConfigurationSurveillance.ressources {
+            EXECUTION InitialiserSonde ressource
+        }
+        
+        # Boucle de surveillance
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE SURVEILLANCE_ACTIVE {
+                # Collecte des métriques
+                POUR ressource DANS ConfigurationSurveillance.ressources {
+                    STRATEGIE metriques = EXECUTION CollecterMetriques ressource
+                    
+                    # Vérification des seuils
+                    EXECUTION VerifierSeuils metriques ressource
+                    
+                    # Mise à jour des statistiques
+                    EXECUTION MettreAJourStatistiques ressource metriques
+                    
+                    ATTENDRE ressource.intervalle
+                }
+            }
+        }
+    }
+}
+
+MISSION GenererRapport {
+    PARAMETRE intervalle
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            moment: TEMPS_ACTUEL,
+            metriques: [],
+            alertes: [],
+            tendances: []
+        }
+        
+        # Compilation des métriques
+        POUR ressource DANS ConfigurationSurveillance.ressources {
+            rapport.metriques = DEPLOIEMENT rapport.metriques {
+                type: ressource.type,
+                donnees: OBTENIR_METRIQUES ressource intervalle
+            }
+        }
+        
+        # Analyse des tendances
+        EXECUTION AnalyserTendances rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

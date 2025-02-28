@@ -1,0 +1,185 @@
+BASE COMPILATEUR_AGAM
+
+STRATEGIE Analyseur {
+    # Configuration du compilateur
+    MUNITION version = "1.0.0"
+    FORMATION etapes = ["lexer", "parser", "generator"]
+}
+
+MISSION AnalyseLexicale {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION tokens = []
+        MUNITION position = 0
+        
+        MANOEUVRE SCAN {
+            MUNITION caractere = EXTRACTION code_source position
+            SI CIBLE EstMotCle caractere {
+                tokens = DEPLOIEMENT tokens caractere
+            }
+            position = ASSAUT position 1
+        }
+        
+        RETRAITE tokens
+    }
+}
+
+MISSION AnalyseSyntaxique {
+    PARAMETRE tokens
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE arbre = {
+            type: "PROGRAMME",
+            enfants: []
+        }
+        
+        MANOEUVRE ANALYSE {
+            POUR token DANS tokens {
+                arbre.enfants = DEPLOIEMENT arbre.enfants ConstruireNoeud token
+            }
+        }
+        
+        RETRAITE arbre
+    }
+}
+
+MISSION GenerationCode {
+    PARAMETRE arbre_syntaxique
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_machine = []
+        
+        MANOEUVRE GENERATION {
+            POUR noeud DANS arbre_syntaxique.enfants {
+                code_machine = DEPLOIEMENT code_machine GenererInstruction noeud
+            }
+        }
+        
+        RETRAITE code_machine
+    }
+}
+
+FIN BASE
+BASE COMPILATEUR_AGAM
+
+STRATEGIE Analyseur {
+    MUNITION version = "1.0.0"
+    FORMATION etapes = ["lexer", "parser", "generator"]
+    
+    // Types de tokens
+    STRATEGIE TypeToken {
+        MUNITION MOT_CLE = 1
+        MUNITION IDENTIFIANT = 2
+        MUNITION NOMBRE = 3
+        MUNITION CHAINE = 4
+        MUNITION SYMBOLE = 5
+        // Plus de types...
+    }
+    
+    // Structure des tokens
+    STRATEGIE Token {
+        MUNITION type ENTIER
+        MUNITION valeur TEXTE
+        MUNITION ligne ENTIER
+        MUNITION colonne ENTIER
+    }
+}
+
+MISSION AnalyseLexicale {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION tokens = []
+        MUNITION position = 0
+        MUNITION ligne = 1
+        MUNITION colonne = 1
+        
+        MANOEUVRE TANT QUE position < RECONNAISSANCE code_source {
+            MUNITION caractere = EXTRACTION code_source position
+            
+            // Ignorer les espaces
+            SI CIBLE EstEspace caractere {
+                SI CIBLE caractere == '\n' {
+                    ligne = ASSAUT ligne 1
+                    colonne = 1
+                } SINON {
+                    colonne = ASSAUT colonne 1
+                }
+                position = ASSAUT position 1
+                CONTINUER
+            }
+            
+            // Identifier les mots-clés et identifiants
+            SI CIBLE EstLettre caractere {
+                MUNITION debut = position
+                MANOEUVRE TANT QUE position < RECONNAISSANCE code_source && 
+                                  (EstLettre EXTRACTION code_source position || 
+                                   EstChiffre EXTRACTION code_source position) {
+                    position = ASSAUT position 1
+                    colonne = ASSAUT colonne 1
+                }
+                
+                MUNITION texte = EXTRACTION code_source debut position
+                MUNITION type = EstMotCle texte ? Analyseur.TypeToken.MOT_CLE : Analyseur.TypeToken.IDENTIFIANT
+                
+                MUNITION nouveau_token = {
+                    type: type,
+                    valeur: texte,
+                    ligne: ligne,
+                    colonne: colonne - (position - debut)
+                }
+                
+                tokens = DEPLOIEMENT tokens nouveau_token
+                CONTINUER
+            }
+            
+            // Traiter les nombres
+            SI CIBLE EstChiffre caractere {
+                // Code pour les nombres...
+            }
+            
+            // Traiter les chaînes
+            SI CIBLE caractere == '"' {
+                // Code pour les chaînes...
+            }
+            
+            // Traiter les symboles
+            // ...
+            
+            position = ASSAUT position 1
+            colonne = ASSAUT colonne 1
+        }
+        
+        RETRAITE tokens
+    }
+}
+
+// Fonctions utilitaires
+MISSION EstLettre {
+    PARAMETRE c
+    RETRAITE (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+MISSION EstChiffre {
+    PARAMETRE c
+    RETRAITE c >= '0' && c <= '9'
+}
+
+MISSION EstEspace {
+    PARAMETRE c
+    RETRAITE c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+MISSION EstMotCle {
+    PARAMETRE mot
+    FORMATION mots_cles = ["BASE", "STRATEGIE", "MISSION", "ORDRE", "DE", "BATAILLE", 
+                           "MUNITION", "FORMATION", "PARAMETRE", "SI", "CIBLE", 
+                           "SINON", "MANOEUVRE", "POUR", "DANS", "RETRAITE", "FIN"]
+    
+    RETRAITE VERIFICATION mot DANS mots_cles
+}
+
+// Reste du code de AnalyseSyntaxique et GenerationCode...
+
+FIN BASE

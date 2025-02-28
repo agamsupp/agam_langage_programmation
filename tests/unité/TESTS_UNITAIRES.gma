@@ -1,0 +1,51 @@
+BASE TESTS_UNITAIRES
+
+STRATEGIE TestConfig {
+    FORMATION tests_requis = [
+        "test_lexer",
+        "test_parser",
+        "test_generator"
+    ]
+}
+
+MISSION TestLexer {
+    ORDRE DE BATAILLE {
+        # Test des mots-clés
+        MUNITION code = "BASE TEST"
+        FORMATION tokens = EXECUTION AnalyseLexicale code
+        
+        SI CIBLE tokens[0] VERIFICATION "BASE" {
+            RAPPORT "Test Lexer: OK"
+        } SINON {
+            RAPPORT "Test Lexer: ECHEC"
+        }
+    }
+}
+
+MISSION TestParser {
+    ORDRE DE BATAILLE {
+        FORMATION tokens = ["BASE", "TEST", "{", "}"]
+        STRATEGIE arbre = EXECUTION AnalyseSyntaxique tokens
+        
+        SI CIBLE arbre.type VERIFICATION "PROGRAMME" {
+            RAPPORT "Test Parser: OK"
+        }
+    }
+}
+
+MISSION TestGenerator {
+    ORDRE DE BATAILLE {
+        STRATEGIE arbre_test = {
+            type: "PROGRAMME",
+            enfants: []
+        }
+        
+        FORMATION code = EXECUTION GenerationCode arbre_test
+        
+        SI CIBLE RECONNAISSANCE code > 0 {
+            RAPPORT "Test Generator: OK"
+        }
+    }
+}
+
+FIN BASE

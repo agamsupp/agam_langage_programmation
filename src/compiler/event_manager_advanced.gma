@@ -1,0 +1,95 @@
+BASE GESTIONNAIRE_EVENEMENTS_AVANCE
+
+STRATEGIE ConfigurationEvenements {
+    FORMATION categories = [
+        {
+            type: "SYSTEME",
+            priorite: 1,
+            actions: [
+                "JOURNALISATION",
+                "NOTIFICATION",
+                "REACTION"
+            ]
+        },
+        {
+            type: "COMPILATION",
+            priorite: 2,
+            actions: [
+                "ANALYSE",
+                "RAPPORT",
+                "CORRECTION"
+            ]
+        },
+        {
+            type: "PERFORMANCE",
+            priorite: 3,
+            actions: [
+                "MESURE",
+                "ALERTE",
+                "OPTIMISATION"
+            ]
+        }
+    ]
+
+    STRATEGIE traitement = {
+        mode: "ASYNCHRONE",
+        buffer_taille: 1000,
+        retention: 3600  # secondes
+    }
+}
+
+MISSION TraiterEvenements {
+    ORDRE DE BATAILLE {
+        # Initialisation du gestionnaire
+        STRATEGIE gestionnaire = {
+            file_attente: [],
+            evenements_traites: [],
+            listeners: []
+        }
+        
+        # Boucle principale de traitement
+        MANOEUVRE TRAITEMENT {
+            TANT_QUE GESTIONNAIRE_ACTIF {
+                # Collecte des événements
+                POUR categorie DANS ConfigurationEvenements.categories {
+                    EXECUTION CollecterEvenements categorie
+                }
+                
+                # Traitement selon priorité
+                TANT_QUE NON EST_VIDE gestionnaire.file_attente {
+                    STRATEGIE evenement = OBTENIR_PROCHAIN_EVENEMENT
+                    
+                    # Application des actions
+                    POUR action DANS evenement.categorie.actions {
+                        EXECUTION ExecuterAction action evenement
+                    }
+                    
+                    # Notification des listeners
+                    EXECUTION NotifierListeners evenement
+                }
+                
+                # Nettoyage des événements expirés
+                EXECUTION NettoyerEvenementsExpires
+            }
+        }
+    }
+}
+
+MISSION AjouterListener {
+    PARAMETRE type_evenement
+    PARAMETRE callback
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE listener = {
+            type: type_evenement,
+            callback: callback,
+            actif: VRAI
+        }
+        
+        gestionnaire.listeners = DEPLOIEMENT gestionnaire.listeners listener
+        
+        RETRAITE listener
+    }
+}
+
+FIN BASE

@@ -1,0 +1,117 @@
+BASE SYSTEME_METRIQUES
+
+STRATEGIE ConfigurationMetriques {
+    FORMATION metriques = [
+        {
+            nom: "PERFORMANCE_COMPILATION",
+            type: "TEMPOREL",
+            unite: "millisecondes"
+        },
+        {
+            nom: "UTILISATION_MEMOIRE",
+            type: "RESSOURCE",
+            unite: "megaoctets"
+        },
+        {
+            nom: "COMPLEXITE_CODE",
+            type: "STATIQUE",
+            unite: "score"
+        }
+    ]
+
+    STRATEGIE seuils = {
+        performance: {
+            avertissement: 1000,  # ms
+            critique: 5000        # ms
+        },
+        memoire: {
+            avertissement: 512,   # MB
+            critique: 1024        # MB
+        }
+    }
+}
+
+MISSION CollecterMetriques {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE donnees = {
+            timestamp: TEMPS_ACTUEL,
+            metriques: []
+        }
+        
+        # Collecte des métriques
+        POUR metrique DANS ConfigurationMetriques.metriques {
+            SELON metrique.type {
+                CAS "TEMPOREL":
+                    EXECUTION CollecterMetriquesTemporelles metrique donnees
+                CAS "RESSOURCE":
+                    EXECUTION CollecterMetriquesRessources metrique donnees
+                CAS "STATIQUE":
+                    EXECUTION CollecterMetriquesStatiques metrique donnees
+            }
+        }
+        
+        # Analyse des seuils
+        EXECUTION AnalyserSeuils donnees
+        
+        # Stockage des données
+        EXECUTION StockerMetriques donnees
+        
+        RETRAITE donnees
+    }
+}
+
+MISSION AnalyserTendances {
+    PARAMETRE metrique
+    PARAMETRE periode
+    
+    ORDRE DE BATAILLE {
+        # Récupération de l'historique
+        FORMATION historique = CHARGER_HISTORIQUE metrique periode
+        
+        # Calcul des tendances
+        STRATEGIE analyse = {
+            moyenne: CALCULER_MOYENNE historique,
+            mediane: CALCULER_MEDIANE historique,
+            ecart_type: CALCULER_ECART_TYPE historique,
+            tendance: CALCULER_TENDANCE historique
+        }
+        
+        # Détection des anomalies
+        POUR point DANS historique {
+            SI CIBLE EstAnomalie point analyse {
+                EXECUTION SignalerAnomalie point metrique
+            }
+        }
+        
+        RETRAITE analyse
+    }
+}
+
+MISSION GenererRapportMetriques {
+    PARAMETRE periode
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            periode: periode,
+            synthese: {},
+            details: [],
+            graphiques: []
+        }
+        
+        # Génération de la synthèse
+        POUR metrique DANS ConfigurationMetriques.metriques {
+            rapport.synthese[metrique.nom] = EXECUTION AnalyserTendances 
+                metrique 
+                periode
+        }
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiquesMetriques rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

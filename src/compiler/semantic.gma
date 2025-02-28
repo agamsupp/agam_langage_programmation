@@ -1,0 +1,67 @@
+BASE ANALYSEUR_SEMANTIQUE
+
+STRATEGIE TableSymboles {
+    FORMATION symboles = []
+    FORMATION types_valides = [
+        "MUNITION", "FORMATION", "STRATEGIE",
+        "ORDRE", "RAPPORT", "MISSION"
+    ]
+}
+
+MISSION AnalyseSémantique {
+    PARAMETRE arbre_syntaxique
+    
+    ORDRE DE BATAILLE {
+        # Vérification des déclarations
+        MISSION VérifierDéclarations {
+            POUR noeud DANS arbre_syntaxique.noeuds {
+                SI CIBLE noeud.type EST "DECLARATION" {
+                    EXECUTION VérifierType noeud
+                    EXECUTION VérifierPortée noeud
+                }
+            }
+        }
+        
+        # Vérification des types
+        MISSION VérifierType {
+            PARAMETRE déclaration
+            
+            SI CIBLE déclaration.type DANS TableSymboles.types_valides {
+                AJOUTER_SYMBOLE déclaration
+            } SINON REPLI {
+                ERREUR "Type invalide: " + déclaration.type
+            }
+        }
+        
+        # Vérification des portées
+        MISSION VérifierPortée {
+            PARAMETRE déclaration
+            
+            SI CIBLE ExisteSymbole déclaration.nom {
+                ERREUR "Double déclaration: " + déclaration.nom
+            }
+        }
+    }
+}
+
+MISSION VérifierOpérations {
+    PARAMETRE opération
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE TypesCompatibles {
+            FORMATION règles = [
+                {op: "ASSAUT", types: ["MUNITION", "MUNITION"]},
+                {op: "REPLI", types: ["MUNITION", "MUNITION"]},
+                {op: "VERIFICATION", types: ["TOUS", "TOUS"]}
+            ]
+        }
+        
+        POUR règle DANS TypesCompatibles.règles {
+            SI CIBLE opération.type VERIFICATION règle.op {
+                EXECUTION VérifierTypesOpérandes opération règle.types
+            }
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,89 @@
+BASE SYSTEME_SURVEILLANCE
+
+STRATEGIE ConfigurationSurveillance {
+    FORMATION metriques = [
+        {
+            type: "SYSTEME",
+            elements: [
+                {nom: "CPU", seuil_alerte: 90},
+                {nom: "MEMOIRE", seuil_alerte: 85},
+                {nom: "DISQUE", seuil_alerte: 95}
+            ],
+            intervalle: 100
+        },
+        {
+            type: "APPLICATION",
+            elements: [
+                {nom: "TEMPS_REPONSE", seuil_alerte: 1000},
+                {nom: "ERREURS", seuil_alerte: 10},
+                {nom: "THREADS", seuil_alerte: 100}
+            ],
+            intervalle: 200
+        }
+    ]
+
+    STRATEGIE alertes = {
+        modes: ["JOURNAL", "NOTIFICATION", "ACTION"],
+        niveaux: ["INFO", "AVERTISSEMENT", "CRITIQUE"],
+        canaux: ["EMAIL", "CONSOLE", "API"]
+    }
+}
+
+MISSION DemarrerSurveillance {
+    ORDRE DE BATAILLE {
+        # Initialisation des collecteurs
+        POUR metrique DANS ConfigurationSurveillance.metriques {
+            EXECUTION InitialiserCollecteur metrique
+        }
+        
+        # Boucle de surveillance
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE SURVEILLANCE_ACTIVE {
+                # Collecte des métriques
+                POUR metrique DANS ConfigurationSurveillance.metriques {
+                    POUR element DANS metrique.elements {
+                        MUNITION valeur = MESURER_METRIQUE element
+                        
+                        # Vérification des seuils
+                        SI CIBLE valeur > element.seuil_alerte {
+                            EXECUTION GenererAlerte element valeur
+                        }
+                        
+                        # Stockage des données
+                        EXECUTION StockerMetrique element valeur
+                    }
+                    
+                    ATTENDRE metrique.intervalle
+                }
+            }
+        }
+    }
+}
+
+MISSION GenererRapport {
+    PARAMETRE periode
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            debut: periode.debut,
+            fin: periode.fin,
+            metriques: [],
+            alertes: [],
+            tendances: []
+        }
+        
+        # Compilation des données
+        POUR metrique DANS ConfigurationSurveillance.metriques {
+            rapport.metriques = DEPLOIEMENT 
+                rapport.metriques 
+                COMPILER_METRIQUES metrique periode
+        }
+        
+        # Analyse des tendances
+        EXECUTION AnalyserTendances rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

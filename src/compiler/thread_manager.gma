@@ -1,0 +1,86 @@
+BASE GESTIONNAIRE_THREADS
+
+STRATEGIE ConfigurationThreads {
+    MUNITION nb_threads_max = 16
+    FORMATION threads_actifs = []
+    FORMATION file_attente = []
+    
+    STRATEGIE priorites = {
+        NORMAL: 0,
+        HAUT: 1,
+        CRITIQUE: 2
+    }
+}
+
+MISSION CreerThread {
+    PARAMETRE fonction
+    PARAMETRE priorite
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE ConfigurationThreads.threads_actifs >= 
+            ConfigurationThreads.nb_threads_max {
+            RAPPORT "ERREUR: Limite de threads atteinte"
+            RETRAITE VIDE
+        }
+        
+        STRATEGIE nouveau_thread = {
+            id: GENERER_ID,
+            fonction: fonction,
+            priorite: priorite,
+            etat: "PRET",
+            pile: CREER_PILE,
+            contexte: SAUVEGARDER_CONTEXTE
+        }
+        
+        ConfigurationThreads.threads_actifs = DEPLOIEMENT 
+            ConfigurationThreads.threads_actifs 
+            nouveau_thread
+            
+        RETRAITE nouveau_thread
+    }
+}
+
+MISSION ExecuterThread {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Préparation du thread
+        thread.etat = "EN_EXECUTION"
+        EXECUTION RESTAURER_CONTEXTE thread.contexte
+        
+        # Exécution protégée
+        MANOEUVRE EXECUTION {
+            EXECUTION thread.fonction
+            thread.etat = "TERMINE"
+        } SINON CAPTURE {
+            thread.etat = "ERREUR"
+            EXECUTION GererErreurThread thread
+        }
+        
+        # Nettoyage
+        EXECUTION LIBERER_RESSOURCES thread
+    }
+}
+
+MISSION OrdonnancerThreads {
+    ORDRE DE BATAILLE {
+        # Tri par priorité
+        FORMATION threads_prets = FILTRER ConfigurationThreads.threads_actifs 
+            AVEC etat "PRET"
+            
+        threads_prets = TRIER_DECROISSANT threads_prets PAR priorite
+        
+        # Exécution des threads
+        POUR thread DANS threads_prets {
+            SI CIBLE thread.priorite == ConfigurationThreads.priorites.CRITIQUE {
+                EXECUTION ExecuterThread thread
+            } SINON {
+                ConfigurationThreads.file_attente = DEPLOIEMENT 
+                    ConfigurationThreads.file_attente 
+                    thread
+            }
+        }
+    }
+}
+
+FIN BASE

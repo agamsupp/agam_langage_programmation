@@ -1,0 +1,101 @@
+BASE MONITEUR_PERFORMANCE_AVANCE
+
+STRATEGIE ConfigurationMoniteur {
+    FORMATION metriques = [
+        {
+            type: "EXECUTION",
+            indicateurs: [
+                "TEMPS_CPU",
+                "CYCLES_INSTRUCTION",
+                "CACHE_HITS"
+            ],
+            intervalle: 100     # ms
+        },
+        {
+            type: "MEMOIRE",
+            indicateurs: [
+                "ALLOCATION",
+                "FRAGMENTATION",
+                "TEMPS_GC"
+            ],
+            intervalle: 250
+        },
+        {
+            type: "IO",
+            indicateurs: [
+                "OPERATIONS_DISQUE",
+                "BANDE_PASSANTE",
+                "LATENCE"
+            ],
+            intervalle: 500
+        }
+    ]
+
+    STRATEGIE analyse = {
+        mode: "TEMPS_REEL",
+        profondeur_historique: 1000,
+        prediction: VRAI
+    }
+}
+
+MISSION SurveillancePerformance {
+    ORDRE DE BATAILLE {
+        # Initialisation des collecteurs
+        POUR metrique DANS ConfigurationMoniteur.metriques {
+            EXECUTION InitialiserCollecteur metrique
+        }
+        
+        # Boucle de surveillance
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE SURVEILLANCE_ACTIVE {
+                # Collecte des métriques
+                POUR metrique DANS ConfigurationMoniteur.metriques {
+                    POUR indicateur DANS metrique.indicateurs {
+                        MUNITION valeur = MESURER_INDICATEUR indicateur
+                        
+                        # Analyse en temps réel
+                        SI CIBLE ConfigurationMoniteur.analyse.mode VERIFICATION "TEMPS_REEL" {
+                            EXECUTION AnalyserIndicateur indicateur valeur
+                        }
+                        
+                        # Stockage des données
+                        EXECUTION StockerMesure indicateur valeur
+                    }
+                    
+                    ATTENDRE metrique.intervalle
+                }
+            }
+        }
+    }
+}
+
+MISSION GenererRapportPerformance {
+    PARAMETRE periode
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            debut: periode.debut,
+            fin: periode.fin,
+            metriques: [],
+            analyses: [],
+            predictions: []
+        }
+        
+        # Compilation des données
+        POUR metrique DANS ConfigurationMoniteur.metriques {
+            rapport.metriques = DEPLOIEMENT rapport.metriques {
+                type: metrique.type,
+                donnees: OBTENIR_DONNEES metrique periode
+            }
+        }
+        
+        # Analyse des tendances
+        SI CIBLE ConfigurationMoniteur.analyse.prediction {
+            EXECUTION AnalyserTendances rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

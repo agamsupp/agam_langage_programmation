@@ -1,0 +1,335 @@
+BASE ASSEMBLEUR_INLINE_TACTIQUE
+    // Module du compilateur pour le support d'assembleur inline
+    // Permet d'intégrer du code assembleur directement dans le code AGAM
+
+    //----------------------------------------------
+    // CONSTANTES ET TYPES
+    //----------------------------------------------
+    
+    MUNITION MODE_ASM_X86 = 0
+    MUNITION MODE_ASM_X64 = 1
+    MUNITION MODE_ASM_ARM = 2
+    
+    STRATEGIE ASM_BLOC
+        MUNITION contenu TEXTE
+        MUNITION mode ENTIER
+        MUNITION position_ligne ENTIER
+        MUNITION position_colonne ENTIER
+        MUNITION fichier_source TEXTE
+    FIN STRATEGIE
+    
+    STRATEGIE CONTEXTE_ASM
+        MUNITION variables_locales FORMATION[64]
+        MUNITION nb_variables = 0
+        MUNITION architecture ENTIER
+        MUNITION mode_bits ENTIER      // 16, 32, 64
+        MUNITION permettre_privilegies BOOLEEN
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // TRAITEMENT ASM INLINE
+    //----------------------------------------------
+    
+    MISSION PARSER_BLOC_ASM
+        PARAMETRE lexer POINTEUR
+        
+        ORDRE DE BATAILLE
+            MUNITION bloc ASM_BLOC
+            bloc.mode = MODE_ASM_X86   // Mode par défaut
+            bloc.position_ligne = lexer.ligne_courante
+            bloc.position_colonne = lexer.colonne_courante
+            bloc.fichier_source = lexer.fichier_courant
+            
+            // Vérifier le début du bloc ASM
+            SI CIBLE lexer.jeton_courant != JETON_MOT_CLE || lexer.valeur_jeton != "ASM"
+                RAPPORT "ERREUR: Bloc ASM attendu"
+                RETRAITE 0
+            FIN SI
+            
+            // Avancer au jeton suivant ('{')
+            EXECUTION lexer.avancer_jeton
+            
+            SI CIBLE lexer.jeton_courant != JETON_ACCOLADE_OUVRANTE
+                RAPPORT "ERREUR: '{' attendu après ASM"
+                RETRAITE 0
+            FIN SI
+            
+            // Avancer après '{'
+            EXECUTION lexer.avancer_jeton
+            
+            // Capturer le contenu jusqu'à l'accolade fermante
+            MUNITION contenu = ""
+            MUNITION profondeur = 1   // Pour gérer les accolades imbriquées
+            
+            MANOEUVRE TANT QUE profondeur > 0 && lexer.jeton_courant != JETON_FIN
+                SI CIBLE lexer.jeton_courant == JETON_ACCOLADE_OUVRANTE
+                    profondeur = profondeur + 1
+                SINON SI CIBLE lexer.jeton_courant == JETON_ACCOLADE_FERMANTE
+                    profondeur = profondeur - 1
+                    
+                    SI CIBLE profondeur == 0
+                        INTERROMPRE
+                    FIN SI
+                FIN SI
+                
+                // Ajouter le texte du jeton
+                contenu = contenu + lexer.jeton_texte + " "
+                
+                // Avancer au jeton suivant
+                EXECUTION lexer.avancer_jeton
+            FIN MANOEUVRE
+            
+            SI CIBLE lexer.jeton_courant != JETON_ACCOLADE_FERMANTE
+                RAPPORT "ERREUR: '}' attendu pour terminer le bloc ASM"
+                RETRAITE 0
+            FIN SI
+            
+            // Avancer après '}'
+            EXECUTION lexer.avancer_jeton
+            
+            bloc.contenu = contenu
+            RETRAITE bloc
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION VERIFIER_BLOC_ASM
+        PARAMETRE bloc ASM_BLOC
+        PARAMETRE contexte CONTEXTE_ASM
+        
+        ORDRE DE BATAILLE
+            // Vérification de sécurité des instructions
+            SI CIBLE EXECUTION CONTIENT_INSTRUCTION_PRIVILEGIEE bloc.contenu && !contexte.permettre_privilegies
+                RAPPORT "ERREUR à " + bloc.fichier_source + ":" + TEXTE(bloc.position_ligne) + ": " 
+                     + "Instructions privilégiées non autorisées dans ce contexte"
+                RETRAITE FAUX
+            FIN SI
+            
+            // Vérifier la compatibilité avec l'architecture cible
+            SI CIBLE contexte.architecture != bloc.mode
+                RAPPORT "AVERTISSEMENT: Le bloc assembleur peut ne pas être compatible avec l'architecture cible"
+            FIN SI
+            
+            // Vérifier l'accès aux variables
+            EXECUTION VERIFIER_REFERENCES_VARIABLES bloc, contexte
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTIENT_INSTRUCTION_PRIVILEGIEE
+        PARAMETRE code TEXTE
+        
+        ORDRE DE BATAILLE
+            // Liste d'instructions privilégiées à vérifier
+            MUNITION instructions_privilegiees FORMATION[20] = [
+                "cli", "sti", "hlt", "lgdt", "lidt", "lldt", "ltr",
+                "mov cr", "mov dr", "invlpg", "wbinvd", "invd",
+                "out", "in", "rdmsr", "wrmsr", "rdtsc", "rdpmc",
+                "sysenter", "sysexit"
+            ]
+            
+            MANOEUVRE POUR i DE 0 A 19
+                SI CIBLE EXECUTION TEXTE_CONTIENT code, instructions_privilegiees[i]
+                    RETRAITE VRAI
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE FAUX
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TEXTE_CONTIENT
+        PARAMETRE texte TEXTE
+        PARAMETRE sous_texte TEXTE
+        
+        ORDRE DE BATAILLE
+            // Recherche simple sans distinguer majuscules/minuscules
+            MUNITION texte_lower = EXECUTION TEXTE_MINUSCULES texte
+            MUNITION sous_texte_lower = EXECUTION TEXTE_MINUSCULES sous_texte
+            
+            RETRAITE texte_lower.indexOf(sous_texte_lower) >= 0
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TEXTE_MINUSCULES
+        PARAMETRE texte TEXTE
+        
+        ORDRE DE BATAILLE
+            MUNITION resultat = ""
+            
+            MANOEUVRE POUR i DE 0 A RECONNAISSANCE(texte) - 1
+                MUNITION c = texte[i]
+                
+                SI CIBLE c >= 'A' && c <= 'Z'
+                    c = c + ('a' - 'A')  // Conversion en minuscule
+                FIN SI
+                
+                resultat = resultat + c
+            FIN MANOEUVRE
+            
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION VERIFIER_REFERENCES_VARIABLES
+        PARAMETRE bloc ASM_BLOC
+        PARAMETRE contexte CONTEXTE_ASM
+        
+        ORDRE DE BATAILLE
+            // Vérifier les références aux variables AGAM
+            MANOEUVRE POUR i DE 0 A contexte.nb_variables - 1
+                MUNITION var = contexte.variables_locales[i]
+                MUNITION var_ref = "[" + var.nom + "]"
+                
+                SI CIBLE EXECUTION TEXTE_CONTIENT bloc.contenu, var_ref
+                    // Vérifier la compatibilité des types
+                    SI CIBLE !EXECUTION TYPE_COMPATIBLE_ASM var.type, contexte.mode_bits
+                        RAPPORT "AVERTISSEMENT: Variable '" + var.nom + "' peut ne pas être compatible avec le mode " 
+                             + TEXTE(contexte.mode_bits) + " bits"
+                    FIN SI
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TYPE_COMPATIBLE_ASM
+        PARAMETRE type_var ENTIER
+        PARAMETRE mode_bits ENTIER
+        
+        ORDRE DE BATAILLE
+            // Vérifier la compatibilité des types avec le mode assembleur
+            SELON type_var
+                CAS TYPE_OCTET:
+                    RETRAITE VRAI  // Toujours compatible
+                    PAUSE
+                    
+                CAS TYPE_MOT:
+                    RETRAITE VRAI  // Toujours compatible
+                    PAUSE
+                    
+                CAS TYPE_DWORD:
+                    RETRAITE mode_bits >= 32  // 32 bits minimum requis
+                    PAUSE
+                    
+                CAS TYPE_QWORD:
+                    RETRAITE mode_bits == 64  // 64 bits requis
+                    PAUSE
+                    
+                DEFAUT:
+                    RETRAITE VRAI  // Par défaut, suppose compatible
+            FIN SELON
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // GÉNÉRATION DE CODE
+    //----------------------------------------------
+    
+    MISSION GENERER_CODE_ASM
+        PARAMETRE bloc ASM_BLOC
+        PARAMETRE contexte_gen POINTEUR
+        
+        ORDRE DE BATAILLE
+            // En-tête spécifique à l'architecture
+            SELON bloc.mode
+                CAS MODE_ASM_X86:
+                    SI CIBLE contexte_gen.mode_bits == 16
+                        EXECUTION contexte_gen.emettre ".code16"
+                    SINON SI CIBLE contexte_gen.mode_bits == 32
+                        EXECUTION contexte_gen.emettre ".code32"
+                    SINON
+                        EXECUTION contexte_gen.emettre ".code64"
+                    FIN SI
+                    PAUSE
+                    
+                CAS MODE_ASM_ARM:
+                    EXECUTION contexte_gen.emettre ".arm"
+                    PAUSE
+                    
+                DEFAUT:
+                    // Pas d'en-tête spécial
+            FIN SELON
+            
+            // Section inline_asm pour l'assembleur
+            EXECUTION contexte_gen.emettre "section .text.inline_asm"
+            EXECUTION contexte_gen.emettre "inline_asm_" + TEXTE(bloc.position_ligne) + "_" + TEXTE(bloc.position_colonne) + ":"
+            
+            // Traiter les références aux variables
+            MUNITION code_final = EXECUTION REMPLACER_REFERENCES_VARIABLES bloc.contenu, contexte_gen
+            
+            // Émettre le code assembleur
+            EXECUTION contexte_gen.emettre code_final
+            
+            // Marquer la fin du code inline
+            EXECUTION contexte_gen.emettre "end_inline_asm_" + TEXTE(bloc.position_ligne) + "_" + TEXTE(bloc.position_colonne) + ":"
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REMPLACER_REFERENCES_VARIABLES
+        PARAMETRE code TEXTE
+        PARAMETRE contexte_gen POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Remplacer les références [var] par les offsets appropriés
+            MUNITION resultat = code
+            
+            MANOEUVRE POUR i DE 0 A contexte_gen.table_symboles.taille - 1
+                MUNITION symbole = contexte_gen.table_symboles[i]
+                
+                SI CIBLE symbole.est_variable
+                    MUNITION ref_modele = "[" + symbole.nom + "]"
+                    MUNITION ref_assembleur = ""
+                    
+                    SI CIBLE symbole.est_local
+                        ref_assembleur = "[ebp" + (symbole.offset >= 0 ? "+" : "") + TEXTE(symbole.offset) + "]"
+                    SINON
+                        ref_assembleur = "[" + symbole.etiquette + "]"
+                    FIN SI
+                    
+                    // Remplacer toutes les occurrences
+                    resultat = EXECUTION REMPLACER_TEXTE resultat, ref_modele, ref_assembleur
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REMPLACER_TEXTE
+        PARAMETRE texte TEXTE
+        PARAMETRE ancien TEXTE
+        PARAMETRE nouveau TEXTE
+        
+        ORDRE DE BATAILLE
+            MUNITION resultat = ""
+            MUNITION position = 0
+            MUNITION trouve = 0
+            
+            MANOEUVRE
+                trouve = texte.indexOf(ancien, position)
+                
+                SI CIBLE trouve < 0
+                    // Ajouter le reste du texte
+                    resultat = resultat + texte.substring(position)
+                    INTERROMPRE
+                FIN SI
+                
+                // Ajouter le texte jusqu'à la position trouvée
+                resultat = resultat + texte.substring(position, trouve)
+                
+                // Ajouter le nouveau texte
+                resultat = resultat + nouveau
+                
+                // Mettre à jour la position
+                position = trouve + RECONNAISSANCE(ancien)
+            FIN MANOEUVRE
+            
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

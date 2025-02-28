@@ -1,0 +1,102 @@
+BASE ANALYSEUR_SYNTAXIQUE_AVANCE
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION regles = [
+        {
+            type: "STRUCTURE",
+            elements: [
+                "BASE",
+                "MISSION",
+                "ORDRE_BATAILLE"
+            ],
+            validation: "STRICTE"
+        },
+        {
+            type: "EXPRESSION",
+            elements: [
+                "CONDITION",
+                "BOUCLE",
+                "OPERATION"
+            ],
+            validation: "CONTEXTUELLE"
+        },
+        {
+            type: "DECLARATION",
+            elements: [
+                "STRATEGIE",
+                "FORMATION",
+                "MUNITION"
+            ],
+            validation: "SEMANTIQUE"
+        }
+    ]
+
+    STRATEGIE recuperation = {
+        mode: "INTELLIGENT",
+        max_tentatives: 3,
+        synchronisation: VRAI
+    }
+}
+
+MISSION AnalyserSyntaxe {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE arbre = {
+            racine: CREER_NOEUD "PROGRAMME",
+            noeuds: [],
+            erreurs: []
+        }
+        
+        # Phase 1: Tokenisation avancée
+        FORMATION tokens = EXECUTION TokeniserAvance code_source
+        
+        # Phase 2: Analyse structurelle
+        MANOEUVRE ANALYSE {
+            TANT_QUE RESTE_TOKENS tokens {
+                STRATEGIE token = LIRE_PROCHAIN_TOKEN
+                
+                SELON token.type {
+                    CAS "STRUCTURE":
+                        EXECUTION AnalyserStructure token arbre
+                    CAS "EXPRESSION":
+                        EXECUTION AnalyserExpression token arbre
+                    CAS "DECLARATION":
+                        EXECUTION AnalyserDeclaration token arbre
+                }
+                
+                # Gestion des erreurs avec récupération
+                SI CIBLE ERREUR_DETECTEE {
+                    SI CIBLE ConfigurationAnalyse.recuperation.mode VERIFICATION "INTELLIGENT" {
+                        EXECUTION TenterRecuperation token
+                    }
+                }
+            }
+        }
+        
+        # Validation finale
+        EXECUTION ValiderArbreSyntaxique arbre
+        
+        RETRAITE arbre
+    }
+}
+
+MISSION ValiderStructure {
+    PARAMETRE noeud
+    
+    ORDRE DE BATAILLE {
+        # Vérification de la structure
+        POUR regle DANS ConfigurationAnalyse.regles[0].elements {
+            SI CIBLE noeud.type VERIFICATION regle {
+                EXECUTION VerifierContraintes noeud regle
+            }
+        }
+        
+        # Validation récursive
+        POUR enfant DANS noeud.enfants {
+            EXECUTION ValiderStructure enfant
+        }
+    }
+}
+
+FIN BASE

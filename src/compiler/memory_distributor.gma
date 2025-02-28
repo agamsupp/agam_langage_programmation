@@ -1,0 +1,84 @@
+BASE MEMOIRE_DISTRIBUEE
+
+STRATEGIE ConfigurationMemoire {
+    FORMATION segments = [
+        {
+            type: "LOCAL",
+            taille: 1024 * 1024,  # 1MB
+            politique: "FIFO",
+            partage: FAUX
+        },
+        {
+            type: "PARTAGE",
+            taille: 2 * 1024 * 1024,  # 2MB
+            politique: "LRU",
+            partage: VRAI
+        }
+    ]
+
+    STRATEGIE synchronisation = {
+        mode: "COHERENCE_FORTE",
+        intervalle: 100,        # ms
+        verrous: VRAI
+    }
+}
+
+MISSION GererMemoireDistribuee {
+    ORDRE DE BATAILLE {
+        # Initialisation des segments
+        POUR segment DANS ConfigurationMemoire.segments {
+            EXECUTION InitialiserSegment segment
+        }
+        
+        # Boucle principale de gestion
+        MANOEUVRE GESTION {
+            TANT_QUE GESTIONNAIRE_ACTIF {
+                # Traitement des demandes d'allocation
+                SI CIBLE DEMANDE_ALLOCATION_PRESENTE {
+                    EXECUTION TraiterDemandeAllocation
+                }
+                
+                # Gestion de la cohérence
+                SI CIBLE ConfigurationMemoire.synchronisation.mode 
+                    VERIFICATION "COHERENCE_FORTE" {
+                    EXECUTION MaintenirCoherence
+                }
+                
+                # Nettoyage périodique
+                SI CIBLE TEMPS_NETTOYAGE_ATTEINT {
+                    EXECUTION NettoyerMemoirePartagee
+                }
+                
+                ATTENDRE ConfigurationMemoire.synchronisation.intervalle
+            }
+        }
+    }
+}
+
+MISSION AllouerMemoire {
+    PARAMETRE taille
+    PARAMETRE type
+    
+    ORDRE DE BATAILLE {
+        # Recherche du segment approprié
+        STRATEGIE segment = TROUVER_SEGMENT_DISPONIBLE type taille
+        
+        SI CIBLE segment NON VIDE {
+            # Allocation locale ou partagée
+            SI CIBLE segment.partage {
+                EXECUTION AllouerMemoirePartagee segment taille
+            } SINON {
+                EXECUTION AllouerMemoireLocale segment taille
+            }
+            
+            # Mise à jour des métadonnées
+            EXECUTION MettreAJourMetadonnees segment
+            
+            RETRAITE SUCCES
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+FIN BASE

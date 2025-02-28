@@ -1,0 +1,231 @@
+BASE InterpreteurAGAM
+
+STRATEGIE EtatGlobal {
+    FORMATION memoire = FORMATION DE TAILLE 1024  # Mémoire simulée
+    MUNITION pointeur_memoire = 0
+    FORMATION pile = []
+    FORMATION registres = [0, 0, 0, 0]  # R0-R3
+    MUNITION compteur_programme = 0
+    FORMATION messages = []
+    MUNITION duree_attente = 0
+    FORMATION programme = []
+}
+
+MISSION InitialiserInterpreteur {
+    ORDRE DE BATAILLE {
+        POUR i DANS SEQUENCE 0 À 1024 {
+            EtatGlobal.memoire[i] = 0
+        }
+        EtatGlobal.pointeur_memoire = 0
+        EtatGlobal.pile = []
+        POUR i DANS SEQUENCE 0 À 4 {
+            EtatGlobal.registres[i] = 0
+        }
+        EtatGlobal.compteur_programme = 0
+        EtatGlobal.messages = []
+    }
+}
+
+MISSION ChargerFichierGMA {
+    PARAMETRE nom_fichier
+    ORDRE DE BATAILLE {
+        # Primitive hypothétique pour lire un fichier
+        FORMATION contenu = LIRE_FICHIER nom_fichier
+        FORMATION lignes = DECOUPER contenu "\n"
+        EtatGlobal.programme = lignes
+    }
+}
+
+MISSION ExecuterLigne {
+    PARAMETRE ligne
+    ORDRE DE BATAILLE {
+        FORMATION tokens = DECOUPER ligne " "
+        SI CIBLE RECONNAISSANCE tokens == 0 { RETRAITE }
+        MUNITION cmd = EXTRACTION tokens 0
+
+        SELON cmd {
+            CAS "BASE":
+                # Ignorer pour l'instant
+            CAS "MISSION":
+                # Début d'une mission, marquer pour exécution ultérieure
+            CAS "MUNITION":
+                MUNITION nom = EXTRACTION tokens 1
+                MUNITION valeur = CONVERTIR_ENTIER EXTRACTION tokens 3
+                EXECUTION DefinirVariable nom valeur
+            CAS "ASSAUT":
+                MUNITION dest = EXTRACTION tokens 1
+                MUNITION reg1 = EXTRACTION tokens 3
+                MUNITION reg2 = EXTRACTION tokens 4
+                EXECUTION AdditionnerRegistres dest reg1 reg2
+            CAS "RAPPORT":
+                MUNITION texte = RECONSTRUIRE tokens 1
+                EXECUTION AfficherTexteStrategique texte GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "EXECUTION":
+                MUNITION sous_cmd = EXTRACTION tokens 1
+                EXECUTION ExecuterSousCommande sous_cmd tokens
+            CAS "AFFICHER":
+                MUNITION texte = RECONSTRUIRE tokens 1
+                MUNITION couleur = EXTRACTION tokens RECONNAISSANCE tokens - 1
+                EXECUTION AfficherTexteStrategique texte couleur
+            CAS "ATTENDRE":
+                MUNITION ms = CONVERTIR_ENTIER EXTRACTION tokens 1
+                ATTENDRE ms
+            CAS "EFFACER_ECRAN":
+                EFFACER_ECRAN
+            CAS "LIRE_ENTREE":
+                MUNITION entree = LIRE_ENTREE
+                RETRAITE entree
+        }
+    }
+}
+
+MISSION DefinirVariable {
+    PARAMETRE nom
+    PARAMETRE valeur
+    ORDRE DE BATAILLE {
+        EtatGlobal.registres[0] = valeur  # R0 pour variables simples
+    }
+}
+
+MISSION AdditionnerRegistres {
+    PARAMETRE dest
+    PARAMETRE reg1
+    PARAMETRE reg2
+    ORDRE DE BATAILLE {
+        EtatGlobal.registres[2] = EtatGlobal.registres[0] ASSAUT EtatGlobal.registres[1]
+    }
+}
+
+MISSION ExecuterSousCommande {
+    PARAMETRE cmd
+    PARAMETRE tokens
+    ORDRE DE BATAILLE {
+        SELON cmd {
+            CAS "GuerreGraph.AfficherTexteStrategique":
+                MUNITION texte = EXTRACTION tokens 2
+                MUNITION couleur = EXTRACTION tokens 3
+                EXECUTION GuerreGraph.AfficherTexteStrategique texte couleur
+            CAS "GuerreGraph.EffetMatrixTactique":
+                MUNITION duree = CONVERTIR_ENTIER EXTRACTION tokens 2
+                EXECUTION GuerreGraph.EffetMatrixTactique duree
+            CAS "MACHINE_VIRTUELLE.ExecuterProgramme":
+                EXECUTION MACHINE_VIRTUELLE.ExecuterProgramme EtatGlobal.programme
+        }
+    }
+}
+
+MISSION BoucleExecution {
+    ORDRE DE BATAILLE {
+        EXECUTION InitialiserInterpreteur
+        EXECUTION ChargerFichierGMA "guerrelang_cli.gma"
+
+        TANT_QUE EtatGlobal.compteur_programme < RECONNAISSANCE EtatGlobal.programme {
+            MUNITION ligne = EXTRACTION EtatGlobal.programme EtatGlobal.compteur_programme
+            EXECUTION ExecuterLigne ligne
+            EtatGlobal.compteur_programme = EtatGlobal.compteur_programme ASSAUT 1
+        }
+    }
+}
+
+# Bibliothèque GuerreGraph intégrée
+BASE GuerreGraph
+    STRATEGIE ConfigurationGraphique {
+        MUNITION LARGEUR = 80
+        MUNITION HAUTEUR = 25
+        STRATEGIE COULEURS {
+            MUNITION ROUGE = 1
+            MUNITION VERT = 2
+            MUNITION ROUGE_ROSE = 3
+        }
+    }
+
+    MISSION AfficherTexteStrategique {
+        PARAMETRE texte
+        PARAMETRE couleur
+        ORDRE DE BATAILLE {
+            AFFICHER texte couleur
+            DEPLOIEMENT texte DANS EtatGlobal.messages
+            SI CIBLE RECONNAISSANCE EtatGlobal.messages > ConfigurationGraphique.HAUTEUR - 1 {
+                RETRAIT EtatGlobal.messages 0
+            }
+            EXECUTION RedessinerEcran
+        }
+    }
+
+    MISSION RedessinerEcran {
+        ORDRE DE BATAILLE {
+            EFFACER_ECRAN
+            POUR message DANS EtatGlobal.messages {
+                AFFICHER message ConfigurationGraphique.COULEURS.ROUGE
+            }
+            AFFICHER "> " ConfigurationGraphique.COULEURS.VERT
+        }
+    }
+
+    MISSION EffetMatrixTactique {
+        PARAMETRE duree
+        ORDRE DE BATAILLE {
+            EXECUTION AfficherTexteStrategique "SIMULATION EFFET MATRIX..." ConfigurationGraphique.COULEURS.VERT
+            MUNITION temps_debut = TEMPS_ACTUEL
+            MANOEUVRE TEMPS_ACTUEL - temps_debut < duree {
+                FORMATION caracteres = "アカサタナABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+                MUNITION ligne = ""
+                POUR i DANS SEQUENCE 0 À 20 {
+                    MUNITION idx = ALEATOIRE 0 RECONNAISSANCE caracteres
+                    ligne = FUSION ligne EXTRACTION caracteres idx
+                }
+                EXECUTION AfficherTexteStrategique ligne ConfigurationGraphique.COULEURS.VERT
+                ATTENDRE 50
+            }
+        }
+    }
+FIN BASE
+
+# CLI intégrée comme exemple
+BASE GuerreLangCLI
+    STRATEGIE ConfigurationCLI {
+        MUNITION VERSION = "1.0"
+    }
+
+    MISSION Initialisation {
+        ORDRE DE BATAILLE {
+            EXECUTION GuerreGraph.EffetMatrixTactique 3000
+            EXECUTION GuerreGraph.AfficherTexteStrategique "SYSTÈME DE COMMANDEMENT TACTIQUE v" + ConfigurationCLI.VERSION GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            EXECUTION GuerreGraph.AfficherTexteStrategique "Initialisation..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            ATTENDRE 1000
+            EXECUTION GuerreGraph.AfficherTexteStrategique "Prêt. Tapez 'help' pour les commandes." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+        }
+    }
+
+    MISSION BouclePrincipale {
+        ORDRE DE BATAILLE {
+            MANOEUVRE true {
+                MUNITION commande = LIRE_ENTREE
+                SELON commande {
+                    CAS "help":
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Commandes : help, deploy, status" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    CAS "deploy":
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Déploiement en cours..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                        ATTENDRE 2000
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Déploiement terminé." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    CAS "status":
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Registres : " FUSION EtatGlobal.registres GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    DEFAUT:
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Commande inconnue." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                }
+                EXECUTION GuerreGraph.RedessinerEcran
+            }
+        }
+    }
+
+    ORDRE DE BATAILLE {
+        EXECUTION Initialisation
+        EXECUTION BouclePrincipale
+    }
+FIN BASE
+
+ORDRE DE BATAILLE {
+    EXECUTION BoucleExecution
+}
+
+FIN BASE

@@ -1,0 +1,84 @@
+BASE TESTEUR_REGRESSION
+
+STRATEGIE ConfigurationTests {
+    FORMATION suites_test = [
+        {
+            type: "FONCTIONNEL",
+            cas_tests: [],
+            comparaison: "EXACT"
+        },
+        {
+            type: "PERFORMANCE",
+            cas_tests: [],
+            comparaison: "TOLERANT"
+        },
+        {
+            type: "COMPORTEMENT",
+            cas_tests: [],
+            comparaison: "PATTERN"
+        }
+    ]
+
+    STRATEGIE historique = {
+        conservation: 10,    # versions
+        analyse: "TENDANCE",
+        alerte: "DEVIATION"
+    }
+}
+
+MISSION ExecuterTestsRegression {
+    PARAMETRE version_courante
+    PARAMETRE version_reference
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultats = {
+            succes: 0,
+            echecs: 0,
+            deviations: []
+        }
+        
+        # Exécution des suites de tests
+        POUR suite DANS ConfigurationTests.suites_test {
+            EXECUTION ExecuterSuiteTests suite version_courante version_reference
+        }
+        
+        # Analyse des résultats
+        EXECUTION AnalyserResultats resultats
+        
+        # Génération du rapport de régression
+        EXECUTION GenererRapportRegression resultats
+        
+        # Mise à jour de l'historique
+        SI CIBLE ConfigurationTests.historique.conservation > 0 {
+            EXECUTION MettreAJourHistorique resultats
+        }
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION CompararerVersions {
+    PARAMETRE resultats_courants
+    PARAMETRE resultats_reference
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE comparaison = {
+            differences: [],
+            regressions: [],
+            ameliorations: []
+        }
+        
+        # Comparaison détaillée
+        POUR test DANS resultats_courants {
+            MUNITION reference = TROUVER_TEST_REFERENCE test resultats_reference
+            
+            SI CIBLE reference NON VIDE {
+                EXECUTION ComparerResultatsTest test reference comparaison
+            }
+        }
+        
+        RETRAITE comparaison
+    }
+}
+
+FIN BASE

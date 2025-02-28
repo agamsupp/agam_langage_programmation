@@ -1,0 +1,334 @@
+BASE DEMONSTRATION_MATRIX
+    // Exemple d'utilisation de la bibliothèque d'effets Matrix
+    // Démontre diverses configurations et effets spéciaux
+
+    INCORPORATION "matrix/matrix_core.gma"
+    INCORPORATION "matrix/effets_speciaux.gma"
+    
+    //----------------------------------------------
+    // CONSTANTES ET VARIABLES GLOBALES
+    //----------------------------------------------
+    
+    MUNITION LARGEUR_ECRAN = 1024
+    MUNITION HAUTEUR_ECRAN = 768
+    
+    MUNITION effet_matrix EFFET_MATRIX
+    MUNITION effets_speciaux EFFETS_SPECIAUX
+    MUNITION contexte_rendu POINTEUR
+    
+    MUNITION temps_demo = 0
+    MUNITION phase_demo = 0
+    MUNITION temps_phase = 0
+    MUNITION derniere_touche = 0
+    
+    //----------------------------------------------
+    // FONCTION PRINCIPALE
+    //----------------------------------------------
+    
+    ORDRE DE BATAILLE
+        // Initialiser le système de rendu (spécifique à l'implémentation)
+        contexte_rendu = APPEL_SYSTEME("initialiser_contexte_graphique", LARGEUR_ECRAN, HAUTEUR_ECRAN)
+        
+        SI CIBLE contexte_rendu == 0
+            RAPPORT "Erreur: Impossible d'initialiser le contexte graphique"
+            RETRAITE 1
+        FIN SI
+        
+        // Initialiser l'effet Matrix
+        effet_matrix = EXECUTION INITIALISER_EFFET_MATRIX LARGEUR_ECRAN, HAUTEUR_ECRAN, 16
+        
+        // Initialiser les effets spéciaux
+        effets_speciaux = EXECUTION INITIALISER_EFFETS_SPECIAUX effet_matrix
+        
+        // Créer quelques colonnes initiales
+        MANOEUVRE POUR i DE 0 A 50
+            EXECUTION CREER_COLONNE_MATRIX effet_matrix
+        FIN MANOEUVRE
+        
+        // Afficher les instructions
+        RAPPORT "Démo de l'effet Matrix"
+        RAPPORT "----------------------"
+        RAPPORT "Touches de contrôle:"
+        RAPPORT "1 - Mode caractères latins"
+        RAPPORT "2 - Mode caractères japonais"
+        RAPPORT "3 - Mode caractères symboles"
+        RAPPORT "4 - Mode caractères mixtes"
+        RAPPORT "G - Activer un effet de glitch"
+        RAPPORT "B - Activer un effet de bruitage"
+        RAPPORT "P - Activer/désactiver l'effet de pulsation"
+        RAPPORT "O - Activer/désactiver l'ondulation"
+        RAPPORT "R - Activer/désactiver l'effet raindrop"
+        RAPPORT "C - Changer les couleurs (vert, cyan, magenta, blanc)"
+        RAPPORT "D - Démo automatique avec tous les effets"
+        RAPPORT "Espace - Effet Flash"
+        RAPPORT "ESC - Quitter"
+        
+        // Boucle principale
+        MANOEUVRE TANT QUE APPEL_SYSTEME("fenetre_ouverte")
+            // Calculer le delta temps
+            MUNITION temps_actuel = APPEL_SYSTEME("obtenir_temps_ms") / 1000.0
+            MUNITION temps_precedent = temps_actuel - APPEL_SYSTEME("delta_temps")
+            MUNITION delta_temps = temps_actuel - temps_precedent
+            
+            // Gérer les entrées utilisateur
+            EXECUTION GERER_ENTREES
+            
+            // Mettre à jour la démo automatique si activée
+            SI CIBLE phase_demo > 0
+                EXECUTION METTRE_A_JOUR_DEMO delta_temps
+            FIN SI
+            
+            // Mettre à jour les effets
+            EXECUTION METTRE_A_JOUR_EFFET_MATRIX effet_matrix, delta_temps
+            EXECUTION METTRE_A_JOUR_EFFETS_SPECIAUX effets_speciaux, delta_temps
+            
+            // Dessiner les effets
+            EXECUTION DESSINER_EFFET_MATRIX effet_matrix, contexte_rendu
+            EXECUTION DESSINER_EFFETS_SPECIAUX effets_speciaux, contexte_rendu
+            
+            // Afficher le résultat
+            APPEL_SYSTEME("rafraichir_ecran")
+            
+            // Limiter le framerate
+            APPEL_SYSTEME("attendre_vsync")
+        FIN MANOEUVRE
+        
+        // Nettoyer
+        APPEL_SYSTEME("liberer_contexte_graphique", contexte_rendu)
+        
+        RETRAITE 0
+    FIN ORDRE
+    
+    //----------------------------------------------
+    // GESTION DES ENTRÉES
+    //----------------------------------------------
+    
+    MISSION GERER_ENTREES
+        ORDRE DE BATAILLE
+            MUNITION touche = APPEL_SYSTEME("obtenir_touche")
+            
+            SI CIBLE touche == 0 || touche == derniere_touche
+                RETRAITE
+            FIN SI
+            
+            derniere_touche = touche
+            
+            SELON touche
+                CAS 27:  // ESC
+                    APPEL_SYSTEME("fermer_fenetre")
+                    PAUSE
+                    
+                CAS 49:  // Touche 1
+                    EXECUTION CHANGER_MODE_CARACTERES effet_matrix, MODE_CARACTERES_LATIN
+                    RAPPORT "Mode caractères latins activé"
+                    PAUSE
+                    
+                CAS 50:  // Touche 2
+                    EXECUTION CHANGER_MODE_CARACTERES effet_matrix, MODE_CARACTERES_JAPONAIS
+                    RAPPORT "Mode caractères japonais activé"
+                    PAUSE
+                    
+                CAS 51:  // Touche 3
+                    EXECUTION CHANGER_MODE_CARACTERES effet_matrix, MODE_CARACTERES_SYMBOLES
+                    RAPPORT "Mode caractères symboles activé"
+                    PAUSE
+                    
+                CAS 52:  // Touche 4
+                    EXECUTION CHANGER_MODE_CARACTERES effet_matrix, MODE_CARACTERES_MIXTE
+                    RAPPORT "Mode caractères mixtes activé"
+                    PAUSE
+                    
+                CAS 71:  // G - Glitch
+                CAS 103:  // g - Glitch
+                    EXECUTION ACTIVER_EFFET_GLITCH effets_speciaux, EFFET_GLITCH_MOYEN, 0.8
+                    RAPPORT "Effet glitch activé"
+                    PAUSE
+                    
+                CAS 66:  // B - Bruitage
+                CAS 98:  // b - Bruitage
+                    EXECUTION ACTIVER_EFFET_BRUITAGE effets_speciaux, 3.0, 0.5, 0.03
+                    RAPPORT "Effet bruitage activé"
+                    PAUSE
+                    
+                CAS 80:  // P - Pulsation
+                CAS 112:  // p - Pulsation
+                    SI CIBLE !effets_speciaux.pulsation.est_actif
+                        EXECUTION ACTIVER_EFFET_PULSATION effets_speciaux, 10.0, 1.5, 0.4
+                        RAPPORT "Effet pulsation activé"
+                    SINON
+                        effets_speciaux.pulsation.est_actif = FAUX
+                        effet_matrix.couleur_principale = effets_speciaux.pulsation.couleur_base
+                        RAPPORT "Effet pulsation désactivé"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 79:  // O - Ondulation
+                CAS 111:  // o - Ondulation
+                    SI CIBLE !effet_matrix.ondulation_active
+                        EXECUTION ACTIVER_EFFET_ONDULATION effet_matrix, VRAI, 8.0, 1.0
+                        RAPPORT "Effet ondulation activé"
+                    SINON
+                        EXECUTION ACTIVER_EFFET_ONDULATION effet_matrix, FAUX
+                        RAPPORT "Effet ondulation désactivé"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 82:  // R - Raindrops
+                CAS 114:  // r - Raindrops
+                    effet_matrix.raindrops_actifs = !effet_matrix.raindrops_actifs
+                    SI CIBLE effet_matrix.raindrops_actifs
+                        RAPPORT "Effet raindrop activé"
+                    SINON
+                        RAPPORT "Effet raindrop désactivé"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 67:  // C - Couleur
+                CAS 99:  // c - Couleur
+                    EXECUTION CHANGER_COULEUR
+                    PAUSE
+                    
+                CAS 68:  // D - Démo
+                CAS 100:  // d - Démo
+                    SI CIBLE phase_demo == 0
+                        phase_demo = 1
+                        temps_phase = 0
+                        RAPPORT "Démo automatique activée"
+                    SINON
+                        phase_demo = 0
+                        RAPPORT "Démo automatique désactivée"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 32:  // Espace - Flash
+                    EXECUTION EFFET_FLASH effet_matrix, contexte_rendu, 0.7
+                    PAUSE
+            FIN SELON
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CHANGER_COULEUR
+        ORDRE DE BATAILLE
+            MUNITION couleur_actuelle = effet_matrix.couleur_principale
+            MUNITION nouvelle_couleur COULEUR_TACTIQUE
+            
+            // Détecter la couleur actuelle et passer à la suivante
+            SI CIBLE couleur_actuelle.vert > 200 && couleur_actuelle.rouge < 50 && couleur_actuelle.bleu < 50
+                // Vert -> Cyan
+                nouvelle_couleur = [0, 200, 200, 255]
+                RAPPORT "Couleur changée en cyan"
+            SINON SI CIBLE couleur_actuelle.vert > 150 && couleur_actuelle.bleu > 150 && couleur_actuelle.rouge < 50
+                // Cyan -> Magenta
+                nouvelle_couleur = [200, 0, 200, 255]
+                RAPPORT "Couleur changée en magenta"
+            SINON SI CIBLE couleur_actuelle.rouge > 150 && couleur_actuelle.bleu > 150 && couleur_actuelle.vert < 50
+                // Magenta -> Blanc
+                nouvelle_couleur = [200, 200, 200, 255]
+                RAPPORT "Couleur changée en blanc"
+            SINON
+                // Autre -> Vert (par défaut)
+                nouvelle_couleur = [0, 255, 0, 255]
+                RAPPORT "Couleur changée en vert"
+            FIN SI
+            
+            // Appliquer la nouvelle couleur
+            EXECUTION CHANGER_COULEUR_PRINCIPALE effet_matrix, nouvelle_couleur
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // DÉMO AUTOMATIQUE
+    //----------------------------------------------
+    
+    MISSION METTRE_A_JOUR_DEMO
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            temps_demo = temps_demo + delta_temps
+            temps_phase = temps_phase + delta_temps
+            
+            // Gérer les différentes phases de la démo
+            SELON phase_demo
+                CAS 1:  // Phase initiale - configuration standard
+                    SI CIBLE temps_phase > 10.0  // Dure 10 secondes
+                        // Passer à la phase suivante
+                        phase_demo = 2
+                        temps_phase = 0
+                        
+                        // Activer l'effet de "réveil"
+                        EXECUTION ACTIVER_SCENE_REVEIL effets_speciaux, effet_matrix
+                        RAPPORT "Démo: Activation de la scène de réveil"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 2:  // Phase de "réveil"
+                    SI CIBLE temps_phase > 15.0  // Dure 15 secondes
+                        // Passer à la phase suivante
+                        phase_demo = 3
+                        temps_phase = 0
+                        
+                        // Activer l'effet de pluie
+                        EXECUTION ACTIVER_SCENE_PLUIE effets_speciaux, effet_matrix
+                        RAPPORT "Démo: Activation de la scène de pluie"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 3:  // Phase de "pluie"
+                    SI CIBLE temps_phase > 15.0  // Dure 15 secondes
+                        // Passer à la phase suivante
+                        phase_demo = 4
+                        temps_phase = 0
+                        
+                        // Activer l'effet de corruption
+                        EXECUTION ACTIVER_SCENE_CORRUPTION effets_speciaux, effet_matrix
+                        RAPPORT "Démo: Activation de la scène de corruption"
+                    FIN SI
+                    PAUSE
+                    
+                CAS 4:  // Phase de "corruption"
+                    SI CIBLE temps_phase > 12.0  // Dure 12 secondes
+                        // Retourner à l'état initial
+                        phase_demo = 1
+                        temps_phase = 0
+                        
+                        // Réinitialiser les effets
+                        EXECUTION REINITIALISER_EFFETS
+                        RAPPORT "Démo: Retour à l'état initial"
+                    FIN SI
+                    PAUSE
+            FIN SELON
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REINITIALISER_EFFETS
+        ORDRE DE BATAILLE
+            // Réinitialiser les effets spéciaux
+            effets_speciaux.glitch.est_actif = FAUX
+            effets_speciaux.bruitage.est_actif = FAUX
+            effets_speciaux.code_binaire.est_actif = FAUX
+            effets_speciaux.pulsation.est_actif = FAUX
+            
+            // Réinitialiser l'effet Matrix
+            effet_matrix.couleur_principale = VERT_MATRIX
+            effet_matrix.ondulation_active = FAUX
+            effet_matrix.raindrops_actifs = VRAI
+            effet_matrix.probabilite_nouvelle_colonne = 0.02
+            
+            // Restaurer la vitesse normale des colonnes
+            MANOEUVRE POUR i DE 0 A effet_matrix.nb_colonnes - 1
+                SI CIBLE effet_matrix.colonnes[i].est_active
+                    effet_matrix.colonnes[i].vitesse = EXECUTION NOMBRE_ALEATOIRE 30, 200
+                FIN SI
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

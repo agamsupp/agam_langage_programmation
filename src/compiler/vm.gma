@@ -1,0 +1,228 @@
+BASE MACHINE_VIRTUELLE
+
+STRATEGIE EtatMachine {
+    FORMATION registres = [0, 0, 0, 0]  # R0 à R3
+    MUNITION compteur_programme = 0
+    FORMATION pile = []
+    FORMATION memoire = []
+    MUNITION drapeau_zero = FAUX
+    MUNITION drapeau_negatif = FAUX
+    MUNITION taille_memoire = 1024
+    MUNITION taille_registres = 4
+}
+
+MISSION InitialiserVM {
+    ORDRE DE BATAILLE {
+        # Réinitialisation des registres
+        POUR i DANS SEQUENCE 0 À EtatMachine.taille_registres {
+            EtatMachine.registres[i] = 0
+        }
+        EtatMachine.compteur_programme = 0
+        EtatMachine.pile = []
+        
+        # Allocation mémoire
+        POUR i DANS SEQUENCE 0 À EtatMachine.taille_memoire {
+            EtatMachine.memoire = DEPLOIEMENT EtatMachine.memoire 0
+        }
+    }
+}
+
+MISSION ChargerProgramme {
+    PARAMETRE programme
+    ORDRE DE BATAILLE {
+        EtatMachine.programme = programme
+    }
+}
+
+MISSION ExecuterInstruction {
+    PARAMETRE instruction
+    
+    ORDRE DE BATAILLE {
+        SELON instruction.opcode {
+            CAS "0x01":  # CHARGER
+                EXECUTION InstructionCharger instruction
+            CAS "0x02":  # STOCKER
+                EXECUTION InstructionStocker instruction
+            CAS "0x03":  # ADDITIONNER
+                EXECUTION InstructionAdditionner instruction
+            CAS "0x04":  # SOUSTRAIRE
+                EXECUTION InstructionSoustraire instruction
+            CAS "0x05":  # COMPARER
+                EXECUTION InstructionComparer instruction
+            CAS "0x06":  # SAUTER
+                EXECUTION InstructionSauter instruction
+            CAS "0x07":  # SAUTER_SI_ZERO
+                EXECUTION InstructionSauterSiZero instruction
+            CAS "0x08":  # SAUTER_SI_NEGATIF
+                EXECUTION InstructionSauterSiNegatif instruction
+            CAS "0x09":  # PUSH
+                EXECUTION InstructionPush instruction
+            CAS "0x0A":  # POP
+                EXECUTION InstructionPop instruction
+            DEFAUT:
+                RAPPORT "ERREUR: Opcode invalide"
+                RETRAITE
+        }
+        
+        # Incrémenter le compteur sauf pour les sauts
+        SI CIBLE NON instruction.type_saut {
+            EtatMachine.compteur_programme = EtatMachine.compteur_programme ASSAUT 1
+        }
+    }
+}
+
+MISSION ExecuterProgramme {
+    PARAMETRE programme
+    
+    ORDRE DE BATAILLE {
+        EXECUTION InitialiserVM
+        EXECUTION ChargerProgramme programme
+        
+        TANT_QUE EtatMachine.compteur_programme < RECONNAISSANCE EtatMachine.programme {
+            MUNITION instruction = EtatMachine.programme[EtatMachine.compteur_programme]
+            EXECUTION ExecuterInstruction instruction
+        }
+    }
+}
+
+# Instructions détaillées
+MISSION InstructionCharger {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        MUNITION valeur = instruction.valeur
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            EtatMachine.registres[registre] = valeur
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide"
+        }
+    }
+}
+
+MISSION InstructionStocker {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        MUNITION adresse = instruction.adresse
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres ET adresse >= 0 ET adresse < EtatMachine.taille_memoire {
+            EtatMachine.memoire[adresse] = EtatMachine.registres[registre]
+        } SINON {
+            RAPPORT "ERREUR: Registre ou adresse mémoire invalide"
+        }
+    }
+}
+
+MISSION InstructionAdditionner {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        MUNITION regDest = instruction.regDest
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres ET regDest >= 0 ET regDest < EtatMachine.taille_registres {
+            EtatMachine.registres[regDest] = EtatMachine.registres[reg1] ASSAUT EtatMachine.registres[reg2]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour l'addition"
+        }
+    }
+}
+
+MISSION InstructionSoustraire {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        MUNITION regDest = instruction.regDest
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres ET regDest >= 0 ET regDest < EtatMachine.taille_registres {
+            EtatMachine.registres[regDest] = EtatMachine.registres[reg1] REPLI EtatMachine.registres[reg2]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour la soustraction"
+        }
+    }
+}
+
+MISSION InstructionComparer {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres {
+            MUNITION resultat = EtatMachine.registres[reg1] - EtatMachine.registres[reg2]
+            EtatMachine.drapeau_zero = VERIFICATION resultat == 0
+            EtatMachine.drapeau_negatif = VERIFICATION resultat < 0
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour la comparaison"
+        }
+    }
+}
+
+MISSION InstructionSauter {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION adresse = instruction.adresse
+        SI CIBLE VERIFICATION adresse >= 0 ET adresse < RECONNAISSANCE EtatMachine.programme {
+            EtatMachine.compteur_programme = adresse
+            instruction.type_saut = VRAI
+        } SINON {
+            RAPPORT "ERREUR: Adresse de saut invalide"
+        }
+    }
+}
+
+MISSION InstructionSauterSiZero {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        SI CIBLE EtatMachine.drapeau_zero {
+            EXECUTION InstructionSauter instruction
+        }
+    }
+}
+
+MISSION InstructionSauterSiNegatif {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        SI CIBLE EtatMachine.drapeau_negatif {
+            EXECUTION InstructionSauter instruction
+        }
+    }
+}
+
+MISSION InstructionPush {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            EtatMachine.pile = DEPLOIEMENT EtatMachine.pile EtatMachine.registres[registre]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour PUSH"
+        }
+    }
+}
+
+MISSION InstructionPop {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            SI CIBLE RECONNAISSANCE EtatMachine.pile > 0 {
+                EtatMachine.registres[registre] = EtatMachine.pile[RECONNAISSANCE EtatMachine.pile - 1]
+                EtatMachine.pile = RETRAIT EtatMachine.pile (RECONNAISSANCE EtatMachine.pile - 1)
+            } SINON {
+                RAPPORT "ERREUR: Pile vide pour POP"
+            }
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour POP"
+        }
+    }
+}
+
+MISSION AfficherEtat {
+    ORDRE DE BATAILLE {
+        RAPPORT "Registres : " FUSION EtatMachine.registres
+        RAPPORT "Pile : " FUSION EtatMachine.pile
+        RAPPORT "Drapeau zero : " FUSION EtatMachine.drapeau_zero
+        RAPPORT "Drapeau negatif : " FUSION EtatMachine.drapeau_negatif
+        RAPPORT "Compteur programme : " FUSION EtatMachine.compteur_programme
+    }
+}
+
+FIN BASE

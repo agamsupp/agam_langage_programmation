@@ -1,0 +1,90 @@
+BASE CONTROLE_QUALITE
+
+STRATEGIE MetriquesQualite {
+    FORMATION criteres = [
+        {
+            type: "CODE",
+            metriques: [
+                {nom: "COMPLEXITE_CYCLOMATIQUE", seuil: 10},
+                {nom: "PROFONDEUR_IMBRICATION", seuil: 4},
+                {nom: "LIGNES_PAR_FONCTION", seuil: 50}
+            ]
+        },
+        {
+            type: "TESTS",
+            metriques: [
+                {nom: "COUVERTURE", seuil: 80},
+                {nom: "TESTS_REUSSIS", seuil: 100},
+                {nom: "MUTATIONS_DETECTEES", seuil: 75}
+            ]
+        },
+        {
+            type: "PERFORMANCE",
+            metriques: [
+                {nom: "TEMPS_COMPILATION", seuil: 5000},
+                {nom: "UTILISATION_MEMOIRE", seuil: 1024},
+                {nom: "TEMPS_EXECUTION", seuil: 1000}
+            ]
+        }
+    ]
+
+    STRATEGIE rapports = {
+        format: "DETAILLE",
+        historique: VRAI,
+        comparaison: VRAI
+    }
+}
+
+MISSION VerifierQualite {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            metriques: [],
+            violations: [],
+            score: 100
+        }
+        
+        # Analyse des critères
+        POUR critere DANS MetriquesQualite.criteres {
+            EXECUTION AnalyserCritere code critere rapport
+        }
+        
+        # Calcul du score global
+        rapport.score = CalculerScoreQualite rapport
+        
+        # Génération des recommandations
+        SI CIBLE rapport.score < 80 {
+            EXECUTION GenererRecommandations rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION AnalyserCritere {
+    PARAMETRE code
+    PARAMETRE critere
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        POUR metrique DANS critere.metriques {
+            MUNITION valeur = MESURER_METRIQUE code metrique
+            
+            SI CIBLE valeur > metrique.seuil {
+                rapport.violations = DEPLOIEMENT rapport.violations {
+                    metrique: metrique.nom,
+                    valeur: valeur,
+                    seuil: metrique.seuil
+                }
+            }
+            
+            rapport.metriques = DEPLOIEMENT rapport.metriques {
+                nom: metrique.nom,
+                valeur: valeur
+            }
+        }
+    }
+}
+
+FIN BASE

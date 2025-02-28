@@ -1,0 +1,91 @@
+BASE OPTIMISEUR_CODE
+
+STRATEGIE ConfigurationOptimisation {
+    FORMATION phases = [
+        {
+            nom: "ELIMINATION_CODE_MORT",
+            actif: VRAI,
+            niveau: 1
+        },
+        {
+            nom: "PROPAGATION_CONSTANTES",
+            actif: VRAI,
+            niveau: 2
+        },
+        {
+            nom: "OPTIMISATION_BOUCLES",
+            actif: VRAI,
+            niveau: 2
+        }
+    ]
+    
+    MUNITION niveau_optimisation = 2
+}
+
+MISSION OptimiserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE code_optimise = code_source
+        
+        # Exécution des phases d'optimisation
+        POUR phase DANS ConfigurationOptimisation.phases {
+            SI CIBLE phase.actif ET phase.niveau <= ConfigurationOptimisation.niveau_optimisation {
+                SELON phase.nom {
+                    CAS "ELIMINATION_CODE_MORT":
+                        code_optimise = EXECUTION EliminerCodeMort code_optimise
+                    CAS "PROPAGATION_CONSTANTES":
+                        code_optimise = EXECUTION PropagerConstantes code_optimise
+                    CAS "OPTIMISATION_BOUCLES":
+                        code_optimise = EXECUTION OptimiserBoucles code_optimise
+                }
+            }
+        }
+        
+        # Validation du code optimisé
+        SI CIBLE NON ValiderOptimisations code_optimise {
+            RAPPORT "ERREUR: Optimisation invalide"
+            RETRAITE code_source
+        }
+        
+        RETRAITE code_optimise
+    }
+}
+
+MISSION EliminerCodeMort {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        FORMATION blocs_utiles = []
+        
+        # Analyse d'accessibilité
+        POUR bloc DANS code.blocs {
+            SI CIBLE EstBlocAccessible bloc {
+                blocs_utiles = DEPLOIEMENT blocs_utiles bloc
+            }
+        }
+        
+        # Reconstruction du code
+        RETRAITE RECONSTRUIRE_CODE blocs_utiles
+    }
+}
+
+MISSION PropagerConstantes {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE table_constantes = {}
+        
+        # Identification des constantes
+        POUR instruction DANS code.instructions {
+            SI CIBLE EstAssignationConstante instruction {
+                table_constantes[instruction.cible] = instruction.valeur
+            }
+        }
+        
+        # Propagation
+        RETRAITE REMPLACER_CONSTANTES code table_constantes
+    }
+}
+
+FIN BASE

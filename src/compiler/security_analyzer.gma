@@ -1,0 +1,101 @@
+BASE ANALYSEUR_SECURITE
+
+STRATEGIE ReglesSecurite {
+    FORMATION regles = [
+        {
+            type: "DEBORDEMENT_TAMPON",
+            severite: "CRITIQUE",
+            verification: "STATIQUE"
+        },
+        {
+            type: "INJECTION_CODE",
+            severite: "CRITIQUE",
+            verification: "DYNAMIQUE"
+        },
+        {
+            type: "ACCES_MEMOIRE",
+            severite: "HAUTE",
+            verification: "HYBRIDE"
+        }
+    ]
+    
+    FORMATION points_verification = [
+        {
+            zone: "ENTREE",
+            validations: ["TAILLE", "TYPE", "LIMITE"]
+        },
+        {
+            zone: "MEMOIRE",
+            validations: ["ALLOCATION", "LIBERATION", "FRONTIERE"]
+        }
+    ]
+}
+
+MISSION AnalyserSecurite {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            vulnerabilites: [],
+            avertissements: [],
+            recommandations: []
+        }
+        
+        # Analyse statique
+        MANOEUVRE ANALYSE_STATIQUE {
+            POUR regle DANS ReglesSecurite.regles {
+                SI CIBLE regle.verification VERIFICATION "STATIQUE" {
+                    EXECUTION VerifierRegleStatique code_source regle rapport
+                }
+            }
+        }
+        
+        # Points d'instrumentation dynamique
+        MANOEUVRE INSTRUMENTATION {
+            POUR point DANS ReglesSecurite.points_verification {
+                EXECUTION InstrumenterPoint code_source point
+            }
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION VerifierRegleStatique {
+    PARAMETRE code
+    PARAMETRE regle
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        SELON regle.type {
+            CAS "DEBORDEMENT_TAMPON":
+                EXECUTION AnalyserDebordementsBuffer code rapport
+            CAS "INJECTION_CODE":
+                EXECUTION AnalyserInjectionCode code rapport
+            CAS "ACCES_MEMOIRE":
+                EXECUTION AnalyserAccesMemoire code rapport
+        }
+    }
+}
+
+MISSION GenererRapportSecurite {
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        # Tri des vulnérabilités par sévérité
+        rapport.vulnerabilites = TRIER_DECROISSANT 
+            rapport.vulnerabilites 
+            PAR severite
+            
+        # Génération des recommandations
+        POUR vuln DANS rapport.vulnerabilites {
+            rapport.recommandations = DEPLOIEMENT 
+                rapport.recommandations 
+                (GENERER_RECOMMANDATION vuln)
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

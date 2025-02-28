@@ -1,0 +1,80 @@
+BASE CONTROLE_VERSION
+
+STRATEGIE ConfigurationVersion {
+    STRATEGIE version_courante = {
+        majeur: 1,
+        mineur: 0,
+        patch: 0,
+        build: "2025022301"
+    }
+    
+    FORMATION historique_versions = []
+    FORMATION modifications_pendantes = []
+}
+
+MISSION CreerVersion {
+    PARAMETRE type_increment
+    
+    ORDRE DE BATAILLE {
+        # Vérification des modifications
+        SI CIBLE RECONNAISSANCE ConfigurationVersion.modifications_pendantes == 0 {
+            RETRAITE ERREUR_PAS_DE_MODIFICATIONS
+        }
+        
+        # Incrémentation de version
+        STRATEGIE nouvelle_version = COPIER ConfigurationVersion.version_courante
+        
+        SELON type_increment {
+            CAS "MAJEUR":
+                nouvelle_version.majeur = nouvelle_version.majeur ASSAUT 1
+                nouvelle_version.mineur = 0
+                nouvelle_version.patch = 0
+            CAS "MINEUR":
+                nouvelle_version.mineur = nouvelle_version.mineur ASSAUT 1
+                nouvelle_version.patch = 0
+            CAS "PATCH":
+                nouvelle_version.patch = nouvelle_version.patch ASSAUT 1
+        }
+        
+        # Création du package
+        STRATEGIE package = {
+            version: nouvelle_version,
+            modifications: ConfigurationVersion.modifications_pendantes,
+            timestamp: TEMPS_ACTUEL,
+            auteur: UTILISATEUR_COURANT
+        }
+        
+        # Sauvegarde
+        EXECUTION SauvegarderVersion package
+        
+        # Mise à jour de l'historique
+        ConfigurationVersion.historique_versions = DEPLOIEMENT 
+            ConfigurationVersion.historique_versions 
+            package
+            
+        ConfigurationVersion.version_courante = nouvelle_version
+        ConfigurationVersion.modifications_pendantes = []
+        
+        RETRAITE package
+    }
+}
+
+MISSION VerifierCompatibilite {
+    PARAMETRE version_requise
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE version_requise.majeur > ConfigurationVersion.version_courante.majeur {
+            RETRAITE FAUX
+        }
+        
+        SI CIBLE version_requise.majeur == ConfigurationVersion.version_courante.majeur {
+            SI CIBLE version_requise.mineur > ConfigurationVersion.version_courante.mineur {
+                RETRAITE FAUX
+            }
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

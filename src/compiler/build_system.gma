@@ -1,0 +1,88 @@
+BASE SYSTEME_BUILD
+
+STRATEGIE ConfigurationBuild {
+    STRATEGIE parametres = {
+        mode: "RELEASE",
+        optimisation: "NIVEAU_2",
+        debug_symbols: FAUX,
+        compression: VRAI
+    }
+    
+    FORMATION etapes = [
+        {
+            nom: "PREPARATION",
+            obligatoire: VRAI,
+            dependances: []
+        },
+        {
+            nom: "COMPILATION",
+            obligatoire: VRAI,
+            dependances: ["PREPARATION"]
+        },
+        {
+            nom: "TESTS",
+            obligatoire: ConfigurationBuild.parametres.mode == "DEBUG",
+            dependances: ["COMPILATION"]
+        }
+    ]
+}
+
+MISSION ExecuterBuild {
+    PARAMETRE config
+    
+    ORDRE DE BATAILLE {
+        # Vérification de l'environnement
+        SI CIBLE NON VerifierEnvironnementBuild {
+            RETRAITE ERREUR_ENVIRONNEMENT
+        }
+        
+        # Exécution des étapes de build
+        POUR etape DANS ConfigurationBuild.etapes {
+            SI CIBLE etape.obligatoire OU EstEtapeActivee etape.nom {
+                SI CIBLE NON VerifierDependances etape {
+                    RETRAITE ERREUR_DEPENDANCES
+                }
+                
+                SELON etape.nom {
+                    CAS "PREPARATION":
+                        EXECUTION PreparerEnvironnement config
+                    CAS "COMPILATION":
+                        EXECUTION CompilerProjet config
+                    CAS "TESTS":
+                        EXECUTION ExecuterTests config
+                }
+            }
+        }
+        
+        # Génération des artefacts
+        EXECUTION GenererArtefacts config
+    }
+}
+
+MISSION GenererArtefacts {
+    PARAMETRE config
+    
+    ORDRE DE BATAILLE {
+        FORMATION artefacts = []
+        
+        # Compilation des fichiers sources
+        POUR fichier DANS FICHIERS_SOURCES {
+            STRATEGIE artefact = EXECUTION CompilerFichier fichier config
+            artefacts = DEPLOIEMENT artefacts artefact
+        }
+        
+        # Optimisation si nécessaire
+        SI CIBLE config.optimisation > 0 {
+            artefacts = EXECUTION OptimiserArtefacts artefacts config
+        }
+        
+        # Compression si activée
+        SI CIBLE config.compression {
+            artefacts = EXECUTION CompresserArtefacts artefacts
+        }
+        
+        RETRAITE artefacts
+    }
+}
+
+FIN BASE

@@ -1,0 +1,397 @@
+BASE GESTIONNAIRE_PAQUETS_RESOLVEUR
+
+STRATEGIE ConfigurationResolveur {
+    version_min_acceptable: "0.1.0",
+    priorite_stabilite: VRAI,  # Préférer les versions stables
+    resolution_recursive: VRAI,
+    resolution_parallele: VRAI,
+    max_profondeur: 20,        # Protection contre les dépendances circulaires
+    niveau_log: "INFO"
+}
+
+MISSION ResolveurInitialiser {
+    PARAMETRE registre
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du résolveur de dépendances AGAM"
+        
+        # Configurer le résolveur avec les options par défaut
+        STRATEGIE config = ConfigurationResolveur
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet résolveur
+        STRATEGIE resolveur = {
+            configuration: config,
+            registre: registre,
+            cache_resolution: {}
+        }
+        
+        RAPPORT "Résolveur initialisé"
+        
+        RETRAITE resolveur
+    }
+}
+
+MISSION ResoudreDependances {
+    PARAMETRE resolveur
+    PARAMETRE dependances
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Résolution des dépendances: " + JOINDRE dependances ", "
+        
+        # Vérifier que le registre est connecté
+        SI CIBLE !resolveur.registre.connecte {
+            EXECUTION RegistreConnecter resolveur.registre
+        }
+        
+        # Résultat de la résolution
+        STRATEGIE resultat = {
+            resolu: VRAI,
+            dependances: [],
+            graphe: {}
+        }
+        
+        # Liste des dépendances à traiter
+        FORMATION a_traiter = dependances
+        
+        # Ensemble des dépendances déjà traitées (pour éviter les doublons)
+        STRATEGIE traitees = {}
+        
+        # Traiter toutes les dépendances
+        TANT QUE RECONNAISSANCE a_traiter > 0 {
+            MUNITION dep_actuelle = a_traiter[0]
+            a_traiter = EXTRACTION a_traiter 1 RECONNAISSANCE a_traiter
+            
+            # Vérifier si cette dépendance a déjà été traitée
+            SI CIBLE traitees[dep_actuelle.nom] == VRAI {
+                CONTINUER
+            }
+            
+            # Marquer comme traitée
+            traitees[dep_actuelle.nom] = VRAI
+            
+            # Analyser la spécification de dépendance
+            STRATEGIE spec = EXECUTION AnalyserSpecDependance dep_actuelle
+            
+            # Obtenir les versions disponibles du paquet
+            FORMATION versions = EXECUTION ObtenirVersionsPaquet resolveur.registre spec.nom
+            
+            # Filtrer les versions selon la contrainte
+            FORMATION versions_compatibles = EXECUTION FiltrerVersionsCompatibles versions spec.contrainte
+            
+            SI CIBLE RECONNAISSANCE versions_compatibles == 0 {
+                resultat.resolu = FAUX
+                resultat.erreur = "Aucune version compatible trouvée pour " + spec.nom + " (" + spec.contrainte + ")"
+                RETRAITE resultat
+            }
+            
+            # Sélectionner la meilleure version selon les critères
+            MUNITION meilleure_version = EXECUTION SelectionnerMeilleureVersion versions_compatibles resolveur.configuration
+            
+            # Ajouter à la liste des dépendances résolues
+            resultat.dependances = DEPLOIEMENT resultat.dependances {
+                nom: spec.nom,
+                version: meilleure_version
+            }
+            
+            # Ajouter au graphe de dépendances
+            resultat.graphe[spec.nom] = meilleure_version
+            
+            # Si la résolution récursive est activée, récupérer les dépendances de ce paquet
+            SI CIBLE resolveur.configuration.resolution_recursive {
+                # Obtenir les infos du paquet
+                STRATEGIE infos_paquet = EXECUTION ObtenirInfosPaquetVersion resolveur.registre spec.nom meilleure_version
+                
+                # Ajouter les dépendances de ce paquet à la liste à traiter
+                SI CIBLE infos_paquet != NULE ET RECONNAISSANCE infos_paquet.dependances > 0 {
+                    POUR dep_indirecte DANS infos_paquet.dependances {
+                        a_traiter = DEPLOIEMENT a_traiter dep_indirecte
+                    }
+                }
+            }
+        }
+        
+        RAPPORT "Résolution de dépendances terminée: " + RECONNAISSANCE resultat.dependances + " paquets"
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION AnalyserSpecDependance {
+    PARAMETRE spec_dependance
+    
+    ORDRE DE BATAILLE {
+        # Analyser une spécification de dépendance du type "nom >= version"
+        
+        # Si c'est déjà un objet structuré, le retourner tel quel
+        SI CIBLE TypeDe(spec_dependance) == "OBJET" {
+            RETRAITE spec_dependance
+        }
+        
+        # Analyser la chaîne de caractères
+        STRATEGIE spec = {
+            nom: "",
+            contrainte: "",
+            operateur: "",
+            version: ""
+        }
+        
+        # Rechercher l'opérateur
+        SI CIBLE spec_dependance CONTIENT ">=" {
+            FORMATION parties = DIVISER spec_dependance ">="
+            spec.nom = AFFINER parties[0]
+            spec.version = AFFINER parties[1]
+            spec.operateur = ">="
+            spec.contrainte = ">= " + spec.version
+        } SINON SI CIBLE spec_dependance CONTIENT ">" {
+            FORMATION parties = DIVISER spec_dependance ">"
+            spec.nom = AFFINER parties[0]
+            spec.version = AFFINER parties[1]
+            spec.operateur = ">"
+            spec.contrainte = "> " + spec.version
+        } SINON SI CIBLE spec_dependance CONTIENT "<=" {
+            FORMATION parties = DIVISER spec_dependance "<="
+            spec.nom = AFFINER parties[0]
+            spec.version = AFFINER parties[1]
+            spec.operateur = "<="
+            spec.contrainte = "<= " + spec.version
+        } SINON SI CIBLE spec_dependance CONTIENT "<" {
+            FORMATION parties = DIVISER spec_dependance "<"
+            spec.nom = AFFINER parties[0]
+            spec.version = AFFINER parties[1]
+            spec.operateur = "<"
+            spec.contrainte = "< " + spec.version
+        } SINON SI CIBLE spec_dependance CONTIENT "==" {
+            FORMATION parties = DIVISER spec_dependance "=="
+            spec.nom = AFFINER parties[0]
+            spec.version = AFFINER parties[1]
+            spec.operateur = "=="
+            spec.contrainte = "== " + spec.version
+        } SINON {
+            # Si pas d'opérateur, considérer que c'est juste le nom du paquet
+            # (prendre n'importe quelle version)
+            spec.nom = AFFINER spec_dependance
+            spec.operateur = ""
+            spec.contrainte = ""
+        }
+        
+        RETRAITE spec
+    }
+}
+
+MISSION FiltrerVersionsCompatibles {
+    PARAMETRE versions
+    PARAMETRE contrainte
+    
+    ORDRE DE BATAILLE {
+        # Si pas de contrainte, toutes les versions sont compatibles
+        SI CIBLE contrainte == NULE OU contrainte == "" {
+            RETRAITE versions
+        }
+        
+        FORMATION compatibles = []
+        
+        # Extraire l'opérateur et la version de référence
+        STRATEGIE parties = DIVISER contrainte " "
+        MUNITION operateur = parties[0]
+        MUNITION version_ref = parties[1]
+        
+        POUR version DANS versions {
+            SI CIBLE EXECUTION ComparerVersions version version_ref operateur {
+                compatibles = DEPLOIEMENT compatibles version
+            }
+        }
+        
+        RETRAITE compatibles
+    }
+}
+
+MISSION ComparerVersions {
+    PARAMETRE version1
+    PARAMETRE version2
+    PARAMETRE operateur
+    
+    ORDRE DE BATAILLE {
+        # Comparer deux versions sémantiques (format X.Y.Z)
+        
+        # Décomposer les versions
+        FORMATION comp1 = DIVISER version1 "."
+        FORMATION comp2 = DIVISER version2 "."
+        
+        # Convertir en nombres
+        MUNITION major1 = ENTIER(comp1[0])
+        MUNITION minor1 = ENTIER(comp1[1])
+        MUNITION patch1 = ENTIER(comp1[2])
+        
+        MUNITION major2 = ENTIER(comp2[0])
+        MUNITION minor2 = ENTIER(comp2[1])
+        MUNITION patch2 = ENTIER(comp2[2])
+        
+        # Calculer le résultat de la comparaison
+        MUNITION resultat = 0
+        
+        SI CIBLE major1 > major2 {
+            resultat = 1
+        } SINON SI CIBLE major1 < major2 {
+            resultat = -1
+        } SINON SI CIBLE minor1 > minor2 {
+            resultat = 1
+        } SINON SI CIBLE minor1 < minor2 {
+            resultat = -1
+        } SINON SI CIBLE patch1 > patch2 {
+            resultat = 1
+        } SINON SI CIBLE patch1 < patch2 {
+            resultat = -1
+        }
+        
+        # Interpréter le résultat selon l'opérateur
+        SI CIBLE operateur == ">" {
+            RETRAITE resultat > 0
+        } SINON SI CIBLE operateur == ">=" {
+            RETRAITE resultat >= 0
+        } SINON SI CIBLE operateur == "<" {
+            RETRAITE resultat < 0
+        } SINON SI CIBLE operateur == "<=" {
+            RETRAITE resultat <= 0
+        } SINON SI CIBLE operateur == "==" {
+            RETRAITE resultat == 0
+        } SINON {
+            # Opérateur non reconnu
+            RETRAITE FAUX
+        }
+    }
+}
+
+MISSION SelectionnerMeilleureVersion {
+    PARAMETRE versions
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Par défaut, prendre la version la plus récente
+        MUNITION index_meilleur = 0
+        
+        POUR i DEPUIS 1 JUSQU'A RECONNAISSANCE versions - 1 {
+            SI CIBLE EXECUTION ComparerVersions versions[i] versions[index_meilleur] ">" {
+                index_meilleur = i
+            }
+        }
+        
+        RETRAITE versions[index_meilleur]
+    }
+}
+
+MISSION ObtenirInfosPaquetVersion {
+    PARAMETRE registre
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    
+    ORDRE DE BATAILLE {
+        # Simuler la récupération des informations d'une version spécifique d'un paquet
+        # Dans un système réel, ceci ferait une requête au registre
+        
+        # Créer quelques infos de paquet simulées pour les besoins du test
+        SI CIBLE nom_paquet == "stdlib-collections" ET version == "1.1.0" {
+            RETRAITE {
+                nom: "stdlib-collections",
+                version: "1.1.0",
+                description: "Bibliothèque standard de collections AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 45600,
+                date_publication: "2025-02-20"
+            }
+        } SINON SI CIBLE nom_paquet == "stdlib-io" ET version == "1.0.2" {
+            RETRAITE {
+                nom: "stdlib-io",
+                version: "1.0.2",
+                description: "Bibliothèque standard d'entrées/sorties AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 32400,
+                date_publication: "2025-02-18"
+            }
+        } SINON SI CIBLE nom_paquet == "stdlib-network" ET version == "1.0.0" {
+            RETRAITE {
+                nom: "stdlib-network",
+                version: "1.0.0",
+                description: "Bibliothèque standard de réseau AGAM",
+                auteur: "Équipe AGAM",
+                dependances: ["stdlib-io >= 1.0.0"],
+                taille: 56800,
+                date_publication: "2025-02-22"
+            }
+        } SINON SI CIBLE nom_paquet == "stdlib-concurrency" ET version == "1.0.0" {
+            RETRAITE {
+                nom: "stdlib-concurrency",
+                version: "1.0.0",
+                description: "Bibliothèque standard de concurrence AGAM",
+                auteur: "Équipe AGAM",
+                dependances: [],
+                taille: 38200,
+                date_publication: "2025-02-24"
+            }
+        }
+        
+        # Paquet ou version non trouvé
+        RETRAITE NULE
+    }
+}
+
+MISSION AFFINER {
+    PARAMETRE chaine
+    
+    ORDRE DE BATAILLE {
+        # Enlever les espaces au début et à la fin
+        # Dans un système réel, ceci utiliserait une fonction de la bibliothèque standard
+        
+        # Simuler l'affinage
+        RETRAITE chaine
+    }
+}
+
+MISSION ENTIER {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Convertir en entier
+        # Dans un système réel, ceci utiliserait une fonction de la bibliothèque standard
+        
+        # Pour la simulation, retourner la valeur telle quelle (on suppose que c'est déjà un entier)
+        RETRAITE valeur
+    }
+}
+
+MISSION TypeDe {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Déterminer le type d'une valeur
+        # Dans un système réel, ceci utiliserait une fonction de la bibliothèque standard
+        
+        # Pour la simulation, faire une estimation basique
+        SI CIBLE valeur == NULE {
+            RETRAITE "NULE"
+        } SINON SI CIBLE TYPEDE valeur == "OBJET" {
+            RETRAITE "OBJET"
+        } SINON SI CIBLE TYPEDE valeur == "FORMATION" {
+            RETRAITE "FORMATION"
+        } SINON SI CIBLE TYPEDE valeur == "CHAINE" {
+            RETRAITE "CHAINE"
+        } SINON SI CIBLE TYPEDE valeur == "NOMBRE" {
+            RETRAITE "NOMBRE"
+        } SINON SI CIBLE TYPEDE valeur == "BOOLEEN" {
+            RETRAITE "BOOLEEN"
+        } SINON {
+            RETRAITE "INCONNU"
+        }
+    }
+}
+
+FIN BASE

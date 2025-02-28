@@ -1,0 +1,98 @@
+BASE GENERATEUR_CODE_MACHINE
+
+STRATEGIE ConfigurationMachine {
+    FORMATION instructions = [
+        {
+            mnemonique: "CHARGER",
+            opcode: "0x01",
+            taille: 4,
+            flags: ["MODIFIE_REGISTRES"]
+        },
+        {
+            mnemonique: "STOCKER",
+            opcode: "0x02",
+            taille: 4,
+            flags: ["ACCES_MEMOIRE"]
+        },
+        {
+            mnemonique: "AJOUTER",
+            opcode: "0x03",
+            taille: 4,
+            flags: ["MODIFIE_FLAGS"]
+        }
+    ]
+
+    FORMATION registres = [
+        {nom: "R0", code: "0x00", usage: "GENERAL"},
+        {nom: "R1", code: "0x01", usage: "GENERAL"},
+        {nom: "R2", code: "0x02", usage: "POINTEUR"}
+    ]
+}
+
+MISSION GenererCodeMachine {
+    PARAMETRE code_intermediaire
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_machine = []
+        
+        POUR instruction DANS code_intermediaire {
+            STRATEGIE instruction_machine = {
+                opcode: OBTENIR_OPCODE instruction,
+                operandes: CONVERTIR_OPERANDES instruction,
+                taille: CALCULER_TAILLE instruction
+            }
+            
+            code_machine = DEPLOIEMENT code_machine instruction_machine
+        }
+        
+        # Optimisation bas niveau
+        SI CIBLE NIVEAU_OPTIMISATION > 0 {
+            code_machine = EXECUTION OptimiserCodeMachine code_machine
+        }
+        
+        # Résolution des adresses
+        EXECUTION ResoudreAdresses code_machine
+        
+        RETRAITE code_machine
+    }
+}
+
+MISSION OptimiserCodeMachine {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Optimisation des accès mémoire
+        MANOEUVRE OPTIMISATION_MEMOIRE {
+            POUR i DANS SEQUENCE 0 À (RECONNAISSANCE code - 1) {
+                SI CIBLE EstAccesMemoire code[i] {
+                    EXECUTION OptimiserAccesMemoire code i
+                }
+            }
+        }
+        
+        # Optimisation des registres
+        MANOEUVRE OPTIMISATION_REGISTRES {
+            FORMATION registres_utilises = []
+            EXECUTION OptimiserAllocationRegistres code registres_utilises
+        }
+        
+        RETRAITE code
+    }
+}
+
+MISSION GenererCodeBinaire {
+    PARAMETRE code_machine
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_binaire = []
+        
+        POUR instruction DANS code_machine {
+            FORMATION octets = ENCODER_INSTRUCTION instruction
+            code_binaire = DEPLOIEMENT code_binaire octets
+        }
+        
+        RETRAITE code_binaire
+    }
+}
+
+FIN BASE

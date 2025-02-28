@@ -1,0 +1,89 @@
+BASE GESTIONNAIRE_PILE
+
+STRATEGIE ConfigurationPile {
+    MUNITION taille_pile = 1024 * 1024  # 1MB
+    MUNITION taille_cadre = 4096        # 4KB par cadre
+    MUNITION limite_recursion = 100
+    
+    FORMATION pile = []
+    FORMATION cadres_actifs = []
+    MUNITION profondeur_courante = 0
+}
+
+MISSION CreerCadrePile {
+    PARAMETRE fonction
+    PARAMETRE parametres
+    
+    ORDRE DE BATAILLE {
+        # Vérification de la profondeur
+        SI CIBLE ConfigurationPile.profondeur_courante >= 
+            ConfigurationPile.limite_recursion {
+            RETRAITE ERREUR_DEPASSEMENT_PILE
+        }
+        
+        # Création du nouveau cadre
+        STRATEGIE nouveau_cadre = {
+            id: GENERER_ID,
+            fonction: fonction,
+            parametres: parametres,
+            variables_locales: [],
+            pointeur_retour: ConfigurationPile.cadres_actifs[-1],
+            offset_base: ConfigurationPile.pile.taille
+        }
+        
+        # Allocation espace pour variables locales
+        EXECUTION AllouerEspaceVariables nouveau_cadre
+        
+        # Sauvegarde du contexte
+        EXECUTION SauvegarderContexte
+        
+        # Empilage du cadre
+        ConfigurationPile.cadres_actifs = DEPLOIEMENT 
+            ConfigurationPile.cadres_actifs 
+            nouveau_cadre
+            
+        ConfigurationPile.profondeur_courante = 
+            ConfigurationPile.profondeur_courante ASSAUT 1
+    }
+}
+
+MISSION DetruireCadrePile {
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE ConfigurationPile.cadres_actifs > 0 {
+            # Récupération du cadre courant
+            STRATEGIE cadre = ConfigurationPile.cadres_actifs[-1]
+            
+            # Restauration du contexte
+            EXECUTION RestaurerContexte cadre.pointeur_retour
+            
+            # Nettoyage des variables locales
+            EXECUTION LibererEspaceVariables cadre
+            
+            # Dépilage du cadre
+            ConfigurationPile.cadres_actifs = RETRAIT 
+                ConfigurationPile.cadres_actifs 
+                -1
+                
+            ConfigurationPile.profondeur_courante = 
+                ConfigurationPile.profondeur_courante REPLI 1
+        }
+    }
+}
+
+MISSION GererDepassementPile {
+    PARAMETRE taille_requise
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE (ConfigurationPile.pile.taille ASSAUT taille_requise) > 
+            ConfigurationPile.taille_pile {
+            # Nettoyage d'urgence
+            EXECUTION NettoyerPile
+            
+            SI CIBLE NON EspaceDisponible taille_requise {
+                RETRAITE ERREUR_DEPASSEMENT_MEMOIRE
+            }
+        }
+    }
+}
+
+FIN BASE

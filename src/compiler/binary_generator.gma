@@ -1,0 +1,86 @@
+BASE GENERATEUR_BINAIRE
+
+STRATEGIE FormatBinaire {
+    STRATEGIE en_tete = {
+        signature: "AGAM",
+        version: 1,
+        type_architecture: "x86_64",
+        flags: 0
+    }
+
+    FORMATION sections = [
+        {nom: ".code", type: "EXECUTABLE"},
+        {nom: ".data", type: "DONNEES"},
+        {nom: ".symbol", type: "SYMBOLES"}
+    ]
+}
+
+MISSION GenererBinaire {
+    PARAMETRE code_intermediaire
+    
+    ORDRE DE BATAILLE {
+        # Préparation des sections
+        STRATEGIE binaire = {
+            en_tete: COPIER FormatBinaire.en_tete,
+            sections: [],
+            table_symboles: []
+        }
+
+        # Génération du code
+        MISSION GenererSectionCode {
+            FORMATION code = []
+            
+            POUR instruction DANS code_intermediaire {
+                FORMATION code_machine = EXECUTION TraduireInstruction instruction
+                code = DEPLOIEMENT code code_machine
+            }
+            
+            RETRAITE code
+        }
+
+        # Génération des données
+        MISSION GenererSectionDonnees {
+            FORMATION donnees = []
+            
+            POUR variable DANS VARIABLES_GLOBALES {
+                donnees = DEPLOIEMENT donnees {
+                    adresse: variable.adresse,
+                    taille: variable.taille,
+                    valeur: variable.valeur_initiale
+                }
+            }
+            
+            RETRAITE donnees
+        }
+
+        # Construction du binaire final
+        binaire.sections = [
+            {type: "CODE", contenu: EXECUTION GenererSectionCode},
+            {type: "DONNEES", contenu: EXECUTION GenererSectionDonnees},
+            {type: "SYMBOLES", contenu: EXECUTION GenererTableSymboles}
+        ]
+
+        RETRAITE binaire
+    }
+}
+
+MISSION TraduireInstruction {
+    PARAMETRE instruction
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_machine = []
+        
+        SELON instruction.type {
+            CAS "ARITHMETIQUE":
+                code_machine = EXECUTION GenererCodeArithmetique instruction
+            CAS "CONTROLE":
+                code_machine = EXECUTION GenererCodeControle instruction
+            CAS "MEMOIRE":
+                code_machine = EXECUTION GenererCodeMemoire instruction
+        }
+        
+        RETRAITE code_machine
+    }
+}
+
+FIN BASE

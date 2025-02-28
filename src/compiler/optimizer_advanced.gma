@@ -1,0 +1,93 @@
+BASE OPTIMISEUR_AVANCE
+
+STRATEGIE OptimisationsAvancees {
+    FORMATION phases = [
+        {
+            nom: "ELIMINATION_CODE_MORT",
+            niveau: 1
+        },
+        {
+            nom: "PROPAGATION_CONSTANTES",
+            niveau: 2
+        },
+        {
+            nom: "DEROULAGE_BOUCLES",
+            niveau: 3
+        }
+    ]
+}
+
+MISSION OptimiserCodeAvance {
+    PARAMETRE code_source
+    PARAMETRE niveau_optimisation
+    
+    ORDRE DE BATAILLE {
+        POUR phase DANS OptimisationsAvancees.phases {
+            SI CIBLE phase.niveau <= niveau_optimisation {
+                SELON phase.nom {
+                    CAS "ELIMINATION_CODE_MORT":
+                        code_source = EXECUTION EliminerCodeMort code_source
+                    CAS "PROPAGATION_CONSTANTES":
+                        code_source = EXECUTION PropagerConstantes code_source
+                    CAS "DEROULAGE_BOUCLES":
+                        code_source = EXECUTION DeroulerBoucles code_source
+                }
+            }
+        }
+        
+        RETRAITE code_source
+    }
+}
+
+MISSION EliminerCodeMort {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        FORMATION blocs_accessibles = []
+        
+        # Construction du graphe de flux
+        STRATEGIE graphe = EXECUTION ConstruireGrapheFlux code
+        
+        # Analyse d'accessibilité
+        MANOEUVRE ANALYSE {
+            POUR bloc DANS graphe.blocs {
+                SI CIBLE EstBlocAccessible bloc {
+                    blocs_accessibles = DEPLOIEMENT blocs_accessibles bloc
+                }
+            }
+        }
+        
+        # Reconstruction du code
+        RETRAITE ReconstruireCode blocs_accessibles
+    }
+}
+
+MISSION PropagerConstantes {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE constantes = {}
+        
+        # Identification des constantes
+        MANOEUVRE IDENTIFICATION {
+            POUR instruction DANS code {
+                SI CIBLE EstAssignationConstante instruction {
+                    constantes[instruction.variable] = instruction.valeur
+                }
+            }
+        }
+        
+        # Propagation
+        MANOEUVRE PROPAGATION {
+            POUR instruction DANS code {
+                SI CIBLE UtiliseVariables instruction {
+                    instruction = RemplacerConstantes instruction constantes
+                }
+            }
+        }
+        
+        RETRAITE code
+    }
+}
+
+FIN BASE

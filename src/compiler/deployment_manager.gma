@@ -1,0 +1,86 @@
+BASE GESTIONNAIRE_DEPLOIEMENT
+
+STRATEGIE ConfigurationDeploiement {
+    FORMATION environnements = [
+        {
+            nom: "PRODUCTION",
+            configuration: CHARGER_CONFIG "prod",
+            validation_requise: VRAI
+        },
+        {
+            nom: "PREPRODUCTION",
+            configuration: CHARGER_CONFIG "preprod",
+            validation_requise: VRAI
+        }
+    ]
+    
+    FORMATION etapes_deploiement = [
+        {
+            nom: "VALIDATION",
+            obligatoire: VRAI
+        },
+        {
+            nom: "PREPARATION",
+            obligatoire: VRAI
+        },
+        {
+            nom: "DEPLOIEMENT",
+            obligatoire: VRAI
+        },
+        {
+            nom: "VERIFICATION",
+            obligatoire: VRAI
+        }
+    ]
+}
+
+MISSION LancerDeploiement {
+    PARAMETRE package
+    PARAMETRE environnement
+    
+    ORDRE DE BATAILLE {
+        # Vérification pré-déploiement
+        SI CIBLE NON VerifierPrerequis package environnement {
+            RETRAITE ERREUR_PREREQUIS
+        }
+        
+        # Exécution des étapes
+        POUR etape DANS ConfigurationDeploiement.etapes_deploiement {
+            SI CIBLE etape.obligatoire {
+                SELON etape.nom {
+                    CAS "VALIDATION":
+                        EXECUTION ValiderPackage package environnement
+                    CAS "PREPARATION":
+                        EXECUTION PreparerDeploiement package environnement
+                    CAS "DEPLOIEMENT":
+                        EXECUTION ExecuterDeploiement package environnement
+                    CAS "VERIFICATION":
+                        EXECUTION VerifierDeploiement package environnement
+                }
+            }
+        }
+        
+        # Mise à jour de l'historique
+        EXECUTION EnregistrerDeploiement package environnement
+    }
+}
+
+MISSION RollbackDeploiement {
+    PARAMETRE deploiement
+    
+    ORDRE DE BATAILLE {
+        # Sauvegarde de l'état actuel
+        EXECUTION SauvegarderEtatActuel
+        
+        # Restauration version précédente
+        EXECUTION RestaurerVersion deploiement.version_precedente
+        
+        # Vérification post-rollback
+        SI CIBLE NON VerifierSysteme {
+            RAPPORT "ERREUR: Échec de la vérification post-rollback"
+            EXECUTION RestaurerSauvegarde
+        }
+    }
+}
+
+FIN BASE

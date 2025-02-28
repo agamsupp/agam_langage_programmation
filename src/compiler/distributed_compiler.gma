@@ -1,0 +1,87 @@
+BASE COMPILATEUR_DISTRIBUE
+
+STRATEGIE ConfigurationDistribution {
+    FORMATION noeuds = [
+        {
+            type: "MAITRE",
+            responsabilites: [
+                "ORCHESTRATION",
+                "DISTRIBUTION",
+                "ASSEMBLAGE"
+            ],
+            nombre: 1
+        },
+        {
+            type: "TRAVAILLEUR",
+            responsabilites: [
+                "COMPILATION",
+                "OPTIMISATION",
+                "TESTS"
+            ],
+            nombre: "AUTO"
+        }
+    ]
+
+    STRATEGIE communication = {
+        protocole: "SECURISE",
+        compression: VRAI,
+        retry: 3
+    }
+}
+
+MISSION DemarrerDistribution {
+    ORDRE DE BATAILLE {
+        # Initialisation du noeud maître
+        SI CIBLE EST_NOEUD_MAITRE {
+            EXECUTION InitialiserMaitre
+            EXECUTION DemarrerOrchestration
+        } SINON {
+            EXECUTION InitialiserTravailleur
+            EXECUTION AttendreInstructions
+        }
+        
+        # Boucle principale
+        MANOEUVRE DISTRIBUTION {
+            TANT_QUE DISTRIBUTION_ACTIVE {
+                SI CIBLE EST_NOEUD_MAITRE {
+                    # Distribution des tâches
+                    EXECUTION DistribuerTaches
+                    
+                    # Surveillance des travailleurs
+                    EXECUTION SurveillanceNoeuds
+                    
+                    # Assemblage des résultats
+                    EXECUTION AssemblerResultats
+                } SINON {
+                    # Traitement des tâches
+                    EXECUTION TraiterTachesRecues
+                    
+                    # Envoi des résultats
+                    EXECUTION EnvoyerResultats
+                }
+            }
+        }
+    }
+}
+
+MISSION GererPanne {
+    PARAMETRE noeud
+    
+    ORDRE DE BATAILLE {
+        # Détection de la panne
+        EXECUTION DetecterTypePanne noeud
+        
+        # Tentative de récupération
+        SI CIBLE PanneRecuperable noeud {
+            EXECUTION TenterRecuperation noeud
+        } SINON {
+            # Redistribution des tâches
+            EXECUTION RedistribuerTaches noeud.taches
+            
+            # Mise à jour de la topologie
+            EXECUTION MettreAJourTopologie
+        }
+    }
+}
+
+FIN BASE

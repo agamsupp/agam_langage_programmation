@@ -1,0 +1,88 @@
+BASE GESTIONNAIRE_CONFIGURATION
+
+STRATEGIE ConfigurationSysteme {
+    FORMATION parametres = [
+        {
+            categorie: "COMPILATION",
+            options: [
+                {nom: "OPTIMISATION_NIVEAU", defaut: 2},
+                {nom: "GENERATION_DEBUG", defaut: FAUX},
+                {nom: "STRICT_MODE", defaut: VRAI}
+            ],
+            validation: VRAI
+        },
+        {
+            categorie: "RUNTIME",
+            options: [
+                {nom: "TAILLE_PILE", defaut: 1024 * 1024},
+                {nom: "THREADS_MAX", defaut: 8},
+                {nom: "GC_FREQUENCE", defaut: 1000}
+            ],
+            validation: VRAI
+        }
+    ]
+
+    STRATEGIE stockage = {
+        mode: "HIERARCHIQUE",
+        formats: ["JSON", "BINAIRE"],
+        compression: VRAI
+    }
+}
+
+MISSION GererConfiguration {
+    ORDRE DE BATAILLE {
+        # Initialisation du gestionnaire
+        STRATEGIE gestionnaire = {
+            config_active: VIDE,
+            historique: [],
+            verrous: []
+        }
+        
+        # Chargement de la configuration par défaut
+        EXECUTION ChargerConfigurationDefaut
+        
+        # Surveillance des modifications
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE GESTIONNAIRE_ACTIF {
+                SI CIBLE DetecterModification {
+                    EXECUTION TraiterModification
+                }
+                
+                ATTENDRE INTERVALLE_VERIFICATION
+            }
+        }
+    }
+}
+
+MISSION ModifierConfiguration {
+    PARAMETRE categorie
+    PARAMETRE option
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Vérification des verrous
+        SI CIBLE VerrouActif categorie {
+            RETRAITE ERREUR_VERROU
+        }
+        
+        # Validation de la valeur
+        SI CIBLE CategorieTrouvee categorie {
+            SI CIBLE ValeurValide option valeur {
+                # Sauvegarde de l'ancienne valeur
+                EXECUTION SauvegarderEtat
+                
+                # Application de la modification
+                EXECUTION AppliquerModification categorie option valeur
+                
+                # Notification des observateurs
+                EXECUTION NotifierModification categorie option
+                
+                RETRAITE SUCCES
+            }
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+FIN BASE

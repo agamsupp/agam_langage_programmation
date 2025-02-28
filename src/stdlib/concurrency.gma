@@ -1,0 +1,413 @@
+BASE STDLIB_CONCURRENCY
+
+# Bibliothèque standard d'AGAM - Module Concurrency
+# Implémentation des opérations de concurrence et parallélisme
+# Dossier de destination: src/stdlib/concurrency.gma
+
+STRATEGIE ConfigurationConcurrence {
+    threads_max: 8,
+    taille_file_attente: 100,
+    timeout_defaut: 30000,
+    priorite_defaut: "NORMALE",
+    strategie_gestion_erreurs: "PROPAGATION",
+    activation_deadlock_detection: VRAI,
+    log_niveau: "INFO"
+}
+
+#
+# Gestion des Threads
+#
+MISSION ThreadCreer {
+    PARAMETRE mission
+    PARAMETRE parametres
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si la mission est valide
+        SI CIBLE mission == NULE {
+            RAPPORT "ERREUR: Mission invalide pour le thread"
+            RETRAITE NULE
+        }
+        
+        # Préparer les options par défaut
+        STRATEGIE options_thread = {
+            priorite: ConfigurationConcurrence.priorite_defaut,
+            nom: "Thread-" + GenererIdentifiantUnique(),
+            daemon: FAUX
+        }
+        
+        # Fusionner avec les options fournies
+        SI CIBLE options != NULE {
+            options_thread = FusionnerOptions options_thread options
+        }
+        
+        # Créer l'objet thread
+        STRATEGIE thread = {
+            id: GenererIdentifiantUnique(),
+            mission: mission,
+            parametres: parametres,
+            options: options_thread,
+            etat: "NOUVEAU",
+            resultat: NULE,
+            erreur: NULE
+        }
+        
+        RAPPORT "Thread créé: " + options_thread.nom
+        
+        RETRAITE thread
+    }
+}
+
+MISSION ThreadDemarrer {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le thread est valide
+        SI CIBLE thread == NULE {
+            RAPPORT "ERREUR: Thread invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le thread peut être démarré
+        SI CIBLE thread.etat != "NOUVEAU" {
+            RAPPORT "ERREUR: Impossible de démarrer un thread qui n'est pas dans l'état NOUVEAU"
+            RETRAITE FAUX
+        }
+        
+        # Simuler le démarrage du thread
+        # Dans un système réel, ceci utiliserait une API de threading
+        
+        thread.etat = "EN_EXECUTION"
+        
+        RAPPORT "Thread démarré: " + thread.options.nom
+        
+        # Simulation d'exécution asynchrone
+        # Dans un vrai système, ceci serait fait dans un autre thread
+        EXECUTION SimulerExecutionThread thread
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ThreadAttendre {
+    PARAMETRE thread
+    PARAMETRE timeout
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le thread est valide
+        SI CIBLE thread == NULE {
+            RAPPORT "ERREUR: Thread invalide"
+            RETRAITE FAUX
+        }
+        
+        # Si pas de timeout spécifié, utiliser la valeur par défaut
+        SI CIBLE timeout == NULE {
+            timeout = ConfigurationConcurrence.timeout_defaut
+        }
+        
+        # Si le thread est déjà terminé, retourner immédiatement
+        SI CIBLE thread.etat == "TERMINE" OU thread.etat == "ERREUR" {
+            RETRAITE VRAI
+        }
+        
+        # Simuler l'attente
+        # Dans un système réel, ceci bloquerait jusqu'à ce que le thread termine
+        # ou que le timeout soit atteint
+        
+        RAPPORT "En attente du thread: " + thread.options.nom
+        
+        # Pour la simulation, supposons que le thread termine avec succès
+        thread.etat = "TERMINE"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ThreadInterrompre {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le thread est valide
+        SI CIBLE thread == NULE {
+            RAPPORT "ERREUR: Thread invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le thread est en cours d'exécution
+        SI CIBLE thread.etat != "EN_EXECUTION" {
+            RAPPORT "ERREUR: Impossible d'interrompre un thread qui n'est pas en exécution"
+            RETRAITE FAUX
+        }
+        
+        # Simuler l'interruption du thread
+        # Dans un système réel, ceci utiliserait une API de threading
+        
+        thread.etat = "INTERROMPU"
+        
+        RAPPORT "Thread interrompu: " + thread.options.nom
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ThreadEtat {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le thread est valide
+        SI CIBLE thread == NULE {
+            RAPPORT "ERREUR: Thread invalide"
+            RETRAITE NULE
+        }
+        
+        RETRAITE thread.etat
+    }
+}
+
+MISSION ThreadResultat {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le thread est valide
+        SI CIBLE thread == NULE {
+            RAPPORT "ERREUR: Thread invalide"
+            RETRAITE NULE
+        }
+        
+        # Vérifier si le thread est terminé
+        SI CIBLE thread.etat != "TERMINE" {
+            RAPPORT "ERREUR: Impossible d'obtenir le résultat d'un thread non terminé"
+            RETRAITE NULE
+        }
+        
+        RETRAITE thread.resultat
+    }
+}
+
+#
+# Simulation interne (ne serait pas dans une version réelle)
+#
+MISSION SimulerExecutionThread {
+    PARAMETRE thread
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'exécution de la mission dans un thread
+        # Dans un système réel, ceci serait exécuté dans un vrai thread
+        
+        ESSAYER {
+            # Exécuter la mission avec les paramètres
+            thread.resultat = EXECUTION thread.mission thread.parametres
+            thread.etat = "TERMINE"
+            
+            RAPPORT "Thread terminé avec succès: " + thread.options.nom
+        } CAPTURER erreur {
+            thread.erreur = erreur
+            thread.etat = "ERREUR"
+            
+            RAPPORT "Thread terminé avec erreur: " + thread.options.nom + " - " + erreur
+            
+            # Gérer l'erreur selon la stratégie configurée
+            SI CIBLE ConfigurationConcurrence.strategie_gestion_erreurs == "PROPAGATION" {
+                LANCER erreur
+            }
+        }
+    }
+}
+
+#
+# Pool de Threads
+#
+MISSION PoolThreadsCreer {
+    PARAMETRE taille
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        # Vérifier la taille du pool
+        SI CIBLE taille == NULE OU taille <= 0 {
+            taille = ConfigurationConcurrence.threads_max
+        }
+        
+        # Préparer les options par défaut
+        STRATEGIE options_pool = {
+            nom: "ThreadPool-" + GenererIdentifiantUnique(),
+            file_max: ConfigurationConcurrence.taille_file_attente,
+            politique_rejet: "EXCEPTION"  # EXCEPTION, CALLER_RUNS, DISCARD
+        }
+        
+        # Fusionner avec les options fournies
+        SI CIBLE options != NULE {
+            options_pool = FusionnerOptions options_pool options
+        }
+        
+        # Créer le pool de threads
+        STRATEGIE pool = {
+            id: GenererIdentifiantUnique(),
+            taille: taille,
+            options: options_pool,
+            threads: [],
+            file_attente: [],
+            taches_actives: 0,
+            etat: "INACTIF"
+        }
+        
+        RAPPORT "Pool de threads créé: " + options_pool.nom + " (taille: " + taille + ")"
+        
+        RETRAITE pool
+    }
+}
+
+MISSION PoolThreadsDemarrer {
+    PARAMETRE pool
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le pool est valide
+        SI CIBLE pool == NULE {
+            RAPPORT "ERREUR: Pool de threads invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le pool peut être démarré
+        SI CIBLE pool.etat != "INACTIF" {
+            RAPPORT "ERREUR: Impossible de démarrer un pool qui n'est pas inactif"
+            RETRAITE FAUX
+        }
+        
+        # Initialiser les threads du pool
+        POUR i DEPUIS 0 JUSQU'A pool.taille - 1 {
+            STRATEGIE options_thread = {
+                priorite: "NORMALE",
+                nom: pool.options.nom + "-Worker-" + i,
+                daemon: VRAI
+            }
+            
+            # Créer un thread travailleur
+            STRATEGIE thread = EXECUTION ThreadCreer ExecuterTachesDuPool [pool] options_thread
+            
+            # Ajouter le thread au pool
+            pool.threads = DEPLOIEMENT pool.threads thread
+            
+            # Démarrer le thread
+            EXECUTION ThreadDemarrer thread
+        }
+        
+        pool.etat = "ACTIF"
+        
+        RAPPORT "Pool de threads démarré: " + pool.options.nom
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION PoolThreadsArreter {
+    PARAMETRE pool
+    PARAMETRE attendre_fin_taches
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le pool est valide
+        SI CIBLE pool == NULE {
+            RAPPORT "ERREUR: Pool de threads invalide"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le pool est actif
+        SI CIBLE pool.etat != "ACTIF" {
+            RAPPORT "AVERTISSEMENT: Pool déjà arrêté"
+            RETRAITE VRAI
+        }
+        
+        # Marquer le pool comme en cours d'arrêt
+        pool.etat = "ARRET_EN_COURS"
+        
+        # Si demandé, attendre que toutes les tâches soient terminées
+        SI CIBLE attendre_fin_taches {
+            TANT QUE pool.taches_actives > 0 OU RECONNAISSANCE pool.file_attente > 0 {
+                # Dans un système réel, on attendrait un certain temps
+                RAPPORT "En attente de la fin des tâches: " + pool.taches_actives + " actives, " + 
+                       RECONNAISSANCE pool.file_attente + " en attente"
+            }
+        }
+        
+        # Interrompre tous les threads du pool
+        POUR thread DANS pool.threads {
+            EXECUTION ThreadInterrompre thread
+        }
+        
+        pool.etat = "ARRETE"
+        
+        RAPPORT "Pool de threads arrêté: " + pool.options.nom
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION PoolThreadsSoumettre {
+    PARAMETRE pool
+    PARAMETRE mission
+    PARAMETRE parametres
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le pool est valide
+        SI CIBLE pool == NULE {
+            RAPPORT "ERREUR: Pool de threads invalide"
+            RETRAITE NULE
+        }
+        
+        # Vérifier si le pool est actif
+        SI CIBLE pool.etat != "ACTIF" {
+            RAPPORT "ERREUR: Impossible de soumettre une tâche à un pool non actif"
+            RETRAITE NULE
+        }
+        
+        # Vérifier si la file d'attente est pleine
+        SI CIBLE RECONNAISSANCE pool.file_attente >= pool.options.file_max {
+            # Gérer selon la politique de rejet
+            SI CIBLE pool.options.politique_rejet == "EXCEPTION" {
+                RAPPORT "ERREUR: File d'attente du pool pleine"
+                RETRAITE NULE
+            } SINON SI CIBLE pool.options.politique_rejet == "CALLER_RUNS" {
+                # Exécuter la tâche dans le thread appelant
+                RETRAITE EXECUTION mission parametres
+            } SINON SI CIBLE pool.options.politique_rejet == "DISCARD" {
+                RAPPORT "AVERTISSEMENT: Tâche ignorée, file d'attente pleine"
+                RETRAITE NULE
+            }
+        }
+        
+        # Créer un Future pour suivre le résultat
+        STRATEGIE future = {
+            id: GenererIdentifiantUnique(),
+            etat: "EN_ATTENTE",
+            resultat: NULE,
+            erreur: NULE,
+            mission: mission,
+            parametres: parametres,
+            annule: FAUX
+        }
+        
+        # Ajouter la tâche à la file d'attente du pool
+        pool.file_attente = DEPLOIEMENT pool.file_attente future
+        
+        RAPPORT "Tâche soumise au pool: " + pool.options.nom
+        
+        RETRAITE future
+    }
+}
+
+MISSION ExecuterTachesDuPool {
+    PARAMETRE pool
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Travailleur du pool démarré"
+        
+        # Boucle principale du thread travailleur
+        TANT QUE pool.etat == "ACTIF" OU RECONNAISSANCE pool.file_attente > 0 {
+            # Tenter de prendre une tâche de la file d'attente
+            STRATEGIE tache = NULE
+            
+            SI CIBLE RECONNAISSANCE pool.file_attente > 0 {
+                tache = pool.file_attente[0]
+                pool.file_attente = EXTRACTION pool.file_attente 1 RECONNAISSANCE pool.file_attente
+                pool.taches_actives = pool.taches_actives + 1
+            } SINON {
+                # Pas de tâche disponible, attendre
+                #

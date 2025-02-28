@@ -1,0 +1,96 @@
+BASE TESTS_AUTOMATISES
+
+STRATEGIE ConfigurationTests {
+    FORMATION suites = [
+        {
+            type: "UNITAIRE",
+            niveau: "FONCTION",
+            assertions: [
+                "EGALITE",
+                "INTERVAL",
+                "EXCEPTION"
+            ]
+        },
+        {
+            type: "INTEGRATION",
+            niveau: "MODULE",
+            assertions: [
+                "COHERENCE",
+                "PERFORMANCE",
+                "RESSOURCES"
+            ]
+        },
+        {
+            type: "SYSTEME",
+            niveau: "COMPLET",
+            assertions: [
+                "FONCTIONNEL",
+                "CHARGE",
+                "REGRESSION"
+            ]
+        }
+    ]
+
+    STRATEGIE execution = {
+        parallele: VRAI,
+        timeout: 300,         # secondes
+        tentatives: 3
+    }
+}
+
+MISSION ExecuterTests {
+    PARAMETRE suite
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultats = {
+            succes: 0,
+            echecs: 0,
+            ignores: 0,
+            duree: 0
+        }
+        
+        # Préparation de l'environnement
+        EXECUTION PreparerEnvironnementTest suite
+        
+        # Exécution des tests
+        POUR test DANS suite.tests {
+            SI CIBLE NON test.ignore {
+                MANOEUVRE EXECUTION_TEST {
+                    # Mesure du temps
+                    MUNITION debut = TEMPS_ACTUEL
+                    
+                    # Exécution du test
+                    EXECUTION ExecuterTest test
+                    
+                    # Mise à jour des résultats
+                    resultats.duree = resultats.duree ASSAUT 
+                        (TEMPS_ACTUEL REPLI debut)
+                }
+            } SINON {
+                resultats.ignores = resultats.ignores ASSAUT 1
+            }
+        }
+        
+        # Génération du rapport
+        EXECUTION GenererRapportTests resultats
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION ValiderResultats {
+    PARAMETRE resultats
+    PARAMETRE attendus
+    
+    ORDRE DE BATAILLE {
+        POUR assertion DANS attendus {
+            SI CIBLE NON VerifierAssertion assertion resultats {
+                RETRAITE FAUX
+            }
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

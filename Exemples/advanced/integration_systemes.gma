@@ -1,0 +1,1415 @@
+BASE EXEMPLE_INTEGRATION_SYSTEMES
+
+# Exemple d'intégration de systèmes en AGAM
+# Ce module montre comment AGAM peut être utilisé pour l'intégration
+# de différents systèmes à travers divers protocoles et formats.
+
+STRATEGIE ConfigurationIntegration {
+    systemes: [
+        {
+            nom: "SYSTEM_ALPHA",
+            type: "REST",
+            url_base: "https://api.system-alpha.com/v1",
+            auth_type: "BEARER",
+            timeout: 30000,
+            retry: 3,
+            format_donnees: "JSON"
+        },
+        {
+            nom: "SYSTEM_BRAVO",
+            type: "SOAP",
+            url_base: "https://services.system-bravo.org/ws",
+            auth_type: "BASIC",
+            timeout: 20000,
+            retry: 2,
+            format_donnees: "XML"
+        },
+        {
+            nom: "SYSTEM_CHARLIE",
+            type: "MESSAGERIE",
+            url_base: "amqp://message-broker.system-charlie.net",
+            auth_type: "CERTIFICAT",
+            timeout: 10000,
+            retry: 5,
+            format_donnees: "BINAIRE"
+        },
+        {
+            nom: "SYSTEM_DELTA",
+            type: "BASE_DONNEES",
+            url_base: "jdbc:postgresql://db.system-delta.io:5432/maindb",
+            auth_type: "LOGIN_MDP",
+            timeout: 15000,
+            retry: 0,
+            format_donnees: "SQL"
+        }
+    ],
+    format_echange_commun: "JSON",
+    journalisation: VRAI,
+    niveau_journal: "INFO",
+    validation_schema: VRAI,
+    schemas_dir: "./schemas/",
+    schema_transformation: VRAI,
+    securite: {
+        chiffrement_transport: VRAI,
+        chiffrement_donnees: VRAI,
+        verification_integrite: VRAI,
+        audit_complet: VRAI
+    },
+    performance: {
+        mise_en_cache: VRAI,
+        ttl_cache: 3600,
+        compression: VRAI,
+        seuil_compression_kb: 10,
+        parallele: VRAI,
+        max_connexions: 50
+    }
+}
+
+MISSION InitialiserIntegrateur {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du système d'intégration AGAM"
+        
+        # Configurer l'intégrateur avec les options par défaut
+        STRATEGIE config = ConfigurationIntegration
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet intégrateur
+        STRATEGIE integrateur = {
+            configuration: config,
+            adaptateurs: {},
+            transformateurs: {},
+            validateurs: {},
+            cache: {},
+            journal: {
+                entrees: [],
+                compteurs: {
+                    info: 0,
+                    warning: 0,
+                    erreur: 0
+                }
+            },
+            statistiques: {
+                requetes_totales: 0,
+                requetes_reussies: 0,
+                requetes_echec: 0,
+                temps_moyen_ms: 0
+            }
+        }
+        
+        # Initialiser les adaptateurs pour chaque système
+        POUR systeme DANS config.systemes {
+            STRATEGIE adaptateur = EXECUTION InitialiserAdaptateur systeme
+            integrateur.adaptateurs[systeme.nom] = adaptateur
+            
+            RAPPORT "Adaptateur initialisé pour le système: " + systeme.nom
+        }
+        
+        # Initialiser les transformateurs de données
+        EXECUTION InitialiserTransformateurs integrateur
+        
+        # Initialiser les validateurs de schéma
+        SI CIBLE config.validation_schema {
+            EXECUTION InitialiserValidateurs integrateur
+        }
+        
+        RAPPORT "Système d'intégration initialisé"
+        
+        RETRAITE integrateur
+    }
+}
+
+MISSION InitialiserAdaptateur {
+    PARAMETRE systeme
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur pour: " + systeme.nom
+        
+        STRATEGIE adaptateur = {
+            configuration: systeme,
+            connexion: NULE,
+            etat: "NON_CONNECTE",
+            compteur_requetes: 0,
+            derniere_connexion: NULE
+        }
+        
+        # Sélectionner l'implémentation appropriée selon le type de système
+        SI CIBLE systeme.type == "REST" {
+            adaptateur.implementation = EXECUTION InitialiserAdaptateurREST systeme
+        } SINON SI CIBLE systeme.type == "SOAP" {
+            adaptateur.implementation = EXECUTION InitialiserAdaptateurSOAP systeme
+        } SINON SI CIBLE systeme.type == "MESSAGERIE" {
+            adaptateur.implementation = EXECUTION InitialiserAdaptateurMessagerie systeme
+        } SINON SI CIBLE systeme.type == "BASE_DONNEES" {
+            adaptateur.implementation = EXECUTION InitialiserAdaptateurBD systeme
+        } SINON {
+            RAPPORT "AVERTISSEMENT: Type de système non reconnu: " + systeme.type
+            adaptateur.implementation = EXECUTION InitialiserAdaptateurGenerique systeme
+        }
+        
+        RETRAITE adaptateur
+    }
+}
+
+MISSION InitialiserAdaptateurREST {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur REST pour: " + configuration.nom
+        
+        STRATEGIE implementation = {
+            type: "REST",
+            client: NULE,
+            operations: {
+                get: EXECUTION CreerOperationRESTGet configuration,
+                post: EXECUTION CreerOperationRESTPost configuration,
+                put: EXECUTION CreerOperationRESTPut configuration,
+                delete: EXECUTION CreerOperationRESTDelete configuration
+            },
+            transformateurs: {
+                requete: EXECUTION CreerTransformateurRequeteREST configuration,
+                reponse: EXECUTION CreerTransformateurReponseREST configuration
+            }
+        }
+        
+        RETRAITE implementation
+    }
+}
+
+MISSION InitialiserAdaptateurSOAP {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur SOAP pour: " + configuration.nom
+        
+        STRATEGIE implementation = {
+            type: "SOAP",
+            client: NULE,
+            operations: {
+                appel: EXECUTION CreerOperationSOAPAppel configuration
+            },
+            transformateurs: {
+                requete: EXECUTION CreerTransformateurRequeteSOAP configuration,
+                reponse: EXECUTION CreerTransformateurReponseSOAP configuration
+            }
+        }
+        
+        RETRAITE implementation
+    }
+}
+
+MISSION InitialiserAdaptateurMessagerie {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur de Messagerie pour: " + configuration.nom
+        
+        STRATEGIE implementation = {
+            type: "MESSAGERIE",
+            client: NULE,
+            operations: {
+                publier: EXECUTION CreerOperationPublier configuration,
+                souscrire: EXECUTION CreerOperationSouscrire configuration
+            },
+            transformateurs: {
+                message: EXECUTION CreerTransformateurMessage configuration
+            }
+        }
+        
+        RETRAITE implementation
+    }
+}
+
+MISSION InitialiserAdaptateurBD {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur de Base de Données pour: " + configuration.nom
+        
+        STRATEGIE implementation = {
+            type: "BASE_DONNEES",
+            connexion: NULE,
+            operations: {
+                requete: EXECUTION CreerOperationRequete configuration,
+                maj: EXECUTION CreerOperationMiseAJour configuration,
+                procedure: EXECUTION CreerOperationProcedure configuration
+            },
+            transformateurs: {
+                requete: EXECUTION CreerTransformateurRequeteSQL configuration,
+                resultat: EXECUTION CreerTransformateurResultatSQL configuration
+            }
+        }
+        
+        RETRAITE implementation
+    }
+}
+
+MISSION InitialiserAdaptateurGenerique {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'adaptateur générique pour: " + configuration.nom
+        
+        STRATEGIE implementation = {
+            type: "GENERIQUE",
+            operations: {
+                envoyer: EXECUTION CreerOperationEnvoyerGenerique configuration,
+                recevoir: EXECUTION CreerOperationRecevoirGenerique configuration
+            }
+        }
+        
+        RETRAITE implementation
+    }
+}
+
+MISSION InitialiserTransformateurs {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation des transformateurs de données"
+        
+        # Initialiser les transformateurs pour chaque combinaison de formats
+        STRATEGIE formats = ["JSON", "XML", "CSV", "BINAIRE", "SQL"]
+        
+        POUR format_source DANS formats {
+            integrateur.transformateurs[format_source] = {}
+            
+            POUR format_cible DANS formats {
+                SI CIBLE format_source != format_cible {
+                    STRATEGIE transformateur = EXECUTION CreerTransformateur format_source format_cible
+                    integrateur.transformateurs[format_source][format_cible] = transformateur
+                    
+                    RAPPORT "Transformateur initialisé: " + format_source + " -> " + format_cible
+                }
+            }
+        }
+        
+        RETRAITE integrateur
+    }
+}
+
+MISSION CreerTransformateur {
+    PARAMETRE format_source
+    PARAMETRE format_cible
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = {
+            source: format_source,
+            cible: format_cible,
+            transformation: NULE
+        }
+        
+        # Sélectionner l'implémentation appropriée selon les formats
+        SI CIBLE format_source == "JSON" ET format_cible == "XML" {
+            transformateur.transformation = EXECUTION CreerTransformationJSONVersXML
+        } SINON SI CIBLE format_source == "XML" ET format_cible == "JSON" {
+            transformateur.transformation = EXECUTION CreerTransformationXMLVersJSON
+        } SINON SI CIBLE format_source == "JSON" ET format_cible == "CSV" {
+            transformateur.transformation = EXECUTION CreerTransformationJSONVersCSV
+        } SINON SI CIBLE format_source == "CSV" ET format_cible == "JSON" {
+            transformateur.transformation = EXECUTION CreerTransformationCSVVersJSON
+        } SINON SI CIBLE format_source == "BINAIRE" ET format_cible == "JSON" {
+            transformateur.transformation = EXECUTION CreerTransformationBinaireVersJSON
+        } SINON SI CIBLE format_source == "JSON" ET format_cible == "BINAIRE" {
+            transformateur.transformation = EXECUTION CreerTransformationJSONVersBinaire
+        } SINON SI CIBLE format_source == "SQL" ET format_cible == "JSON" {
+            transformateur.transformation = EXECUTION CreerTransformationSQLVersJSON
+        } SINON SI CIBLE format_source == "JSON" ET format_cible == "SQL" {
+            transformateur.transformation = EXECUTION CreerTransformationJSONVersSQL
+        } SINON {
+            transformateur.transformation = EXECUTION CreerTransformationGenerique format_source format_cible
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+MISSION InitialiserValidateurs {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation des validateurs de schéma"
+        
+        # Charger les schémas de validation
+        EXECUTION ChargerSchemas integrateur
+        
+        # Initialiser les validateurs pour chaque format
+        integrateur.validateurs["JSON"] = EXECUTION CreerValidateurJSON integrateur
+        integrateur.validateurs["XML"] = EXECUTION CreerValidateurXML integrateur
+        
+        RETRAITE integrateur
+    }
+}
+
+MISSION ChargerSchemas {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Chargement des schémas de validation"
+        
+        # Simuler le chargement des schémas
+        integrateur.schemas = {
+            "entite_client": {
+                type: "JSON",
+                schema: {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "integer" },
+                        "nom": { "type": "string" },
+                        "email": { "type": "string", "format": "email" }
+                    },
+                    "required": ["id", "nom", "email"]
+                }
+            },
+            "entite_commande": {
+                type: "JSON",
+                schema: {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "integer" },
+                        "client_id": { "type": "integer" },
+                        "date": { "type": "string", "format": "date-time" },
+                        "montant": { "type": "number" },
+                        "articles": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": { "type": "integer" },
+                                    "quantite": { "type": "integer" },
+                                    "prix_unitaire": { "type": "number" }
+                                }
+                            }
+                        }
+                    },
+                    "required": ["id", "client_id", "date", "montant", "articles"]
+                }
+            }
+        }
+        
+        RETRAITE integrateur
+    }
+}
+
+MISSION CreerValidateurJSON {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Création du validateur JSON"
+        
+        STRATEGIE validateur = {
+            type: "JSON",
+            valider: EXECUTION CreerFonctionValidationJSON integrateur
+        }
+        
+        RETRAITE validateur
+    }
+}
+
+MISSION CreerFonctionValidationJSON {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        # Créer une fonction de validation JSON basée sur les schémas chargés
+        
+        STRATEGIE fonction = CREER_FONCTION (donnees, type_schema) {
+            RAPPORT "Validation des données JSON contre le schéma: " + type_schema
+            
+            # Vérifier si le schéma existe
+            SI CIBLE !integrateur.schemas[type_schema] {
+                RAPPORT "ERREUR: Schéma non trouvé: " + type_schema
+                RETRAITE {
+                    valide: FAUX,
+                    erreurs: ["Schéma non trouvé: " + type_schema]
+                }
+            }
+            
+            STRATEGIE schema = integrateur.schemas[type_schema].schema
+            
+            # Simuler la validation
+            # Dans une implémentation réelle, ceci utiliserait une bibliothèque de validation JSON Schema
+            
+            # Pour cette simulation, considérer les données comme valides
+            RETRAITE {
+                valide: VRAI,
+                erreurs: []
+            }
+        }
+        
+        RETRAITE fonction
+    }
+}
+
+MISSION CreerValidateurXML {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Création du validateur XML"
+        
+        STRATEGIE validateur = {
+            type: "XML",
+            valider: EXECUTION CreerFonctionValidationXML integrateur
+        }
+        
+        RETRAITE validateur
+    }
+}
+
+MISSION CreerFonctionValidationXML {
+    PARAMETRE integrateur
+    
+    ORDRE DE BATAILLE {
+        # Créer une fonction de validation XML basée sur les schémas chargés
+        
+        STRATEGIE fonction = CREER_FONCTION (donnees, type_schema) {
+            RAPPORT "Validation des données XML contre le schéma: " + type_schema
+            
+            # Pour cette simulation, considérer les données comme valides
+            RETRAITE {
+                valide: VRAI,
+                erreurs: []
+            }
+        }
+        
+        RETRAITE fonction
+    }
+}
+
+#
+# Fonctions pour l'adaptateur REST
+#
+MISSION CreerOperationRESTGet {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (chemin, parametres, entetes) {
+            RAPPORT "Exécution de GET sur " + configuration.url_base + chemin
+            
+            # Simuler la requête REST
+            RETRAITE {
+                statut: 200,
+                corps: "{ \"id\": 123, \"nom\": \"Exemple\", \"email\": \"exemple@test.com\" }",
+                entetes: {
+                    "Content-Type": "application/json"
+                }
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationRESTPost {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (chemin, corps, parametres, entetes) {
+            RAPPORT "Exécution de POST sur " + configuration.url_base + chemin
+            
+            # Simuler la requête REST
+            RETRAITE {
+                statut: 201,
+                corps: "{ \"id\": 456, \"succes\": true }",
+                entetes: {
+                    "Content-Type": "application/json"
+                }
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationRESTPut {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (chemin, corps, parametres, entetes) {
+            RAPPORT "Exécution de PUT sur " + configuration.url_base + chemin
+            
+            # Simuler la requête REST
+            RETRAITE {
+                statut: 200,
+                corps: "{ \"id\": 123, \"succes\": true }",
+                entetes: {
+                    "Content-Type": "application/json"
+                }
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationRESTDelete {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (chemin, parametres, entetes) {
+            RAPPORT "Exécution de DELETE sur " + configuration.url_base + chemin
+            
+            # Simuler la requête REST
+            RETRAITE {
+                statut: 204,
+                corps: "",
+                entetes: {}
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerTransformateurRequeteREST {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (donnees, chemin, methode) {
+            RAPPORT
+
+            MISSION CreerTransformateurRequeteREST {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (donnees, chemin, methode) {
+            RAPPORT "Transformation des données pour requête REST " + methode
+            
+            # Préparation de la requête REST
+            STRATEGIE requete = {
+                url: configuration.url_base + chemin,
+                methode: methode,
+                corps: NULE,
+                parametres: {},
+                entetes: {
+                    "Accept": "application/json"
+                }
+            }
+            
+            # Ajouter l'authentification si configurée
+            SI CIBLE configuration.auth_type == "BEARER" {
+                requete.entetes["Authorization"] = "Bearer " + ObtenirJeton()
+            } SINON SI CIBLE configuration.auth_type == "BASIC" {
+                requete.entetes["Authorization"] = "Basic " + ObtenirCredentialsBase64()
+            }
+            
+            # Transformer les données en corps de requête si nécessaire
+            SI CIBLE methode == "POST" OU methode == "PUT" {
+                requete.corps = ConvertirEnJSON(donnees)
+                requete.entetes["Content-Type"] = "application/json"
+            } SINON SI CIBLE methode == "GET" {
+                # Transformer les données en paramètres de requête
+                requete.parametres = donnees
+            }
+            
+            RETRAITE requete
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+MISSION CreerTransformateurReponseREST {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (reponse) {
+            RAPPORT "Transformation de la réponse REST"
+            
+            # Vérifier le code de statut
+            SI CIBLE reponse.statut >= 200 ET reponse.statut < 300 {
+                # Vérifier le type de contenu
+                SI CIBLE reponse.entetes["Content-Type"] ET reponse.entetes["Content-Type"] CONTIENT "application/json" {
+                    # Analyser le JSON
+                    STRATEGIE donnees = ParseJSON(reponse.corps)
+                    RETRAITE {
+                        succes: VRAI,
+                        donnees: donnees
+                    }
+                } SINON {
+                    # Retourner le corps tel quel
+                    RETRAITE {
+                        succes: VRAI,
+                        donnees: reponse.corps
+                    }
+                }
+            } SINON {
+                # Échec de la requête
+                RETRAITE {
+                    succes: FAUX,
+                    code_erreur: reponse.statut,
+                    message: "Échec de la requête REST: " + reponse.statut
+                }
+            }
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+#
+# Fonctions pour l'adaptateur SOAP
+#
+MISSION CreerOperationSOAPAppel {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (service, action, parametres, entetes) {
+            RAPPORT "Exécution de l'appel SOAP sur " + configuration.url_base + "/" + service
+            
+            # Simuler la requête SOAP
+            RETRAITE {
+                statut: 200,
+                corps: "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\"><soap:Body><GetClientResponse><Client><ID>123</ID><Nom>Exemple</Nom><Email>exemple@test.com</Email></Client></GetClientResponse></soap:Body></soap:Envelope>",
+                entetes: {
+                    "Content-Type": "application/soap+xml"
+                }
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerTransformateurRequeteSOAP {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (donnees, service, action) {
+            RAPPORT "Transformation des données pour requête SOAP " + action
+            
+            # Préparation de la requête SOAP
+            STRATEGIE requete = {
+                url: configuration.url_base + "/" + service,
+                action: action,
+                corps: "",
+                entetes: {
+                    "Content-Type": "application/soap+xml",
+                    "SOAPAction": action
+                }
+            }
+            
+            # Ajouter l'authentification si configurée
+            SI CIBLE configuration.auth_type == "BASIC" {
+                requete.entetes["Authorization"] = "Basic " + ObtenirCredentialsBase64()
+            }
+            
+            # Générer l'enveloppe SOAP
+            requete.corps = GenererEnveloppeSOAP(action, donnees)
+            
+            RETRAITE requete
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+MISSION CreerTransformateurReponseSOAP {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (reponse) {
+            RAPPORT "Transformation de la réponse SOAP"
+            
+            # Vérifier le code de statut
+            SI CIBLE reponse.statut == 200 {
+                # Extraire les données de l'enveloppe SOAP
+                STRATEGIE donnees = ExtraireDataSOAP(reponse.corps)
+                RETRAITE {
+                    succes: VRAI,
+                    donnees: donnees
+                }
+            } SINON {
+                # Échec de la requête
+                STRATEGIE erreur = ExtraireFaultSOAP(reponse.corps)
+                RETRAITE {
+                    succes: FAUX,
+                    code_erreur: erreur.code OU reponse.statut,
+                    message: erreur.message OU "Échec de la requête SOAP: " + reponse.statut
+                }
+            }
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+#
+# Fonctions pour l'adaptateur de Messagerie
+#
+MISSION CreerOperationPublier {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (sujet, message, options) {
+            RAPPORT "Publication d'un message sur " + sujet
+            
+            # Simuler la publication
+            RETRAITE {
+                succes: VRAI,
+                id_message: GenererID()
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationSouscrire {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (sujet, callback, options) {
+            RAPPORT "Souscription au sujet " + sujet
+            
+            # Simuler la souscription
+            RETRAITE {
+                succes: VRAI,
+                id_souscription: GenererID()
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerTransformateurMessage {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (donnees, type_message) {
+            RAPPORT "Transformation des données pour message " + type_message
+            
+            # Préparation du message
+            STRATEGIE message = {
+                entetes: {
+                    "message-id": GenererID(),
+                    "timestamp": ObtenirDateHeure(),
+                    "type": type_message
+                },
+                corps: NULE
+            }
+            
+            # Transformer les données selon le format configuré
+            SI CIBLE configuration.format_donnees == "BINAIRE" {
+                message.corps = ConvertirEnBinaire(donnees)
+            } SINON SI CIBLE configuration.format_donnees == "JSON" {
+                message.corps = ConvertirEnJSON(donnees)
+                message.entetes["content-type"] = "application/json"
+            }
+            
+            RETRAITE message
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+#
+# Fonctions pour l'adaptateur de Base de Données
+#
+MISSION CreerOperationRequete {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (requete, parametres) {
+            RAPPORT "Exécution de la requête SQL: " + requete
+            
+            # Simuler l'exécution de la requête
+            RETRAITE {
+                succes: VRAI,
+                lignes: [
+                    { "id": 1, "nom": "Client A", "email": "clienta@test.com" },
+                    { "id": 2, "nom": "Client B", "email": "clientb@test.com" }
+                ],
+                colonnes: ["id", "nom", "email"],
+                nombre_lignes: 2
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationMiseAJour {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (requete, parametres) {
+            RAPPORT "Exécution de la mise à jour SQL: " + requete
+            
+            # Simuler l'exécution de la mise à jour
+            RETRAITE {
+                succes: VRAI,
+                lignes_affectees: 1
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationProcedure {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (nom_procedure, parametres) {
+            RAPPORT "Exécution de la procédure stockée: " + nom_procedure
+            
+            # Simuler l'exécution de la procédure
+            RETRAITE {
+                succes: VRAI,
+                resultats: [
+                    { "compte": 42 }
+                ],
+                code_retour: 0
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerTransformateurRequeteSQL {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (donnees, type_operation) {
+            RAPPORT "Transformation des données pour requête SQL " + type_operation
+            
+            STRATEGIE resultat = {
+                requete: "",
+                parametres: []
+            }
+            
+            # Générer la requête SQL selon le type d'opération
+            SI CIBLE type_operation == "SELECT" {
+                resultat.requete = GenererRequeteSelect(donnees)
+            } SINON SI CIBLE type_operation == "INSERT" {
+                resultat.requete = GenererRequeteInsert(donnees)
+            } SINON SI CIBLE type_operation == "UPDATE" {
+                resultat.requete = GenererRequeteUpdate(donnees)
+            } SINON SI CIBLE type_operation == "DELETE" {
+                resultat.requete = GenererRequeteDelete(donnees)
+            }
+            
+            # Extraire les paramètres
+            resultat.parametres = ExtraireParametresSQL(donnees)
+            
+            RETRAITE resultat
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+MISSION CreerTransformateurResultatSQL {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformateur = CREER_FONCTION (resultat) {
+            RAPPORT "Transformation du résultat SQL"
+            
+            # Vérifier si l'opération a réussi
+            SI CIBLE resultat.succes {
+                # Transformer les lignes de résultat en objets
+                SI CIBLE resultat.lignes {
+                    RETRAITE {
+                        succes: VRAI,
+                        donnees: resultat.lignes,
+                        meta: {
+                            colonnes: resultat.colonnes,
+                            nombre_lignes: resultat.nombre_lignes
+                        }
+                    }
+                } SINON SI CIBLE resultat.lignes_affectees {
+                    # Résultat d'une mise à jour
+                    RETRAITE {
+                        succes: VRAI,
+                        nombre_lignes_affectees: resultat.lignes_affectees
+                    }
+                } SINON {
+                    # Autre type de résultat
+                    RETRAITE {
+                        succes: VRAI,
+                        donnees: resultat
+                    }
+                }
+            } SINON {
+                # Échec de l'opération
+                RETRAITE {
+                    succes: FAUX,
+                    code_erreur: resultat.code_erreur OU "INCONNU",
+                    message: resultat.message OU "Échec de l'opération SQL"
+                }
+            }
+        }
+        
+        RETRAITE transformateur
+    }
+}
+
+#
+# Fonctions pour les adaptateurs génériques
+#
+MISSION CreerOperationEnvoyerGenerique {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (destination, donnees, options) {
+            RAPPORT "Envoi de données génériques vers " + destination
+            
+            # Simuler l'envoi
+            RETRAITE {
+                succes: VRAI,
+                id_transaction: GenererID()
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+MISSION CreerOperationRecevoirGenerique {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE operation = CREER_FONCTION (source, options) {
+            RAPPORT "Réception de données génériques depuis " + source
+            
+            # Simuler la réception
+            RETRAITE {
+                succes: VRAI,
+                donnees: { "exemple": "données reçues" }
+            }
+        }
+        
+        RETRAITE operation
+    }
+}
+
+#
+# Fonctions de transformation de formats
+#
+MISSION CreerTransformationJSONVersXML {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation JSON vers XML"
+            
+            # Simuler la transformation
+            RETRAITE "<root><element>Exemple de transformation JSON vers XML</element></root>"
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationXMLVersJSON {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation XML vers JSON"
+            
+            # Simuler la transformation
+            RETRAITE { "element": "Exemple de transformation XML vers JSON" }
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationJSONVersCSV {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation JSON vers CSV"
+            
+            # Simuler la transformation
+            RETRAITE "colonne1,colonne2\nvaleur1,valeur2"
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationCSVVersJSON {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation CSV vers JSON"
+            
+            # Simuler la transformation
+            RETRAITE [{ "colonne1": "valeur1", "colonne2": "valeur2" }]
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationBinaireVersJSON {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation Binaire vers JSON"
+            
+            # Simuler la transformation
+            RETRAITE { "donnees": "Exemple de transformation Binaire vers JSON" }
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationJSONVersBinaire {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation JSON vers Binaire"
+            
+            # Simuler la transformation (représentation fictive)
+            RETRAITE "0101010101010101"
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationSQLVersJSON {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation résultat SQL vers JSON"
+            
+            # Simuler la transformation
+            RETRAITE [
+                { "id": 1, "nom": "Exemple 1" },
+                { "id": 2, "nom": "Exemple 2" }
+            ]
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationJSONVersSQL {
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation JSON vers requête SQL"
+            
+            # Simuler la transformation
+            RETRAITE "INSERT INTO table (colonne1, colonne2) VALUES (?, ?)"
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+MISSION CreerTransformationGenerique {
+    PARAMETRE format_source
+    PARAMETRE format_cible
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE transformation = CREER_FONCTION (donnees) {
+            RAPPORT "Transformation générique " + format_source + " vers " + format_cible
+            
+            # Simuler une transformation générique
+            RETRAITE "Données transformées (de " + format_source + " vers " + format_cible + ")"
+        }
+        
+        RETRAITE transformation
+    }
+}
+
+#
+# Fonctions utilitaires
+#
+MISSION ObtenirJeton {
+    ORDRE DE BATAILLE {
+        # Simuler l'obtention d'un jeton d'authentification
+        RETRAITE "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.exemple"
+    }
+}
+
+MISSION ObtenirCredentialsBase64 {
+    ORDRE DE BATAILLE {
+        # Simuler l'obtention des credentials en Base64
+        RETRAITE "dXNlcm5hbWU6cGFzc3dvcmQ="  # username:password en Base64
+    }
+}
+
+MISSION GenererID {
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'un identifiant unique
+        RETRAITE "ID-" + CHAINE(NOMBRE_ALEATOIRE() * 10000) + "-" + ObtenirDateHeure()
+    }
+}
+
+MISSION ObtenirDateHeure {
+    ORDRE DE BATAILLE {
+        # Simuler l'obtention de la date et l'heure actuelles formatées
+        RETRAITE "20250224-120000"
+    }
+}
+
+MISSION CREER_FONCTION {
+    PARAMETRE signature
+    PARAMETRE corps
+    
+    ORDRE DE BATAILLE {
+        # Simuler la création d'une fonction
+        # Dans une implémentation réelle, ceci utiliserait des fonctions de premier ordre
+        
+        # Pour cette simulation, retourner un objet qui encapsule la fonction
+        RETRAITE {
+            type: "FONCTION",
+            signature: signature,
+            corps: corps,
+            appeler: corps  # Dans la simulation, l'appel exécute directement le corps
+        }
+    }
+}
+
+MISSION CLES {
+    PARAMETRE objet
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'obtention des clés d'un objet
+        RETRAITE ["cle1", "cle2", "cle3"]
+    }
+}
+
+MISSION ConvertirEnJSON {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la conversion en JSON
+        RETRAITE "{ \"exemple\": \"donnees JSON\" }"
+    }
+}
+
+MISSION ParseJSON {
+    PARAMETRE chaine
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'analyse JSON
+        RETRAITE {
+            exemple: "donnees JSON"
+        }
+    }
+}
+
+MISSION GenererEnveloppeSOAP {
+    PARAMETRE action
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'une enveloppe SOAP
+        RETRAITE "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\"><soap:Body><" + 
+               action + ">" + 
+               "<Exemple>Données SOAP</Exemple>" + 
+               "</" + action + "></soap:Body></soap:Envelope>"
+    }
+}
+
+MISSION ExtraireDataSOAP {
+    PARAMETRE enveloppe
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'extraction des données d'une enveloppe SOAP
+        RETRAITE {
+            exemple: "Données extraites de l'enveloppe SOAP"
+        }
+    }
+}
+
+MISSION ExtraireFaultSOAP {
+    PARAMETRE enveloppe
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'extraction d'une erreur d'une enveloppe SOAP
+        RETRAITE {
+            code: "SOAP-ERROR",
+            message: "Erreur SOAP extraite de l'enveloppe"
+        }
+    }
+}
+
+MISSION ConvertirEnBinaire {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la conversion en format binaire
+        RETRAITE "0101010101010101"
+    }
+}
+
+MISSION GenererRequeteSelect {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'une requête SELECT
+        RETRAITE "SELECT * FROM " + donnees.table + " WHERE " + donnees.condition
+    }
+}
+
+MISSION GenererRequeteInsert {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'une requête INSERT
+        RETRAITE "INSERT INTO " + donnees.table + " (colonne1, colonne2) VALUES (?, ?)"
+    }
+}
+
+MISSION GenererRequeteUpdate {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'une requête UPDATE
+        RETRAITE "UPDATE " + donnees.table + " SET colonne1 = ? WHERE " + donnees.condition
+    }
+}
+
+MISSION GenererRequeteDelete {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'une requête DELETE
+        RETRAITE "DELETE FROM " + donnees.table + " WHERE " + donnees.condition
+    }
+}
+
+MISSION ExtraireParametresSQL {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Simuler l'extraction des paramètres SQL
+        RETRAITE [
+            donnees.valeur1 OU "valeur1",
+            donnees.valeur2 OU "valeur2"
+        ]
+    }
+}
+
+MISSION NOMBRE_ALEATOIRE {
+    ORDRE DE BATAILLE {
+        # Simuler la génération d'un nombre aléatoire entre 0 et 1
+        RETRAITE 0.42
+    }
+}
+
+MISSION CHAINE {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Convertir en chaîne de caractères
+        RETRAITE "" + valeur
+    }
+}
+
+#
+# Exemple d'utilisation
+#
+MISSION ExempleIntegration {
+    ORDRE DE BATAILLE {
+        RAPPORT "Exemple d'intégration de systèmes avec AGAM"
+        
+        # Initialiser l'intégrateur
+        STRATEGIE integrateur = EXECUTION InitialiserIntegrateur NULE
+        
+        # Interroger le système Alpha via REST
+        RAPPORT "1. Communication avec le système Alpha via REST"
+        STRATEGIE alpha = integrateur.adaptateurs["SYSTEM_ALPHA"]
+        STRATEGIE resultat_alpha = EXECUTION alpha.implementation.operations.get "/clients/123" NULE NULE
+        STRATEGIE donnees_alpha = EXECUTION alpha.implementation.transformateurs.reponse resultat_alpha
+        
+        RAPPORT "Données obtenues du système Alpha: " + ConvertirEnJSON(donnees_alpha)
+        
+        # Envoyer des données au système Bravo via SOAP
+        RAPPORT "2. Communication avec le système Bravo via SOAP"
+        STRATEGIE bravo = integrateur.adaptateurs["SYSTEM_BRAVO"]
+        STRATEGIE donnees_a_envoyer = {
+            client_id: 123,
+            montant: 99.99,
+            date: "2025-02-24"
+        }
+        STRATEGIE requete_soap = EXECUTION bravo.implementation.transformateurs.requete donnees_a_envoyer "OrderService" "PlaceOrder"
+        STRATEGIE resultat_bravo = EXECUTION bravo.implementation.operations.appel "OrderService" "PlaceOrder" donnees_a_envoyer NULE
+        STRATEGIE reponse_bravo = EXECUTION bravo.implementation.transformateurs.reponse resultat_bravo
+        
+        RAPPORT "Réponse obtenue du système Bravo: " + ConvertirEnJSON(reponse_bravo)
+        
+        # Publier un message sur le système Charlie via Messagerie
+        RAPPORT "3. Communication avec le système Charlie via Messagerie"
+        STRATEGIE charlie = integrateur.adaptateurs["SYSTEM_CHARLIE"]
+        STRATEGIE message = EXECUTION charlie.implementation.transformateurs.message {
+            order_id: 456,
+            status: "CONFIRMED",
+            timestamp: ObtenirDateHeure()
+        } "OrderStatus"
+        STRATEGIE resultat_charlie = EXECUTION charlie.implementation.operations.publier "orders.status" message NULE
+        
+        RAPPORT "Message publié sur le système Charlie: " + ConvertirEnJSON(resultat_charlie)
+        
+        # Interroger le système Delta via SQL
+        RAPPORT "4. Communication avec le système Delta via SQL"
+        STRATEGIE delta = integrateur.adaptateurs["SYSTEM_DELTA"]
+        STRATEGIE requete_sql = EXECUTION delta.implementation.transformateurs.requete {
+            table: "commandes",
+            condition: "client_id = 123"
+        } "SELECT"
+        STRATEGIE resultat_delta = EXECUTION delta.implementation.operations.requete requete_sql.requete requete_sql.parametres
+        STRATEGIE donnees_delta = EXECUTION delta.implementation.transformateurs.resultat resultat_delta
+        
+        RAPPORT "Données obtenues du système Delta: " + ConvertirEnJSON(donnees_delta)
+        
+        # Exemple d'intégration complète entre systèmes
+        RAPPORT "5. Intégration complète entre systèmes"
+        
+        # Récupérer les données client d'Alpha
+        STRATEGIE client = donnees_alpha.donnees
+        
+        # Récupérer les commandes du client depuis Delta
+        STRATEGIE commandes = donnees_delta.donnees
+        
+        # Créer une commande dans Bravo avec les données combinées
+        STRATEGIE nouvelle_commande = {
+            client: client,
+            articles: commandes[0].articles,
+            montant_total: SOMME(commandes, "montant"),
+            date: ObtenirDateHeure()
+        }
+        STRATEGIE requete_nouvelle_commande = EXECUTION bravo.implementation.transformateurs.requete nouvelle_commande "OrderService" "CreateOrder"
+        STRATEGIE resultat_nouvelle_commande = EXECUTION bravo.implementation.operations.appel "OrderService" "CreateOrder" nouvelle_commande NULE
+        
+        # Notifier Charlie du changement de statut
+        STRATEGIE message_statut = EXECUTION charlie.implementation.transformateurs.message {
+            order_id: resultat_nouvelle_commande.order_id,
+            status: "CREATED",
+            client_id: client.id,
+            timestamp: ObtenirDateHeure()
+        } "OrderCreated"
+        EXECUTION charlie.implementation.operations.publier "orders.created" message_statut NULE
+        
+        RAPPORT "Intégration complète terminée avec succès"
+        
+        RETRAITE "Exemple d'intégration terminé"
+    }
+}
+
+MISSION SOMME {
+    PARAMETRE liste
+    PARAMETRE champ
+    
+    ORDRE DE BATAILLE {
+        MUNITION somme = 0
+        
+        POUR item DANS liste {
+            somme = somme + item[champ]
+        }
+        
+        RETRAITE somme
+    }
+}
+
+FIN BASE

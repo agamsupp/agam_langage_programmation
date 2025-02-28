@@ -1,0 +1,87 @@
+BASE MONITEUR_SYSTEME
+
+STRATEGIE ConfigurationMoniteur {
+    FORMATION metriques_systeme = [
+        {
+            type: "PROCESSEUR",
+            metriques: ["UTILISATION", "TEMPERATURE", "CHARGE"],
+            intervalle: 100
+        },
+        {
+            type: "MEMOIRE",
+            metriques: ["UTILISATION", "PAGINATION", "FRAGMENTATION"],
+            intervalle: 200
+        },
+        {
+            type: "SYSTEME_FICHIERS",
+            metriques: ["UTILISATION", "IOPS", "LATENCE"],
+            intervalle: 500
+        }
+    ]
+
+    STRATEGIE seuils = {
+        processeur: {
+            utilisation_max: 90,
+            temperature_max: 80
+        },
+        memoire: {
+            utilisation_max: 85,
+            pagination_max: 1000
+        }
+    }
+}
+
+MISSION SurveillanceSysteme {
+    ORDRE DE BATAILLE {
+        # Initialisation des collecteurs
+        POUR metrique DANS ConfigurationMoniteur.metriques_systeme {
+            EXECUTION InitialiserCollecteur metrique
+        }
+        
+        # Boucle de surveillance
+        MANOEUVRE SURVEILLANCE {
+            TANT_QUE SURVEILLANCE_ACTIVE {
+                POUR metrique DANS ConfigurationMoniteur.metriques_systeme {
+                    # Collecte des données
+                    STRATEGIE donnees = EXECUTION CollecterMetrique metrique
+                    
+                    # Vérification des seuils
+                    SI CIBLE VerifierSeuils donnees metrique {
+                        EXECUTION GenererAlerte metrique donnees
+                    }
+                    
+                    # Stockage des données
+                    EXECUTION StockerDonnees metrique donnees
+                    
+                    ATTENDRE metrique.intervalle
+                }
+            }
+        }
+    }
+}
+
+MISSION AnalyserTendances {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE analyse = {
+            tendances: [],
+            predictions: [],
+            anomalies: []
+        }
+        
+        # Analyse des tendances
+        POUR metrique DANS donnees {
+            analyse.tendances = DEPLOIEMENT 
+                analyse.tendances 
+                (EXECUTION CalculerTendance metrique)
+        }
+        
+        # Prédiction
+        EXECUTION GenererPredictions analyse
+        
+        RETRAITE analyse
+    }
+}
+
+FIN BASE

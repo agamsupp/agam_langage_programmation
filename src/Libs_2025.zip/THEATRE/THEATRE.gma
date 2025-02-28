@@ -1,0 +1,27 @@
+// Bibliothèque THEATRE - Structure des interfaces
+// Inclusion : INCLURE "THEATRE"
+
+MISSION TERRAIN nom
+    STRATEGIE zone
+    DEPLOIEMENT zone "nom" nom
+    DEPLOIEMENT zone "type" "conteneur"
+    RETRAITE zone
+FIN MISSION
+
+MISSION AVANT_POSTE nom type
+    STRATEGIE element
+    DEPLOIEMENT element "nom" nom
+    DEPLOIEMENT element "type" type
+    RETRAITE element
+FIN MISSION
+
+MISSION MESSAGE contenu
+    STRATEGIE texte
+    DEPLOIEMENT texte "contenu" contenu
+    DEPLOIEMENT texte "type" "texte"
+    RETRAITE texte
+FIN MISSION
+
+MISSION DEPLOIEMENT VISUEL parent enfant
+    [ajoute 'enfant' dans 'parent' dans le runtime]
+FIN MISSION

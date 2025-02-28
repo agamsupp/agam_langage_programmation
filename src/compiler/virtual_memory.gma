@@ -1,0 +1,90 @@
+BASE MEMOIRE_VIRTUELLE
+
+STRATEGIE ConfigurationMemoire {
+    MUNITION taille_page = 4096  # 4KB
+    MUNITION pages_totales = 1024 # 4MB d'espace virtuel
+    
+    FORMATION table_pages = []
+    FORMATION pages_libres = []
+}
+
+MISSION InitialiserMemoireVirtuelle {
+    ORDRE DE BATAILLE {
+        # Initialisation de la table des pages
+        POUR i DANS SEQUENCE 0 À ConfigurationMemoire.pages_totales {
+            STRATEGIE page = {
+                numero: i,
+                adresse_physique: 0,
+                present: FAUX,
+                accessible: VRAI,
+                modifie: FAUX
+            }
+            
+            ConfigurationMemoire.table_pages = DEPLOIEMENT 
+                ConfigurationMemoire.table_pages 
+                page
+                
+            ConfigurationMemoire.pages_libres = DEPLOIEMENT 
+                ConfigurationMemoire.pages_libres 
+                i
+        }
+    }
+}
+
+MISSION AllouerPage {
+    PARAMETRE processus
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE ConfigurationMemoire.pages_libres > 0 {
+            MUNITION numero_page = ConfigurationMemoire.pages_libres[0]
+            ConfigurationMemoire.pages_libres = RETRAIT 
+                ConfigurationMemoire.pages_libres 
+                0
+                
+            STRATEGIE page = ConfigurationMemoire.table_pages[numero_page]
+            page.adresse_physique = ALLOCATION_PHYSIQUE ConfigurationMemoire.taille_page
+            page.present = VRAI
+            page.processus = processus
+            
+            RETRAITE numero_page
+        }
+        
+        EXECUTION GererDefautPage
+    }
+}
+
+MISSION LibererPage {
+    PARAMETRE numero_page
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE page = ConfigurationMemoire.table_pages[numero_page]
+        
+        SI CIBLE page.modifie {
+            EXECUTION SauvegarderContenuPage page
+        }
+        
+        page.present = FAUX
+        page.adresse_physique = 0
+        page.processus = VIDE
+        
+        ConfigurationMemoire.pages_libres = DEPLOIEMENT 
+            ConfigurationMemoire.pages_libres 
+            numero_page
+    }
+}
+
+MISSION GererDefautPage {
+    PARAMETRE adresse_virtuelle
+    
+    ORDRE DE BATAILLE {
+        MUNITION numero_page = adresse_virtuelle DIVISION ConfigurationMemoire.taille_page
+        MUNITION page_victime = EXECUTION ChoisirPageVictime
+        
+        EXECUTION LibererPage page_victime
+        MUNITION nouvelle_page = EXECUTION AllouerPage PROCESSUS_COURANT
+        
+        EXECUTION ChargerContenuPage nouvelle_page adresse_virtuelle
+    }
+}
+
+FIN BASE

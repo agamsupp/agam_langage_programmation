@@ -1,0 +1,94 @@
+BASE SYSTEME_DEPLOIEMENT_CONTINU
+
+STRATEGIE ConfigurationDeploiement {
+    FORMATION environnements = [
+        {
+            nom: "DEVELOPPEMENT",
+            verification: "MINIMALE",
+            auto_deploiement: VRAI
+        },
+        {
+            nom: "TEST",
+            verification: "COMPLETE",
+            auto_deploiement: VRAI
+        },
+        {
+            nom: "PRODUCTION",
+            verification: "STRICTE",
+            auto_deploiement: FAUX
+        }
+    ]
+
+    STRATEGIE pipeline = {
+        etapes: [
+            "VALIDATION",
+            "CONSTRUCTION",
+            "TESTS",
+            "DEPLOIEMENT",
+            "VERIFICATION"
+        ],
+        rollback_auto: VRAI
+    }
+}
+
+MISSION ExecuterDeploiement {
+    PARAMETRE version
+    PARAMETRE environnement
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE deploiement = {
+            version: version,
+            environnement: environnement,
+            statut: "EN_COURS",
+            logs: []
+        }
+        
+        # Vérification pré-déploiement
+        SI CIBLE NON VerifierPreRequis version environnement {
+            deploiement.statut = "ECHEC"
+            RETRAITE deploiement
+        }
+        
+        # Exécution du pipeline
+        POUR etape DANS ConfigurationDeploiement.pipeline.etapes {
+            MANOEUVRE EXECUTION_ETAPE {
+                # Exécution de l'étape
+                SI CIBLE NON ExecuterEtape etape deploiement {
+                    SI CIBLE ConfigurationDeploiement.pipeline.rollback_auto {
+                        EXECUTION RollbackDeploiement deploiement
+                    }
+                    deploiement.statut = "ECHEC"
+                    RETRAITE deploiement
+                }
+            }
+        }
+        
+        # Finalisation
+        deploiement.statut = "SUCCES"
+        EXECUTION NotifierDeploiement deploiement
+        
+        RETRAITE deploiement
+    }
+}
+
+MISSION GererRollback {
+    PARAMETRE deploiement
+    
+    ORDRE DE BATAILLE {
+        # Sauvegarde de l'état actuel
+        EXECUTION SauvegarderEtat deploiement.environnement
+        
+        # Restauration version précédente
+        EXECUTION RestaurerVersion deploiement.version_precedente
+        
+        # Vérification post-rollback
+        SI CIBLE NON VerifierEtat deploiement.environnement {
+            RAPPORT "Échec du rollback"
+            RETRAITE FAUX
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

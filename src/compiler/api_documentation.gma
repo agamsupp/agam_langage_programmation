@@ -1,0 +1,116 @@
+BASE DOCUMENTATION_API
+
+STRATEGIE ConfigurationDoc {
+    FORMATION sections = [
+        {
+            nom: "REFERENCE_API",
+            obligatoire: VRAI,
+            format: "MARKDOWN"
+        },
+        {
+            nom: "EXEMPLES",
+            obligatoire: VRAI,
+            format: "CODE"
+        },
+        {
+            nom: "GUIDES",
+            obligatoire: FAUX,
+            format: "MARKDOWN"
+        }
+    ]
+
+    STRATEGIE formatage = {
+        code: {
+            style: "MILITAIRE",
+            indentation: 4,
+            commentaires: VRAI
+        }
+    }
+}
+
+MISSION GenererDocumentation {
+    PARAMETRE source_code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE documentation = {
+            api: [],
+            exemples: [],
+            guides: []
+        }
+        
+        # Analyse du code source
+        MISSION AnalyserCode {
+            # Extraction des commentaires de documentation
+            POUR element DANS source_code {
+                SI CIBLE EstCommentaireDoc element {
+                    EXECUTION ExtraireDocumentation element documentation
+                }
+            }
+            
+            # Analyse de la structure
+            EXECUTION AnalyserStructure source_code documentation
+        }
+        
+        # Génération des sections
+        POUR section DANS ConfigurationDoc.sections {
+            SELON section.nom {
+                CAS "REFERENCE_API":
+                    EXECUTION GenererReferenceAPI documentation
+                CAS "EXEMPLES":
+                    EXECUTION GenererExemples documentation
+                CAS "GUIDES":
+                    EXECUTION GenererGuides documentation
+            }
+        }
+        
+        RETRAITE documentation
+    }
+}
+
+MISSION ExtraireDocumentation {
+    PARAMETRE element
+    PARAMETRE documentation
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE doc_element = {
+            type: element.type,
+            nom: element.nom,
+            description: EXTRAIRE_DESCRIPTION element,
+            parametres: EXTRAIRE_PARAMETRES element,
+            exemples: EXTRAIRE_EXEMPLES element,
+            retour: EXTRAIRE_RETOUR element
+        }
+        
+        # Traitement des tags spéciaux
+        POUR tag DANS element.tags {
+            SELON tag.type {
+                CAS "DEPRECATED":
+                    doc_element.statut = "OBSOLETE"
+                CAS "EXPERIMENTAL":
+                    doc_element.statut = "EXPERIMENTAL"
+                CAS "INTERNAL":
+                    doc_element.acces = "INTERNE"
+            }
+        }
+        
+        RETRAITE doc_element
+    }
+}
+
+MISSION GenererSortie {
+    PARAMETRE documentation
+    PARAMETRE format
+    
+    ORDRE DE BATAILLE {
+        SELON format {
+            CAS "HTML":
+                EXECUTION GenererHTML documentation
+            CAS "MARKDOWN":
+                EXECUTION GenererMarkdown documentation
+            CAS "PDF":
+                EXECUTION GenererPDF documentation
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,79 @@
+BASE ANALYSEUR_CODE
+
+STRATEGIE ReglesAnalyse {
+    FORMATION regles_qualite = [
+        {
+            nom: "ComplexiteCyclomatique",
+            seuil_max: 10,
+            description: "Mesure la complexité des chemins de code"
+        },
+        {
+            nom: "ProfondeurNestage",
+            seuil_max: 4,
+            description: "Vérifie la profondeur d'imbrication des blocs"
+        },
+        {
+            nom: "LongueurMission",
+            seuil_max: 50,
+            description: "Vérifie la longueur des missions"
+        }
+    ]
+
+    FORMATION regles_securite = [
+        {
+            nom: "VerificationMemoire",
+            priorite: "HAUTE"
+        },
+        {
+            nom: "ProtectionDonnees",
+            priorite: "HAUTE"
+        }
+    ]
+}
+
+MISSION AnalyserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            erreurs: [],
+            avertissements: [],
+            metriques: {}
+        }
+
+        # Analyse de qualité
+        MANOEUVRE ANALYSE_QUALITE {
+            POUR regle DANS ReglesAnalyse.regles_qualite {
+                EXECUTION VerifierRegleQualite code_source regle rapport
+            }
+        }
+
+        # Analyse de sécurité
+        MANOEUVRE ANALYSE_SECURITE {
+            POUR regle DANS ReglesAnalyse.regles_securite {
+                EXECUTION VerifierRegleSecurite code_source regle rapport
+            }
+        }
+
+        RETRAITE rapport
+    }
+}
+
+MISSION VerifierRegleQualite {
+    PARAMETRE code
+    PARAMETRE regle
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        SELON regle.nom {
+            CAS "ComplexiteCyclomatique":
+                EXECUTION AnalyserComplexite code rapport
+            CAS "ProfondeurNestage":
+                EXECUTION AnalyserNestage code rapport
+            CAS "LongueurMission":
+                EXECUTION AnalyserLongueur code rapport
+        }
+    }
+}
+
+FIN BASE

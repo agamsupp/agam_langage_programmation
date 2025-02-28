@@ -1,0 +1,108 @@
+BASE SYSTEME_VALIDATION
+
+STRATEGIE ReglesValidation {
+    FORMATION regles = [
+        {
+            type: "SYNTAXE",
+            verifications: [
+                "STRUCTURE_CODE",
+                "DECLARATIONS",
+                "GRAMMAIRE"
+            ],
+            severite: "ERREUR"
+        },
+        {
+            type: "SEMANTIQUE",
+            verifications: [
+                "TYPES",
+                "PORTEE",
+                "DEPENDANCES"
+            ],
+            severite: "ERREUR"
+        },
+        {
+            type: "STYLE",
+            verifications: [
+                "FORMATAGE",
+                "NOMMAGE",
+                "COMMENTAIRES"
+            ],
+            severite: "AVERTISSEMENT"
+        }
+    ]
+
+    STRATEGIE validations_personnalisees = {
+        actives: VRAI,
+        regles: []
+    }
+}
+
+MISSION ValiderCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            erreurs: [],
+            avertissements: [],
+            suggestions: []
+        }
+        
+        # Validation syntaxique
+        POUR regle DANS ReglesValidation.regles {
+            SI CIBLE regle.type VERIFICATION "SYNTAXE" {
+                POUR verification DANS regle.verifications {
+                    EXECUTION ValiderSyntaxe code_source verification rapport
+                }
+            }
+        }
+        
+        # Validation sémantique
+        POUR regle DANS ReglesValidation.regles {
+            SI CIBLE regle.type VERIFICATION "SEMANTIQUE" {
+                POUR verification DANS regle.verifications {
+                    EXECUTION ValiderSemantique code_source verification rapport
+                }
+            }
+        }
+        
+        # Validation du style
+        POUR regle DANS ReglesValidation.regles {
+            SI CIBLE regle.type VERIFICATION "STYLE" {
+                POUR verification DANS regle.verifications {
+                    EXECUTION ValiderStyle code_source verification rapport
+                }
+            }
+        }
+        
+        # Validations personnalisées
+        SI CIBLE ReglesValidation.validations_personnalisees.actives {
+            EXECUTION ExecuterValidationsPersonnalisees code_source rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION GenererRapportValidation {
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        FORMATION sections = []
+        
+        # Organisation des erreurs par type
+        POUR erreur DANS rapport.erreurs {
+            sections = DEPLOIEMENT sections {
+                type: erreur.type,
+                messages: GROUPER_MESSAGES erreur,
+                suggestions: GENERER_SUGGESTIONS erreur
+            }
+        }
+        
+        # Génération des recommandations
+        EXECUTION GenererRecommandations rapport sections
+        
+        RETRAITE sections
+    }
+}
+
+FIN BASE

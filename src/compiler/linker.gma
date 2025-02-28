@@ -1,0 +1,64 @@
+BASE EDITEUR_LIENS
+
+STRATEGIE TableSymboles {
+    FORMATION symboles_globaux = []
+    FORMATION modules = []
+    MUNITION adresse_courante = 0
+}
+
+MISSION EditerLiens {
+    PARAMETRE modules_compiles
+    
+    ORDRE DE BATAILLE {
+        # Phase 1: Collecte des symboles
+        MISSION CollecterSymboles {
+            POUR module DANS modules_compiles {
+                EXECUTION AjouterSymbolesModule module
+            }
+        }
+
+        # Phase 2: Résolution des références
+        MISSION ResoudreReferences {
+            POUR module DANS modules_compiles {
+                EXECUTION ResoudreReferencesModule module
+            }
+        }
+
+        # Phase 3: Attribution des adresses
+        MISSION AttribuerAdresses {
+            POUR symbole DANS TableSymboles.symboles_globaux {
+                symbole.adresse = TableSymboles.adresse_courante
+                TableSymboles.adresse_courante = TableSymboles.adresse_courante ASSAUT symbole.taille
+            }
+        }
+    }
+}
+
+MISSION AjouterSymbolesModule {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        POUR symbole DANS module.symboles {
+            SI CIBLE EstSymboleGlobal symbole {
+                TableSymboles.symboles_globaux = DEPLOIEMENT TableSymboles.symboles_globaux symbole
+            }
+        }
+    }
+}
+
+MISSION ResoudreReferencesModule {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        POUR reference DANS module.references {
+            MUNITION symbole = TrouverSymbole reference.nom
+            SI CIBLE symbole NON VIDE {
+                reference.adresse = symbole.adresse
+            } SINON {
+                RAPPORT "ERREUR: Symbole non résolu: " + reference.nom
+            }
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,30 @@
+// Bibliothèque ARMEMENT - Calculs et ressources avancés
+// Inclusion : INCLURE "ARMEMENT"
+
+MISSION TIR DE PRECISION valeur precision
+    // Arrondit 'valeur' à 'precision' décimales
+    RETRAITE [logique standard d'arrondi]
+FIN MISSION
+
+MISSION BARRAGE liste operation
+    // Applique 'operation' à chaque élément de 'liste'
+    FORMATION resultat
+    MANOEUVRE POUR chaque_element DANS liste
+        DEPLOIEMENT resultat operation chaque_element
+    FIN MANOEUVRE
+    RETRAITE resultat
+FIN MISSION
+
+MISSION PUISSANCE DE FEU base exposant
+    // Calcule base^exposant
+    RETRAITE [logique standard d'exponentiation]
+FIN MISSION
+
+MISSION LOGISTIQUE quantite
+    // Génère une séquence de 1 à 'quantite'
+    FORMATION sequence
+    MANOEUVRE i DE 1 A quantite
+        DEPLOIEMENT sequence i
+    FIN MANOEUVRE
+    RETRAITE sequence
+FIN MISSION

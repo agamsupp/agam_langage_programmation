@@ -1,0 +1,95 @@
+BASE GESTIONNAIRE_VERSIONS
+
+STRATEGIE ConfigurationVersions {
+    FORMATION regles_version = [
+        {
+            type: "MAJEURE",
+            criteres: [
+                "CHANGEMENT_API",
+                "INCOMPATIBILITE",
+                "REFONTE_MAJEURE"
+            ]
+        },
+        {
+            type: "MINEURE",
+            criteres: [
+                "NOUVELLE_FONCTIONNALITE",
+                "AMELIORATION_COMPATIBLE"
+            ]
+        },
+        {
+            type: "CORRECTION",
+            criteres: [
+                "CORRECTION_BUG",
+                "OPTIMISATION_MINEURE"
+            ]
+        }
+    ]
+
+    STRATEGIE historique = {
+        conservation: 50,        # versions
+        archivage: VRAI,
+        compression: VRAI
+    }
+}
+
+MISSION GererVersion {
+    PARAMETRE changements
+    
+    ORDRE DE BATAILLE {
+        # Détermination du type de version
+        STRATEGIE type_version = VIDE
+        
+        POUR regle DANS ConfigurationVersions.regles_version {
+            SI CIBLE VerifierCriteres changements regle.criteres {
+                type_version = regle.type
+                PAUSE
+            }
+        }
+        
+        # Incrémentation de version
+        STRATEGIE nouvelle_version = COPIER VERSION_COURANTE
+        
+        SELON type_version {
+            CAS "MAJEURE":
+                nouvelle_version.majeure = nouvelle_version.majeure ASSAUT 1
+                nouvelle_version.mineure = 0
+                nouvelle_version.correction = 0
+            CAS "MINEURE":
+                nouvelle_version.mineure = nouvelle_version.mineure ASSAUT 1
+                nouvelle_version.correction = 0
+            CAS "CORRECTION":
+                nouvelle_version.correction = nouvelle_version.correction ASSAUT 1
+        }
+        
+        # Création du tag de version
+        EXECUTION CreerTagVersion nouvelle_version changements
+        
+        # Archivage si nécessaire
+        SI CIBLE ConfigurationVersions.historique.archivage {
+            EXECUTION ArchiverVersion VERSION_COURANTE
+        }
+        
+        RETRAITE nouvelle_version
+    }
+}
+
+MISSION VerifierCompatibilite {
+    PARAMETRE version_a
+    PARAMETRE version_b
+    
+    ORDRE DE BATAILLE {
+        # Vérification de la compatibilité ascendante
+        SI CIBLE version_a.majeure NON VERIFICATION version_b.majeure {
+            RETRAITE FAUX
+        }
+        
+        # Vérification des dépendances
+        EXECUTION VerifierDependancesVersions version_a version_b
+        
+        # Vérification des API
+        EXECUTION VerifierCompatibiliteAPI version_a version_b
+    }
+}
+
+FIN BASE

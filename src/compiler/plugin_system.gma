@@ -1,0 +1,107 @@
+BASE SYSTEME_PLUGINS
+
+STRATEGIE ConfigurationPlugins {
+    FORMATION plugins_actifs = []
+    FORMATION points_extension = [
+        {
+            nom: "PRE_COMPILATION",
+            obligatoire: FAUX,
+            contexte: ["CODE_SOURCE", "CONFIG"]
+        },
+        {
+            nom: "POST_COMPILATION",
+            obligatoire: FAUX,
+            contexte: ["CODE_GENERE", "STATISTIQUES"]
+        },
+        {
+            nom: "OPTIMISATION",
+            obligatoire: FAUX,
+            contexte: ["AST", "METRIQUES"]
+        }
+    ]
+}
+
+MISSION ChargerPlugin {
+    PARAMETRE chemin_plugin
+    
+    ORDRE DE BATAILLE {
+        # Vérification de sécurité
+        SI CIBLE NON VerifierSignaturePlugin chemin_plugin {
+            RETRAITE ERREUR_SIGNATURE
+        }
+        
+        # Chargement du manifeste
+        STRATEGIE manifeste = CHARGER_MANIFESTE chemin_plugin
+        
+        # Vérification de compatibilité
+        SI CIBLE NON VerifierCompatibilitePlugin manifeste {
+            RETRAITE ERREUR_COMPATIBILITE
+        }
+        
+        # Chargement du code
+        STRATEGIE plugin = {
+            nom: manifeste.nom,
+            version: manifeste.version,
+            points_extension: manifeste.points_extension,
+            code: CHARGER_CODE chemin_plugin
+        }
+        
+        # Initialisation du plugin
+        MISSION InitialiserPlugin {
+            PARAMETRE plugin
+            
+            POUR point DANS plugin.points_extension {
+                EXECUTION EnregistrerPoint point
+            }
+            
+            EXECUTION plugin.init
+        }
+        
+        ConfigurationPlugins.plugins_actifs = DEPLOIEMENT 
+            ConfigurationPlugins.plugins_actifs 
+            plugin
+            
+        RETRAITE plugin
+    }
+}
+
+MISSION ExecuterPlugins {
+    PARAMETRE point_extension
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        POUR plugin DANS ConfigurationPlugins.plugins_actifs {
+            SI CIBLE point_extension DANS plugin.points_extension {
+                EXECUTION ExecuterPointExtension plugin point_extension contexte
+            }
+        }
+    }
+}
+
+MISSION GererConflitsPlugins {
+    ORDRE DE BATAILLE {
+        FORMATION conflits = []
+        
+        # Détection des conflits
+        POUR plugin1 DANS ConfigurationPlugins.plugins_actifs {
+            POUR plugin2 DANS ConfigurationPlugins.plugins_actifs {
+                SI CIBLE plugin1 NON VERIFICATION plugin2 {
+                    SI CIBLE DetecterConflit plugin1 plugin2 {
+                        conflits = DEPLOIEMENT conflits {
+                            plugin1: plugin1,
+                            plugin2: plugin2,
+                            type: "CONFLIT_RESSOURCE"
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Résolution des conflits
+        POUR conflit DANS conflits {
+            EXECUTION ResoudreConflit conflit
+        }
+    }
+}
+
+FIN BASE

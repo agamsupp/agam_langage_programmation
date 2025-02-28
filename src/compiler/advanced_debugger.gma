@@ -1,0 +1,115 @@
+BASE DEBOGUEUR_AVANCE
+
+STRATEGIE ConfigurationDebug {
+    FORMATION points_arret = [
+        {
+            type: "CODE",
+            conditions: []
+        },
+        {
+            type: "DONNEES",
+            surveillance: ["LECTURE", "ECRITURE"]
+        },
+        {
+            type: "EVENEMENT",
+            declencheurs: ["ERREUR", "EXCEPTION"]
+        }
+    ]
+
+    STRATEGIE inspection = {
+        profondeur_max: 5,
+        taille_historique: 100,
+        mode_temps_reel: VRAI
+    }
+}
+
+MISSION DemarrerDebogage {
+    PARAMETRE programme
+    
+    ORDRE DE BATAILLE {
+        # Initialisation de l'environnement de débogage
+        STRATEGIE contexte = {
+            etat: "PRET",
+            points_arret_actifs: [],
+            pile_appels: [],
+            variables_surveillees: []
+        }
+        
+        # Installation des points d'arrêt
+        POUR point DANS ConfigurationDebug.points_arret {
+            EXECUTION InstallerPointArret point contexte
+        }
+        
+        # Boucle principale de débogage
+        MANOEUVRE DEBOGAGE {
+            TANT_QUE contexte.etat NON VERIFICATION "TERMINE" {
+                EXECUTION ExecuterProgramme programme contexte
+                
+                # Gestion des points d'arrêt
+                SI CIBLE PointArretAtteint {
+                    EXECUTION TraiterPointArret
+                    EXECUTION AfficherContexte
+                    EXECUTION AttendreCommande
+                }
+                
+                # Mise à jour de l'historique
+                EXECUTION MettreAJourHistorique contexte
+            }
+        }
+    }
+}
+
+MISSION InspecterMemoire {
+    PARAMETRE adresse
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE inspection = {
+            donnees: [],
+            structure: IDENTIFIER_STRUCTURE adresse,
+            references: []
+        }
+        
+        # Lecture de la mémoire
+        POUR offset DANS SEQUENCE 0 À taille {
+            inspection.donnees = DEPLOIEMENT inspection.donnees 
+                LIRE_MEMOIRE (adresse ASSAUT offset)
+        }
+        
+        # Analyse des références
+        SI CIBLE inspection.structure NON VIDE {
+            EXECUTION AnalyserReferences inspection
+        }
+        
+        RETRAITE inspection
+    }
+}
+
+MISSION ModifierContexte {
+    PARAMETRE contexte
+    PARAMETRE modifications
+    
+    ORDRE DE BATAILLE {
+        # Validation des modifications
+        SI CIBLE NON ValiderModifications modifications {
+            RETRAITE ERREUR_MODIFICATION
+        }
+        
+        # Application des modifications
+        POUR modif DANS modifications {
+            SELON modif.type {
+                CAS "VARIABLE":
+                    EXECUTION ModifierVariable modif
+                CAS "REGISTRE":
+                    EXECUTION ModifierRegistre modif
+                CAS "MEMOIRE":
+                    EXECUTION ModifierMemoire modif
+            }
+        }
+        
+        # Mise à jour du contexte
+        EXECUTION MettreAJourContexte contexte
+    }
+}
+
+FIN BASE

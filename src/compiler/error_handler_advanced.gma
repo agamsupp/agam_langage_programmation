@@ -1,0 +1,90 @@
+BASE GESTIONNAIRE_ERREURS_AVANCE
+
+STRATEGIE ConfigurationErreurs {
+    FORMATION categories = [
+        {
+            type: "COMPILATION",
+            severite: "CRITIQUE",
+            recuperable: FAUX
+        },
+        {
+            type: "EXECUTION",
+            severite: "HAUTE",
+            recuperable: VRAI
+        },
+        {
+            type: "RESSOURCE",
+            severite: "MOYENNE",
+            recuperable: VRAI
+        }
+    ]
+
+    STRATEGIE strategies_recuperation = [
+        {
+            type: "REPRISE",
+            actions: ["RETOUR_ARRIERE", "NETTOYAGE", "REINITIALISATION"]
+        },
+        {
+            type: "ISOLATION",
+            actions: ["CONTAINMENT", "QUARANTAINE", "NOTIFICATION"]
+        }
+    ]
+}
+
+MISSION GererErreur {
+    PARAMETRE erreur
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Journalisation de l'erreur
+        STRATEGIE trace = {
+            timestamp: TEMPS_ACTUEL,
+            type: erreur.type,
+            message: erreur.message,
+            pile: OBTENIR_PILE_APPELS,
+            contexte: contexte
+        }
+        
+        # Classification de l'erreur
+        POUR categorie DANS ConfigurationErreurs.categories {
+            SI CIBLE erreur.type VERIFICATION categorie.type {
+                SI CIBLE categorie.recuperable {
+                    EXECUTION TenterRecuperation erreur categorie
+                } SINON {
+                    EXECUTION TerminerExecution erreur
+                }
+                PAUSE
+            }
+        }
+        
+        # Notification
+        EXECUTION NotifierErreur trace
+        
+        # Analyse post-mortem
+        EXECUTION AnalyserErreur trace
+    }
+}
+
+MISSION TenterRecuperation {
+    PARAMETRE erreur
+    PARAMETRE categorie
+    
+    ORDRE DE BATAILLE {
+        POUR strategie DANS ConfigurationErreurs.strategies_recuperation {
+            SI CIBLE StrategieApplicable strategie erreur {
+                POUR action DANS strategie.actions {
+                    EXECUTION ExecuterAction action erreur
+                    
+                    SI CIBLE VerifierRecuperation {
+                        RAPPORT "Récupération réussie: " + action
+                        RETRAITE SUCCES
+                    }
+                }
+            }
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+FIN BASE

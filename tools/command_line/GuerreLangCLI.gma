@@ -1,0 +1,106 @@
+BASE GuerreLangCLI
+
+INCLURE "GuerreGraph"
+INCLURE "MACHINE_VIRTUELLE"
+INCLURE "Environnement_Execution"
+INCLURE "MONITEUR_EXECUTION"
+
+STRATEGIE ConfigurationCLI {
+    MUNITION VERSION = "1.0"
+    MUNITION PROMPT = ">"
+}
+
+MISSION Initialisation {
+    ORDRE DE BATAILLE {
+        EXECUTION GuerreGraph.InitialiserEcranTactique
+        EXECUTION Environnement_Execution.InitialiserEnvironnement
+        EXECUTION GuerreGraph.EffetMatrixTactique 3000
+        EXECUTION GuerreGraph.AfficherTexteStrategique "SYSTÈME DE COMMANDEMENT TACTIQUE v" + ConfigurationCLI.VERSION GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+        EXECUTION GuerreGraph.AfficherTexteStrategique "Initialisation..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+        EXECUTION GuerreGraph.AttendreTransmission 1000
+        EXECUTION GuerreGraph.AfficherTexteStrategique "Prêt. Tapez 'help' pour les commandes." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+    }
+}
+
+MISSION BouclePrincipale {
+    ORDRE DE BATAILLE {
+        MANOEUVRE true {
+            MUNITION commande = EXECUTION GuerreGraph.ObtenirTransmission
+            EXECUTION TraiterCommande commande
+            EXECUTION GuerreGraph.RedessinerEcran
+        }
+    }
+}
+
+MISSION TraiterCommande {
+    PARAMETRE commande
+    ORDRE DE BATAILLE {
+        FORMATION parties = DECOUPER commande " "
+        MUNITION cmd = SI CIBLE RECONNAISSANCE parties > 0 ALORS EXTRACTION parties 0 SINON "" FIN CIBLE
+        FORMATION args = SI CIBLE RECONNAISSANCE parties > 1 ALORS RETRAIT parties 0 FIN CIBLE
+
+        SELON cmd {
+            CAS "help":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Commandes : help, deploy, run_vm, monitor, recon, status, halt, reset, config, report" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "deploy":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Déploiement en cours..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                MUNITION adresse = EXECUTION Environnement_Execution.GererMemoire.AllouerMemoire 100
+                EXECUTION GuerreGraph.AttendreTransmission 2000
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Déploiement terminé à l'adresse " FUSION adresse GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "run_vm":
+                FORMATION programme = [                    STRATEGIE DEPLOIEMENT "opcode" "0x01" DEPLOIEMENT "registre" 0 DEPLOIEMENT "valeur" 5 FIN STRATEGIE,                    STRATEGIE DEPLOIEMENT "opcode" "0x01" DEPLOIEMENT "registre" 1 DEPLOIEMENT "valeur" 3 FIN STRATEGIE,                    STRATEGIE DEPLOIEMENT "opcode" "0x03" DEPLOIEMENT "reg1" 0 DEPLOIEMENT "reg2" 1 DEPLOIEMENT "regDest" 2 FIN STRATEGIE                ]
+                EXECUTION MACHINE_VIRTUELLE.ExecuterProgramme programme
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Résultat dans R2 : " FUSION MACHINE_VIRTUELLE.EtatMachine.registres[2] GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "monitor":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Lancement du moniteur..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                EXECUTION MONITEUR_EXECUTION.SurveillanceExecution
+            CAS "recon":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Reconnaissance tactique en cours..." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                EXECUTION GuerreGraph.AttendreTransmission 1500
+                POUR i DANS SEQUENCE 0 À 3 {
+                    MUNITION x = ALEATOIRE 0 100
+                    MUNITION y = ALEATOIRE 0 100
+                    EXECUTION GuerreGraph.AfficherTexteStrategique "Position " FUSION i ": (" FUSION x ", " FUSION y ")" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                }
+            CAS "status":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Registres VM : " FUSION MACHINE_VIRTUELLE.EtatMachine.registres GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Pile VM : " FUSION MACHINE_VIRTUELLE.EtatMachine.pile GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Mémoire allouée : " FUSION MONITEUR_EXECUTION.ConfigurationMoniteur.sondes[0].valeurs["MEMOIRE"] "%" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "halt":
+                EXECUTION GuerreGraph.FermerEcranTactique
+            CAS "reset":
+                EXECUTION MACHINE_VIRTUELLE.InitialiserVM
+                EXECUTION Environnement_Execution.InitialiserEnvironnement
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Système réinitialisé." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+            CAS "config":
+                SI CIBLE RECONNAISSANCE args == 2 ET EXTRACTION args 0 DANS ["cpu_max", "memoire_max", "io_max"] {
+                    MUNITION seuil = EXTRACTION args 0
+                    MUNITION valeur = CONVERTIR_ENTIER EXTRACTION args 1
+                    SI CIBLE valeur != "ECHEC" {
+                        MONITEUR_EXECUTION.ConfigurationMoniteur.alertes.seuils[seuil] = valeur
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "Seuil " FUSION seuil " mis à " FUSION valeur GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    } SINON {
+                        EXECUTION GuerreGraph.AfficherTexteStrategique "ERREUR : Valeur invalide" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    }
+                } SINON {
+                    EXECUTION GuerreGraph.AfficherTexteStrategique "Usage : config [cpu_max|memoire_max|io_max] [valeur]" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                }
+            CAS "report":
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Rapport de surveillance :" GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                POUR sonde DANS MONITEUR_EXECUTION.ConfigurationMoniteur.sondes {
+                    POUR metrique DANS sonde.metriques {
+                        EXECUTION GuerreGraph.AfficherTexteStrategique sonde.type " - " FUSION metrique " : " FUSION sonde.valeurs[metrique] GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+                    }
+                }
+            DEFAUT:
+                EXECUTION GuerreGraph.AfficherTexteStrategique "Commande inconnue." GuerreGraph.ConfigurationGraphique.COULEURS.ROUGE
+        }
+    }
+}
+
+ORDRE DE BATAILLE {
+    EXECUTION Initialisation
+    EXECUTION BouclePrincipale
+}
+
+FIN BASE

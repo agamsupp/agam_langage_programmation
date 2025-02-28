@@ -1,0 +1,85 @@
+BASE SYSTEME_PROFILAGE
+
+STRATEGIE ConfigurationProfilage {
+    FORMATION points_mesure = [
+        {
+            type: "TEMPS_EXECUTION",
+            active: VRAI,
+            seuil: 1000  # milliseconds
+        },
+        {
+            type: "UTILISATION_MEMOIRE",
+            active: VRAI,
+            seuil: 1024 * 1024  # 1MB
+        },
+        {
+            type: "APPELS_FONCTION",
+            active: VRAI,
+            seuil: 100
+        }
+    ]
+
+    FORMATION donnees_collectees = []
+    MUNITION intervalle_echantillonnage = 100  # milliseconds
+}
+
+MISSION InitialiserProfilage {
+    ORDRE DE BATAILLE {
+        # Initialisation des compteurs
+        POUR point DANS ConfigurationProfilage.points_mesure {
+            point.compteur = 0
+            point.dernier_echantillon = TEMPS_ACTUEL
+        }
+        
+        # Configuration des points d'instrumentation
+        EXECUTION ConfigurerInstrumentation
+        
+        # Démarrage de la collecte
+        EXECUTION DemarrerCollecte
+    }
+}
+
+MISSION CollecterMetriques {
+    PARAMETRE fonction
+    
+    ORDRE DE BATAILLE {
+        POUR point DANS ConfigurationProfilage.points_mesure {
+            SI CIBLE point.active {
+                SELON point.type {
+                    CAS "TEMPS_EXECUTION":
+                        EXECUTION MesurerTempsExecution fonction
+                    CAS "UTILISATION_MEMOIRE":
+                        EXECUTION MesurerUtilisationMemoire fonction
+                    CAS "APPELS_FONCTION":
+                        EXECUTION CompterAppelsFonction fonction
+                }
+                
+                # Vérification des seuils
+                SI CIBLE point.compteur > point.seuil {
+                    EXECUTION GenererAlerte point fonction
+                }
+            }
+        }
+    }
+}
+
+MISSION GenererRapportProfilage {
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            timestamp: TEMPS_ACTUEL,
+            metriques: ConfigurationProfilage.donnees_collectees,
+            synthese: {
+                temps_total: CalculerTempsTotal,
+                memoire_pic: CalculerMemoirePic,
+                fonctions_chaudes: IdentifierFonctionsChaudes
+            }
+        }
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiquesPerformance rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

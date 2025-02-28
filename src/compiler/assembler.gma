@@ -1,0 +1,85 @@
+BASE ASSEMBLEUR_AGAM
+
+STRATEGIE InstructionsBase {
+    FORMATION instructions = [
+        {code: "CHARGER", opcode: "0x01"},
+        {code: "STOCKER", opcode: "0x02"},
+        {code: "ADDITIONNER", opcode: "0x03"},
+        {code: "SOUSTRAIRE", opcode: "0x04"},
+        {code: "COMPARER", opcode: "0x05"},
+        {code: "SAUTER", opcode: "0x06"}
+    ]
+
+    FORMATION registres = [
+        {nom: "R0", code: "0x00"},
+        {nom: "R1", code: "0x01"},
+        {nom: "R2", code: "0x02"},
+        {nom: "R3", code: "0x03"}
+    ]
+}
+
+MISSION AssemblerCode {
+    PARAMETRE code_intermediaire
+    
+    ORDRE DE BATAILLE {
+        FORMATION code_machine = []
+        
+        POUR instruction DANS code_intermediaire {
+            STRATEGIE inst_machine = EXECUTION TraduireInstruction instruction
+            code_machine = DEPLOIEMENT code_machine inst_machine
+        }
+        
+        # Résolution des étiquettes
+        EXECUTION ResoudreEtiquettes code_machine
+        
+        RETRAITE code_machine
+    }
+}
+
+MISSION TraduireInstruction {
+    PARAMETRE instruction
+    
+    ORDRE DE BATAILLE {
+        POUR inst_base DANS InstructionsBase.instructions {
+            SI CIBLE instruction.code VERIFICATION inst_base.code {
+                RETRAITE {
+                    opcode: inst_base.opcode,
+                    operandes: EXECUTION TraduireOperandes instruction.operandes
+                }
+            }
+        }
+        
+        RAPPORT "ERREUR: Instruction non reconnue"
+        RETRAITE VIDE
+    }
+}
+
+MISSION ResoudreEtiquettes {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE table_etiquettes = {}
+        
+        # Première passe : collecter les étiquettes
+        MANOEUVRE COLLECTION {
+            MUNITION position = 0
+            POUR instruction DANS code {
+                SI CIBLE EstEtiquette instruction {
+                    table_etiquettes[instruction.nom] = position
+                }
+                position = position ASSAUT 1
+            }
+        }
+        
+        # Deuxième passe : résoudre les références
+        MANOEUVRE RESOLUTION {
+            POUR instruction DANS code {
+                SI CIBLE ReferenceEtiquette instruction {
+                    instruction.adresse = table_etiquettes[instruction.reference]
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

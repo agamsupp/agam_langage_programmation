@@ -1,0 +1,16 @@
+// Bibliothèque COMMANDEMENT - Contrôle avancé
+// Inclusion : INCLURE "COMMANDEMENT"
+
+MISSION POSTE DE COMMANDE nom parametres
+    // Définit une fonction réutilisable
+    [corps défini par l'utilisateur]
+FIN MISSION
+
+STRATEGIE COMPLEXE cle valeur
+    // Crée ou manipule un dictionnaire
+    RETRAITE [logique de dictionnaire standard]
+
+MISSION CHAINE DE COMMANDE variable
+    // Structure switch-like
+    [cas définis par l'utilisateur]
+FIN MISSION

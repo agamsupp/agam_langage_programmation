@@ -1,0 +1,91 @@
+BASE GESTIONNAIRE_EXCEPTIONS
+
+STRATEGIE CatalogueExceptions {
+    FORMATION exceptions = [
+        {
+            code: "E001",
+            type: "ERREUR_EXECUTION",
+            message: "Division par zéro"
+        },
+        {
+            code: "E002",
+            type: "ERREUR_MEMOIRE",
+            message: "Dépassement de pile"
+        },
+        {
+            code: "E003",
+            type: "ERREUR_ACCES",
+            message: "Violation de segment"
+        }
+    ]
+
+    FORMATION gestionnaires = []
+}
+
+MISSION EnregistrerGestionnaire {
+    PARAMETRE type_exception
+    PARAMETRE code_gestionnaire
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE nouveau_gestionnaire = {
+            type: type_exception,
+            code: code_gestionnaire,
+            actif: VRAI
+        }
+        
+        CatalogueExceptions.gestionnaires = DEPLOIEMENT 
+            CatalogueExceptions.gestionnaires 
+            nouveau_gestionnaire
+    }
+}
+
+MISSION LeverException {
+    PARAMETRE code_erreur
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Recherche de l'exception
+        STRATEGIE exception = VIDE
+        
+        POUR exc DANS CatalogueExceptions.exceptions {
+            SI CIBLE exc.code VERIFICATION code_erreur {
+                exception = exc
+                PAUSE
+            }
+        }
+        
+        SI CIBLE exception EST VIDE {
+            RAPPORT "Exception inconnue: " + code_erreur
+            RETRAITE
+        }
+        
+        # Recherche du gestionnaire
+        POUR gestionnaire DANS CatalogueExceptions.gestionnaires {
+            SI CIBLE gestionnaire.type VERIFICATION exception.type {
+                SI CIBLE gestionnaire.actif {
+                    EXECUTION gestionnaire.code contexte
+                    RETRAITE
+                }
+            }
+        }
+        
+        # Si aucun gestionnaire trouvé
+        RAPPORT "Exception non gérée: " + exception.message
+        EXECUTION TerminerExecution
+    }
+}
+
+MISSION RecupererException {
+    ORDRE DE BATAILLE {
+        # Restauration du contexte
+        EXECUTION RestaurerContexte
+        
+        # Nettoyage de la pile
+        EXECUTION NettoyerPile
+        
+        # Reprise de l'exécution
+        EXECUTION ReprendreExecution
+    }
+}
+
+FIN BASE

@@ -1,0 +1,86 @@
+BASE GESTIONNAIRE_RESSOURCES
+
+STRATEGIE EtatRessources {
+    FORMATION ressources_systeme = [
+        {
+            type: "MEMOIRE",
+            total: 1024 * 1024,  # 1MB
+            utilise: 0,
+            limites: {min: 1024, max: 1024 * 1024}
+        },
+        {
+            type: "PROCESSEUR",
+            coeurs: 4,
+            charge: 0,
+            limites: {min: 0, max: 100}
+        }
+    ]
+    
+    FORMATION allocations = []
+}
+
+MISSION ReserverRessource {
+    PARAMETRE type_ressource
+    PARAMETRE quantite
+    
+    ORDRE DE BATAILLE {
+        # Vérification disponibilité
+        POUR ressource DANS EtatRessources.ressources_systeme {
+            SI CIBLE ressource.type VERIFICATION type_ressource {
+                SI CIBLE (ressource.utilise ASSAUT quantite) <= ressource.limites.max {
+                    ressource.utilise = ressource.utilise ASSAUT quantite
+                    
+                    STRATEGIE allocation = {
+                        id: GENERER_ID,
+                        type: type_ressource,
+                        quantite: quantite,
+                        timestamp: TEMPS_ACTUEL
+                    }
+                    
+                    EtatRessources.allocations = DEPLOIEMENT 
+                        EtatRessources.allocations 
+                        allocation
+                        
+                    RETRAITE allocation.id
+                }
+            }
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+MISSION LibererRessource {
+    PARAMETRE allocation_id
+    
+    ORDRE DE BATAILLE {
+        POUR allocation DANS EtatRessources.allocations {
+            SI CIBLE allocation.id VERIFICATION allocation_id {
+                POUR ressource DANS EtatRessources.ressources_systeme {
+                    SI CIBLE ressource.type VERIFICATION allocation.type {
+                        ressource.utilise = ressource.utilise REPLI allocation.quantite
+                        RETRAITE SUCCES
+                    }
+                }
+            }
+        }
+    }
+}
+
+MISSION SurveillanceRessources {
+    ORDRE DE BATAILLE {
+        MANOEUVRE SURVEILLANCE {
+            POUR ressource DANS EtatRessources.ressources_systeme {
+                SI CIBLE ressource.utilise > (ressource.limites.max * 0.9) {
+                    EXECUTION AlerteSurUtilisation ressource
+                }
+                
+                SI CIBLE ressource.utilise < ressource.limites.min {
+                    EXECUTION AlerteSousUtilisation ressource
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

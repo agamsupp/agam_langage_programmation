@@ -1,0 +1,80 @@
+BASE CHARGEUR_DYNAMIQUE
+
+STRATEGIE ConfigurationChargeur {
+    FORMATION modules_charges = []
+    FORMATION dependances = []
+    FORMATION symboles_exportes = []
+    
+    STRATEGIE options = {
+        resolution_retardee: VRAI,
+        verification_symboles: VRAI,
+        cache_modules: VRAI
+    }
+}
+
+MISSION ChargerModule {
+    PARAMETRE chemin_module
+    
+    ORDRE DE BATAILLE {
+        # Vérification si déjà chargé
+        SI CIBLE ModuleDejaCharge chemin_module {
+            RETRAITE OBTENIR_MODULE chemin_module
+        }
+        
+        # Lecture de l'en-tête du module
+        STRATEGIE en_tete = LIRE_EN_TETE chemin_module
+        
+        # Vérification de compatibilité
+        SI CIBLE NON VerifierCompatibilite en_tete {
+            RETRAITE ERREUR_COMPATIBILITE
+        }
+        
+        # Chargement des dépendances
+        POUR dependance DANS en_tete.dependances {
+            EXECUTION ChargerDependance dependance
+        }
+        
+        # Allocation mémoire pour le module
+        STRATEGIE espace_module = {
+            code: ALLOUER_MEMOIRE en_tete.taille_code,
+            donnees: ALLOUER_MEMOIRE en_tete.taille_donnees,
+            bss: ALLOUER_MEMOIRE en_tete.taille_bss
+        }
+        
+        # Chargement du code
+        EXECUTION ChargerSection chemin_module "CODE" espace_module.code
+        EXECUTION ChargerSection chemin_module "DONNEES" espace_module.donnees
+        
+        # Résolution des symboles
+        EXECUTION ResoudreSymboles espace_module
+        
+        # Initialisation du module
+        EXECUTION InitialiserModule espace_module
+        
+        RETRAITE espace_module
+    }
+}
+
+MISSION ResoudreSymboles {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        POUR symbole DANS module.table_symboles {
+            SI CIBLE symbole.type VERIFICATION "EXTERNE" {
+                STRATEGIE resolution = RECHERCHER_SYMBOLE 
+                    symbole.nom 
+                    ConfigurationChargeur.symboles_exportes
+                    
+                SI CIBLE resolution NON VIDE {
+                    EXECUTION LierSymbole symbole resolution
+                } SINON SI CIBLE ConfigurationChargeur.options.resolution_retardee {
+                    EXECUTION AjouterResolutionRetardee symbole
+                } SINON {
+                    RETRAITE ERREUR_RESOLUTION_SYMBOLE
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

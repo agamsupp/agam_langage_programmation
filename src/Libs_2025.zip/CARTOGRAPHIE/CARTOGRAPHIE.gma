@@ -1,0 +1,23 @@
+// Bibliothèque CARTOGRAPHIE - Données spatiales
+// Inclusion : INCLURE "CARTOGRAPHIE"
+
+MISSION POSITION x y
+    STRATEGIE coord
+    DEPLOIEMENT coord "x" x
+    DEPLOIEMENT coord "y" y
+    RETRAITE coord
+FIN MISSION
+
+MISSION DISTANCE point1 point2
+    RETRAITE [racine((point1.x - point2.x)^2 + (point1.y - point2.y)^2)]
+FIN MISSION
+
+MISSION ZONE liste_points
+    RETRAITE liste_points
+FIN MISSION
+
+MISSION TRAJECTOIRE depart arrivee
+    FORMATION chemin
+    [logique d’interpolation linéaire]
+    RETRAITE chemin
+FIN MISSION

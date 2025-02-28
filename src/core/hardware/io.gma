@@ -1,0 +1,297 @@
+BASE ACCES_MATERIEL_TACTIQUE
+    // Module pour l'accès direct au matériel
+    // Permet l'interaction avec les ports d'entrée/sortie et les registres
+
+    STRATEGIE REGISTRE_CPU
+        MUNITION EAX, EBX, ECX, EDX ENTIER
+        MUNITION ESI, EDI, EBP, ESP ENTIER
+        MUNITION EIP, EFLAGS ENTIER
+        MUNITION CR0, CR2, CR3, CR4 ENTIER
+    FIN STRATEGIE
+
+    //----------------------------------------------
+    // ENTRÉE/SORTIE PORTS
+    //----------------------------------------------
+    
+    MISSION PORT_LIRE_OCTET
+        PARAMETRE port ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION valeur ENTIER = 0
+            
+            ASM {
+                mov dx, [port]
+                in al, dx
+                mov [valeur], al
+            }
+            
+            RETRAITE valeur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PORT_ECRIRE_OCTET
+        PARAMETRE port ENTIER
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov dx, [port]
+                mov al, [valeur]
+                out dx, al
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PORT_LIRE_MOT
+        PARAMETRE port ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION valeur ENTIER = 0
+            
+            ASM {
+                mov dx, [port]
+                in ax, dx
+                mov [valeur], ax
+            }
+            
+            RETRAITE valeur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PORT_ECRIRE_MOT
+        PARAMETRE port ENTIER
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov dx, [port]
+                mov ax, [valeur]
+                out dx, ax
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PORT_LIRE_DWORD
+        PARAMETRE port ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION valeur ENTIER = 0
+            
+            ASM {
+                mov dx, [port]
+                in eax, dx
+                mov [valeur], eax
+            }
+            
+            RETRAITE valeur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PORT_ECRIRE_DWORD
+        PARAMETRE port ENTIER
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov dx, [port]
+                mov eax, [valeur]
+                out dx, eax
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // ACCÈS REGISTRES CPU
+    //----------------------------------------------
+    
+    MISSION REGISTRE_LIRE_CR0
+        ORDRE DE BATAILLE
+            MUNITION valeur ENTIER = 0
+            
+            ASM {
+                mov eax, cr0
+                mov [valeur], eax
+            }
+            
+            RETRAITE valeur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REGISTRE_ECRIRE_CR0
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov eax, [valeur]
+                mov cr0, eax
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REGISTRE_LIRE_CR3
+        ORDRE DE BATAILLE
+            MUNITION valeur ENTIER = 0
+            
+            ASM {
+                mov eax, cr3
+                mov [valeur], eax
+            }
+            
+            RETRAITE valeur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION REGISTRE_ECRIRE_CR3
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov eax, [valeur]
+                mov cr3, eax
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // CONTRÔLE DES INTERRUPTIONS
+    //----------------------------------------------
+    
+    MISSION INTERRUPTIONS_ACTIVER
+        ORDRE DE BATAILLE
+            ASM {
+                sti
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION INTERRUPTIONS_DESACTIVER
+        ORDRE DE BATAILLE
+            ASM {
+                cli
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION INTERRUPTIONS_ETAT
+        ORDRE DE BATAILLE
+            MUNITION etat ENTIER = 0
+            
+            ASM {
+                pushfd
+                pop eax
+                and eax, 0x200
+                mov [etat], eax
+            }
+            
+            RETRAITE etat != 0
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // CONTRÔLE CACHE ET TLB
+    //----------------------------------------------
+    
+    MISSION CACHE_INVALIDER
+        ORDRE DE BATAILLE
+            ASM {
+                wbinvd
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TLB_INVALIDER
+        ORDRE DE BATAILLE
+            ASM {
+                invlpg [esp]
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TLB_INVALIDER_ADRESSE
+        PARAMETRE adresse POINTEUR
+        
+        ORDRE DE BATAILLE
+            ASM {
+                mov eax, [adresse]
+                invlpg [eax]
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // HALT ET ATTENTE
+    //----------------------------------------------
+    
+    MISSION CPU_PAUSE
+        ORDRE DE BATAILLE
+            ASM {
+                pause
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CPU_HALT
+        ORDRE DE BATAILLE
+            ASM {
+                hlt
+            }
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ATTENDRE_COURT
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A 1000
+                ASM {
+                    nop
+                }
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ATTENDRE_PORT
+        PARAMETRE port ENTIER
+        PARAMETRE masque ENTIER
+        PARAMETRE valeur ENTIER
+        
+        ORDRE DE BATAILLE
+            MANOEUVRE
+                MUNITION lu = EXECUTION PORT_LIRE_OCTET port
+                
+                SI CIBLE (lu & masque) == valeur
+                    INTERROMPRE
+                FIN SI
+                
+                EXECUTION CPU_PAUSE
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

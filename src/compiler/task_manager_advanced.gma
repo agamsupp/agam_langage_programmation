@@ -1,0 +1,95 @@
+BASE GESTIONNAIRE_TACHES_AVANCE
+
+STRATEGIE ConfigurationTaches {
+    FORMATION types_taches = [
+        {
+            type: "COMPILATION",
+            priorite: 1,
+            timeout: 300,  # secondes
+            retries: 2
+        },
+        {
+            type: "OPTIMISATION",
+            priorite: 2,
+            timeout: 600,
+            retries: 1
+        },
+        {
+            type: "ANALYSE",
+            priorite: 3,
+            timeout: 900,
+            retries: 0
+        }
+    ]
+
+    STRATEGIE ordonnancement = {
+        mode: "PRIORITE_DYNAMIQUE",
+        quantum: 100,         # ms
+        preemption: VRAI
+    }
+}
+
+MISSION GererTaches {
+    ORDRE DE BATAILLE {
+        # Initialisation des files
+        STRATEGIE files = {
+            haute_priorite: [],
+            moyenne_priorite: [],
+            basse_priorite: []
+        }
+        
+        # Boucle principale d'ordonnancement
+        MANOEUVRE ORDONNANCEMENT {
+            TANT_QUE GESTIONNAIRE_ACTIF {
+                # Traitement des nouvelles tâches
+                POUR tache DANS TACHES_NOUVELLES {
+                    EXECUTION ClassifierTache tache files
+                }
+                
+                # Exécution des tâches selon priorité
+                POUR file DANS files {
+                    SI CIBLE NON EST_VIDE file {
+                        EXECUTION ExecuterTachePrioritaire file
+                    }
+                }
+                
+                # Rééquilibrage si nécessaire
+                SI CIBLE DESEQUILIBRE_DETECTE files {
+                    EXECUTION ReequilibrerCharges files
+                }
+                
+                ATTENDRE ConfigurationTaches.ordonnancement.quantum
+            }
+        }
+    }
+}
+
+MISSION ExecuterTache {
+    PARAMETRE tache
+    
+    ORDRE DE BATAILLE {
+        # Préparation de l'environnement
+        EXECUTION PreparerEnvironnement tache
+        
+        # Exécution avec surveillance
+        MANOEUVRE EXECUTION {
+            MUNITION debut = TEMPS_ACTUEL
+            MUNITION tentatives = 0
+            
+            TANT_QUE tentatives < tache.type.retries + 1 {
+                SI CIBLE ExecuterProcessus tache {
+                    RETRAITE SUCCES
+                } SINON {
+                    tentatives = tentatives ASSAUT 1
+                    SI CIBLE tentatives <= tache.type.retries {
+                        EXECUTION ReinitialiserTache tache
+                    }
+                }
+            }
+            
+            RETRAITE ECHEC
+        }
+    }
+}
+
+FIN BASE

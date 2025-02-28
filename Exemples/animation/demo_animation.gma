@@ -1,0 +1,222 @@
+BASE DEMONSTRATION_ANIMATION
+    // Exemple d'utilisation de la bibliothèque d'animation AGAM
+    // Démontre diverses animations et effets
+
+    INCORPORATION "animation/animation_core.gma"
+    INCORPORATION "animation/sprites.gma"
+    INCORPORATION "animation/effets.gma"
+    
+    //----------------------------------------------
+    // CONSTANTES ET VARIABLES GLOBALES
+    //----------------------------------------------
+    
+    MUNITION LARGEUR_ECRAN = 800
+    MUNITION HAUTEUR_ECRAN = 600
+    
+    MUNITION controleur_animation CONTROLEUR_ANIMATION
+    MUNITION contexte_rendu POINTEUR
+    MUNITION sprites FORMATION[20]
+    MUNITION nb_sprites = 0
+    
+    //----------------------------------------------
+    // FONCTION PRINCIPALE
+    //----------------------------------------------
+    
+    ORDRE DE BATAILLE
+        // Initialiser le système de rendu (spécifique à l'implémentation)
+        contexte_rendu = APPEL_SYSTEME("initialiser_contexte_graphique", LARGEUR_ECRAN, HAUTEUR_ECRAN)
+        
+        SI CIBLE contexte_rendu == 0
+            RAPPORT "Erreur: Impossible d'initialiser le contexte graphique"
+            RETRAITE 1
+        FIN SI
+        
+        // Initialiser le contrôleur d'animation
+        controleur_animation = EXECUTION CONTROLEUR_INITIALISER 60
+        
+        // Créer une scène de démonstration
+        EXECUTION CREER_SCENE_DEMO
+        
+        // Boucle principale
+        MANOEUVRE TANT QUE APPEL_SYSTEME("fenetre_ouverte")
+            // Effacer l'écran
+            EXECUTION EFFACER_ECRAN contexte_rendu, [0, 0, 0, 255]  // Noir
+            
+            // Mettre à jour les animations
+            EXECUTION CONTROLEUR_METTRE_A_JOUR controleur_animation
+            
+            // Dessiner tous les sprites
+            EXECUTION DESSINER_SPRITES
+            
+            // Afficher le résultat
+            EXECUTION RAFRAICHIR_ECRAN contexte_rendu
+            
+            // Attendre le prochain cycle
+            APPEL_SYSTEME("attendre_vsync")
+        FIN MANOEUVRE
+        
+        // Nettoyer
+        EXECUTION LIBERER_RESSOURCES
+        
+        RETRAITE 0
+    FIN ORDRE
+    
+    //----------------------------------------------
+    // FONCTIONS DE DÉMONSTRATION
+    //----------------------------------------------
+    
+    MISSION CREER_SCENE_DEMO
+        ORDRE DE BATAILLE
+            // 1. Créer un rectangle qui se déplace et change de couleur
+            MUNITION rectangle = EXECUTION CREER_SPRITE_RECTANGLE 100, 100, 100, 50, [255, 0, 0, 255]
+            EXECUTION AJOUTER_SPRITE rectangle
+            
+            // Animation de déplacement
+            MUNITION anim_deplace = EXECUTION CREER_ANIM_DEPLACE rectangle, 600, 100, 3.0, INTERPOLATION_EASE_IN_OUT
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_deplace
+            
+            // Animation de couleur
+            MUNITION anim_couleur = EXECUTION CREER_ANIM_COULEUR rectangle, [0, 0, 255, 255], 3.0, INTERPOLATION_LINEAIRE
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_couleur
+            
+            // 2. Créer un cercle avec animation d'échelle
+            MUNITION cercle = EXECUTION CREER_SPRITE_CERCLE 400, 300, 50, [0, 255, 0, 255]
+            EXECUTION AJOUTER_SPRITE cercle
+            
+            // Animation d'échelle pulsante (répétée indéfiniment)
+            MUNITION anim_echelle = EXECUTION CREER_ANIM_OSCILLATION cercle, 3, 0.5, 0.5, 10.0, 0
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_echelle
+            
+            // 3. Créer un texte qui apparaît progressivement
+            MUNITION texte = EXECUTION CREER_SPRITE_TEXTE 250, 200, "Animation AGAM!", "Arial", 24, [255, 255, 255, 0]
+            EXECUTION AJOUTER_SPRITE texte
+            
+            // Animation d'opacité (apparition)
+            MUNITION anim_opacite = EXECUTION CREER_ANIM_OPACITE texte, 1.0, 2.0, INTERPOLATION_EASE_IN
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_opacite
+            
+            // 4. Créer une image qui tourne
+            MUNITION image = EXECUTION CREER_SPRITE_IMAGE 600, 400, 100, 100, "ressources/logo.png"
+            EXECUTION AJOUTER_SPRITE image
+            
+            // Animation de rotation continue
+            MUNITION anim_rotation = EXECUTION CREER_ANIM_ROTATION image, 360, 4.0, INTERPOLATION_LINEAIRE
+            anim_rotation.repetition = 0  // Répétition infinie
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_rotation
+            
+            // 5. Animation suivant une trajectoire
+            MUNITION etoile = EXECUTION CREER_SPRITE_RECTANGLE 100, 500, 20, 20, [255, 255, 0, 255]
+            EXECUTION AJOUTER_SPRITE etoile
+            
+            // Définir les points de la trajectoire
+            MUNITION points_trajectoire FORMATION[5]
+            points_trajectoire[0].x = 100
+            points_trajectoire[0].y = 500
+            points_trajectoire[0].proportion_temps = 0.0
+            
+            points_trajectoire[1].x = 200
+            points_trajectoire[1].y = 400
+            points_trajectoire[1].proportion_temps = 0.25
+            
+            points_trajectoire[2].x = 400
+            points_trajectoire[2].y = 450
+            points_trajectoire[2].proportion_temps = 0.5
+            
+            points_trajectoire[3].x = 600
+            points_trajectoire[3].y = 350
+            points_trajectoire[3].proportion_temps = 0.75
+            
+            points_trajectoire[4].x = 700
+            points_trajectoire[4].y = 500
+            points_trajectoire[4].proportion_temps = 1.0
+            
+            MUNITION anim_trajectoire = EXECUTION CREER_ANIM_TRAJECTOIRE etoile, 
+                                                               points_trajectoire, 
+                                                               5, 
+                                                               8.0, 
+                                                               INTERPOLATION_EASE_IN_OUT
+            anim_trajectoire.repetition = 0  // Répétition infinie
+            EXECUTION CONTROLEUR_AJOUTER_ANIMATION controleur_animation, anim_trajectoire
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION AJOUTER_SPRITE
+        PARAMETRE sprite POINTEUR
+        
+        ORDRE DE BATAILLE
+            SI CIBLE nb_sprites < 20
+                sprites[nb_sprites] = sprite
+                nb_sprites = nb_sprites + 1
+                RETRAITE VRAI
+            FIN SI
+            
+            RETRAITE FAUX
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION DESSINER_SPRITES
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A nb_sprites - 1
+                EXECUTION SPRITE_DESSINER sprites[i], contexte_rendu
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION LIBERER_RESSOURCES
+        ORDRE DE BATAILLE
+            // Libérer les ressources des sprites
+            MANOEUVRE POUR i DE 0 A nb_sprites - 1
+                // Libération spécifique selon le type de sprite
+                SI CIBLE sprites[i].type == TYPE_SPRITE_IMAGE
+                    // Libérer l'image
+                FIN SI
+                
+                // Libérer le sprite
+                APPEL_SYSTEME("liberer_memoire", sprites[i])
+            FIN MANOEUVRE
+            
+            // Réinitialiser le compteur
+            nb_sprites = 0
+            
+            // Libérer le contexte de rendu
+            APPEL_SYSTEME("liberer_contexte_graphique", contexte_rendu)
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // FONCTIONS DE RENDU (ABSTRAITES)
+    //----------------------------------------------
+    
+    MISSION EFFACER_ECRAN
+        PARAMETRE contexte POINTEUR
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            // Appel au système sous-jacent pour effacer l'écran
+            APPEL_SYSTEME("effacer_ecran", contexte, couleur)
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION RAFRAICHIR_ECRAN
+        PARAMETRE contexte POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Appel au système sous-jacent pour mettre à jour l'affichage
+            APPEL_SYSTEME("rafraichir_ecran", contexte)
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    // Autres fonctions de rendu abstraites...
+    // (DESSINER_RECTANGLE, DESSINER_CERCLE, etc.)
+
+FIN BASE

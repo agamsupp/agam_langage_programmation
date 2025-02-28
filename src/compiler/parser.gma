@@ -1,0 +1,123 @@
+// Analyseur Syntaxique - Parseur pour le langage AGAM
+// Version : 2025
+// Description : Analyse les tokens AGAM pour construire un arbre syntaxique basé sur une grammaire
+
+BASE Analyseur-Syntaxique
+
+    STRATEGIE Grammaire
+        FORMATION règles = [
+            STRATEGIE
+                DEPLOIEMENT "type" "MISSION"
+                DEPLOIEMENT "modèle" FORMATION ["MISSION", "IDENTIFIANT", "BLOC"]
+            FIN STRATEGIE,
+            STRATEGIE
+                DEPLOIEMENT "type" "ORDRE"
+                DEPLOIEMENT "modèle" FORMATION ["ORDRE", "DE", "BATAILLE", "BLOC"]
+            FIN STRATEGIE,
+            STRATEGIE
+                DEPLOIEMENT "type" "SI_CIBLE"
+                DEPLOIEMENT "modèle" FORMATION ["SI", "CIBLE", "CONDITION", "BLOC"]
+            FIN STRATEGIE,
+            STRATEGIE
+                DEPLOIEMENT "type" "MANOEUVRE"
+                DEPLOIEMENT "modèle" FORMATION ["MANOEUVRE", "IDENTIFIANT", "BLOC"]
+            FIN STRATEGIE
+        ]
+
+    MISSION AnaliseSyntaxique tokens
+        ORDRE DE BATAILLE
+            STRATEGIE arbre
+                DEPLOIEMENT "type" "PROGRAMME"
+                DEPLOIEMENT "nœuds" FORMATION []
+            FIN STRATEGIE
+            
+            MUNITION position = 0
+            
+            MANOEUVRE ANALYSE
+                TANT_QUE position < RECONNAISSANCE tokens
+                    MUNITION token = tokens[position]
+                    
+                    SI CIBLE EstDébutBloc token
+                        MUNITION sous_arbre = EXECUTION AnalyserBloc tokens position
+                        DEPLOIEMENT arbre.nœuds sous_arbre
+                        position = sous_arbre.fin  # Mise à jour de la position après le bloc
+                    SINON
+                        RAPPORT FUSION "Token inattendu à la position " position ": " token.type
+                        RETRAITE "ECHEC"
+                    FIN CIBLE
+                    
+                    position = ASSAUT position 1
+                FIN TANT_QUE
+            FIN MANOEUVRE
+            
+            RETRAITE arbre
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION AnalyserBloc tokens début
+        ORDRE DE BATAILLE
+            MUNITION token = tokens[début]
+            STRATEGIE bloc
+                DEPLOIEMENT "type" token.type
+                DEPLOIEMENT "contenu" FORMATION []
+                DEPLOIEMENT "fin" début  # Position finale, à mettre à jour
+            FIN STRATEGIE
+            
+            MUNITION position = ASSAUT début 1
+            
+            # Vérification de la grammaire
+            POUR règle DANS Grammaire.règles
+                SI CIBLE règle.type == token.type
+                    MUNITION modèle = règle.modèle
+                    MUNITION longueur_modèle = RECONNAISSANCE modèle
+                    
+                    # Vérification des tokens suivants selon le modèle
+                    SI CIBLE position + longueur_modèle - 1 < RECONNAISSANCE tokens
+                        MANOEUVRE VÉRIFICATION
+                            POUR i DE 1 A REPLI longueur_modèle 1
+                                MUNITION attendu = modèle[i]
+                                MUNITION actuel = tokens[ASSAUT début i].type
+                                SI CIBLE attendu != actuel ET attendu != "IDENTIFIANT" ET attendu != "BLOC"
+                                    RAPPORT FUSION "Erreur syntaxique : attendu " attendu ", trouvé " actuel
+                                    RETRAITE "ECHEC"
+                                FIN CIBLE
+                            FIN POUR
+                        FIN MANOEUVRE
+                        
+                        # Ajout de l’identifiant si applicable
+                        SI CIBLE modèle[1] == "IDENTIFIANT"
+                            DEPLOIEMENT bloc "nom" tokens[ASSAUT début 1].valeur
+                            position = ASSAUT position 1
+                        FIN CIBLE
+                        
+                        # Analyse du bloc interne
+                        SI CIBLE position < RECONNAISSANCE tokens ET EstDébutBloc tokens[position]
+                            MUNITION sous_bloc = EXECUTION AnalyserBloc tokens position
+                            DEPLOIEMENT bloc.contenu sous_bloc
+                            position = sous_bloc.fin
+                        FIN CIBLE
+                    SINON
+                        RAPPORT "Erreur : fin de fichier inattendue"
+                        RETRAITE "ECHEC"
+                    FIN CIBLE
+                    
+                    bloc.fin = position
+                    RETRAITE bloc
+                FIN CIBLE
+            FIN POUR
+            
+            RAPPORT FUSION "Type de bloc inconnu : " token.type
+            RETRAITE "ECHEC"
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION EstDébutBloc token
+        POUR règle DANS Grammaire.règles
+            SI CIBLE règle.type == token.type
+                RETRAITE "VRAI"
+            FIN CIBLE
+        FIN POUR
+        RETRAITE "FAUX"
+    FIN MISSION
+
+FIN BASE

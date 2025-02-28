@@ -1,0 +1,94 @@
+BASE ANALYSEUR_STATIQUE_AVANCE
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION regles = [
+        {
+            type: "SECURITE",
+            verifications: [
+                "BUFFER_OVERFLOW",
+                "INJECTION_CODE",
+                "RACE_CONDITION"
+            ],
+            severite: "CRITIQUE"
+        },
+        {
+            type: "PERFORMANCE",
+            verifications: [
+                "COMPLEXITE_CYCLOMATIQUE",
+                "ALLOCATION_MEMOIRE",
+                "BOUCLES_IMBRIQUEES"
+            ],
+            severite: "AVERTISSEMENT"
+        },
+        {
+            type: "QUALITE",
+            verifications: [
+                "DUPLICATION_CODE",
+                "COUPLAGE",
+                "COHERENCE"
+            ],
+            severite: "INFORMATION"
+        }
+    ]
+
+    STRATEGIE parametres = {
+        profondeur_analyse: 5,
+        seuils_personnalises: VRAI,
+        analyses_paralleles: VRAI
+    }
+}
+
+MISSION AnalyserCodeStatique {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultats = {
+            violations: [],
+            metriques: [],
+            recommandations: []
+        }
+        
+        # Phase 1: Analyse de sécurité
+        POUR verification DANS regles.SECURITE.verifications {
+            EXECUTION AnalyserSecurite verification code_source resultats
+        }
+        
+        # Phase 2: Analyse de performance
+        POUR verification DANS regles.PERFORMANCE.verifications {
+            EXECUTION AnalyserPerformance verification code_source resultats
+        }
+        
+        # Phase 3: Analyse de qualité
+        POUR verification DANS regles.QUALITE.verifications {
+            EXECUTION AnalyserQualite verification code_source resultats
+        }
+        
+        # Génération des recommandations
+        EXECUTION GenererRecommandations resultats
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION AnalyserFluxDonnees {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Construction du graphe de flux
+        STRATEGIE graphe = {
+            noeuds: [],
+            arcs: [],
+            chemins: []
+        }
+        
+        # Analyse des chemins
+        POUR chemin DANS graphe.chemins {
+            EXECUTION AnalyserCheminDonnees chemin
+        }
+        
+        # Détection des anomalies
+        EXECUTION DetecterAnomaliesFlux graphe
+    }
+}
+
+FIN BASE

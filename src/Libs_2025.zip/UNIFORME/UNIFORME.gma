@@ -1,0 +1,18 @@
+// Bibliothèque UNIFORME - Style et présentation
+// Inclusion : INCLURE "UNIFORME"
+
+MISSION TENUE element attribut valeur
+    [applique 'attribut' = 'valeur' à 'element']
+FIN MISSION
+
+MISSION DISPOSITION element type
+    [définit la disposition de 'element' comme 'type']
+FIN MISSION
+
+MISSION CAMOUFLAGE element
+    TENUE element "visible" "non"
+FIN MISSION
+
+MISSION VISIBILITE element
+    TENUE element "visible" "oui"
+FIN MISSION

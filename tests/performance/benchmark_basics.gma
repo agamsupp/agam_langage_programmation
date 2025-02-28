@@ -1,0 +1,1271 @@
+BASE TESTS_PERFORMANCE_BASE
+
+STRATEGIE ConfigurationBenchmark {
+    iterations_default: 1000,
+    iterations_detaillees: 10000,
+    iterations_courtes: 100,
+    repetitions: 5,
+    warmup_iterations: 100,
+    seuil_regression: 10,  # Pourcentage d'augmentation considéré comme une régression
+    formats_sortie: ["CONSOLE", "JSON", "CSV", "HTML"],
+    format_defaut: "CONSOLE",
+    niveaux_detail: ["MINIMAL", "STANDARD", "DETAILLE"],
+    niveau_defaut: "STANDARD",
+    exclure_outliers: VRAI,
+    collecte_memoire: VRAI,
+    collecter_perf_systeme: VRAI,
+    afficher_graphiques: VRAI,
+    enregistrer_historique: VRAI
+}
+
+STRATEGIE BenchmarkSuites {
+    # Suites de tests de performance prédéfinies
+    operations_base: {
+        description: "Tests de performance des opérations de base",
+        tests: [
+            {
+                nom: "addition_entiers",
+                description: "Addition d'entiers",
+                fonction: AdditionnerEntiers,
+                parametres: [1000000, 2000000],
+                iterations: 10000,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "concatenation_chaines",
+                description: "Concaténation de chaînes",
+                fonction: ConcatenerChaines,
+                parametres: ["AGAM", " est ", "un langage ", "de programmation"],
+                iterations: 10000,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "boucle_iteration",
+                description: "Itération de boucle simple",
+                fonction: BoucleIterationSimple,
+                parametres: [1000],
+                iterations: 1000,
+                mesures: ["temps"]
+            }
+        ]
+    },
+    operations_collections: {
+        description: "Tests de performance des opérations sur collections",
+        tests: [
+            {
+                nom: "creation_liste",
+                description: "Création d'une liste",
+                fonction: CreerListeTest,
+                parametres: [10000],
+                iterations: 100,
+                mesures: ["temps", "memoire"]
+            },
+            {
+                nom: "acces_liste",
+                description: "Accès aux éléments d'une liste",
+                fonction: AccesListeTest,
+                parametres: [10000, 1000],
+                iterations: 100,
+                mesures: ["temps"]
+            },
+            {
+                nom: "tri_liste",
+                description: "Tri d'une liste",
+                fonction: TriListeTest,
+                parametres: [1000],
+                iterations: 100,
+                mesures: ["temps", "memoire"]
+            }
+        ]
+    },
+    operations_fichiers: {
+        description: "Tests de performance des opérations sur fichiers",
+        tests: [
+            {
+                nom: "lecture_fichier",
+                description: "Lecture d'un fichier",
+                fonction: LectureFichierTest,
+                parametres: ["test_data.txt", 100],
+                iterations: 50,
+                mesures: ["temps"]
+            },
+            {
+                nom: "ecriture_fichier",
+                description: "Écriture dans un fichier",
+                fonction: EcritureFichierTest,
+                parametres: ["test_output.txt", 1000],
+                iterations: 50,
+                mesures: ["temps"]
+            }
+        ]
+    }
+}
+
+MISSION InitialiserBenchmark {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du système de benchmark"
+        
+        # Configurer le benchmark avec les options par défaut
+        STRATEGIE config = ConfigurationBenchmark
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet benchmark
+        STRATEGIE benchmark = {
+            configuration: config,
+            suites: BenchmarkSuites,
+            resultats: {},
+            historique: {},
+            compteur_executions: 0
+        }
+        
+        # Initialiser l'environnement de test
+        EXECUTION InitialiserEnvironnementTest benchmark
+        
+        RAPPORT "Système de benchmark initialisé"
+        
+        RETRAITE benchmark
+    }
+}
+
+MISSION InitialiserEnvironnementTest {
+    PARAMETRE benchmark
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'environnement de test"
+        
+        # Vérifier l'existence des répertoires de données
+        SI CIBLE !RepertoireExiste "./test_data" {
+            EXECUTION CreerRepertoire "./test_data"
+        }
+        
+        SI CIBLE !RepertoireExiste "./test_results" {
+            EXECUTION CreerRepertoire "./test_results"
+        }
+        
+        # Générer des données de test si nécessaire
+        SI CIBLE !FichierExiste "./test_data/test_data.txt" {
+            EXECUTION GenererFichierTest "./test_data/test_data.txt" 1000
+        }
+        
+        # Charger l'historique des résultats si disponible
+        SI CIBLE FichierExiste "./test_results/benchmark_history.json" {
+            STRATEGIE historique = EXECUTION LireFichierJSON "./test_results/benchmark_history.json"
+            
+            SI CIBLE historique != NULE {
+                benchmark.historique = historique
+            }
+        }
+        
+        RAPPORT "Environnement de test initialisé"
+        
+        RETRAITE benchmark
+    }
+}
+
+MISSION ExecuterBenchmarkSuite {
+    PARAMETRE benchmark
+    PARAMETRE nom_suite
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si la suite existe
+        SI CIBLE !benchmark.suites[nom_suite] {
+            RAPPORT "ERREUR: Suite de benchmark non trouvée: " + nom_suite
+            RETRAITE {
+                succes: FAUX,
+                erreur: "Suite non trouvée: " + nom_suite
+            }
+        }
+        
+        STRATEGIE suite = benchmark.suites[nom_suite]
+        RAPPORT "Exécution de la suite de benchmark: " + nom_suite + " - " + suite.description
+        
+        # Options par défaut
+        STRATEGIE options_test = {
+            format: benchmark.configuration.format_defaut,
+            niveau_detail: benchmark.configuration.niveau_defaut,
+            exclure_outliers: benchmark.configuration.exclure_outliers,
+            enregistrer_resultats: VRAI,
+            fichier_sortie: "./test_results/benchmark_" + nom_suite + "_" + ObtenirDateHeure() + "." + 
+                           benchmark.configuration.format_defaut.toLowerCase()
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_test[cle] = options[cle]
+            }
+        }
+        
+        # Résultats de la suite
+        STRATEGIE resultats_suite = {
+            nom: nom_suite,
+            description: suite.description,
+            timestamp: ObtenirDateHeure(),
+            tests: [],
+            stats: {
+                temps_total: 0,
+                tests_executes: 0,
+                tests_reussis: 0,
+                tests_echoues: 0,
+                regressions: 0
+            }
+        }
+        
+        # Exécuter chaque test de la suite
+        POUR test DANS suite.tests {
+            RAPPORT "Exécution du test: " + test.nom + " - " + test.description
+            
+            # Phase d'échauffement (warmup)
+            SI CIBLE benchmark.configuration.warmup_iterations > 0 {
+                RAPPORT "Phase d'échauffement avec " + benchmark.configuration.warmup_iterations + " itérations"
+                EXECUTION Executer
+
+     # Phase d'échauffement (warmup)
+            SI CIBLE benchmark.configuration.warmup_iterations > 0 {
+                RAPPORT "Phase d'échauffement avec " + benchmark.configuration.warmup_iterations + " itérations"
+                EXECUTION ExecuterFonctionTest test.fonction test.parametres benchmark.configuration.warmup_iterations
+            }
+            
+            # Exécuter le test avec le nombre d'itérations spécifié
+            MUNITION iterations = test.iterations OU benchmark.configuration.iterations_default
+            
+            # Exécution du test avec répétitions pour obtenir des statistiques plus précises
+            FORMATION resultats_repetitions = []
+            
+            POUR i DEPUIS 1 JUSQU'A benchmark.configuration.repetitions {
+                RAPPORT "Répétition " + i + "/" + benchmark.configuration.repetitions
+                
+                # Mesurer le temps d'exécution
+                STRATEGIE debut = ObtenirTempsActuel()
+                
+                # Mesurer la mémoire si configuré
+                STRATEGIE memoire_avant = NULE
+                SI CIBLE test.mesures CONTIENT "memoire" ET benchmark.configuration.collecte_memoire {
+                    memoire_avant = ObtenirUsageMemoire()
+                }
+                
+                # Exécuter la fonction de test
+                STRATEGIE resultat_execution = EXECUTION ExecuterFonctionTest test.fonction test.parametres iterations
+                
+                # Mesurer le temps écoulé
+                STRATEGIE fin = ObtenirTempsActuel()
+                STRATEGIE temps_execution = fin - debut
+                
+                # Mesurer la mémoire après si configuré
+                STRATEGIE memoire_apres = NULE
+                SI CIBLE test.mesures CONTIENT "memoire" ET benchmark.configuration.collecte_memoire {
+                    memoire_apres = ObtenirUsageMemoire()
+                }
+                
+                # Collecter les résultats
+                STRATEGIE resultat_repetition = {
+                    iteration: i,
+                    temps_execution: temps_execution,
+                    temps_moyen_iteration: temps_execution / iterations,
+                    resultat: resultat_execution
+                }
+                
+                SI CIBLE memoire_avant != NULE ET memoire_apres != NULE {
+                    resultat_repetition.usage_memoire = memoire_apres - memoire_avant
+                }
+                
+                resultats_repetitions = DEPLOIEMENT resultats_repetitions resultat_repetition
+            }
+            
+            # Calculer les statistiques
+            STRATEGIE stats = EXECUTION CalculerStatistiques resultats_repetitions options_test.exclure_outliers
+            
+            # Vérifier s'il y a une régression par rapport à l'historique
+            STRATEGIE regression = FAUX
+            SI CIBLE benchmark.configuration.enregistrer_historique ET 
+               benchmark.historique[nom_suite] ET 
+               benchmark.historique[nom_suite][test.nom] {
+                
+                STRATEGIE historique_test = benchmark.historique[nom_suite][test.nom]
+                STRATEGIE pourcentage_changement = ((stats.temps_moyen - historique_test.temps_moyen) / historique_test.temps_moyen) * 100
+                
+                SI CIBLE pourcentage_changement > benchmark.configuration.seuil_regression {
+                    regression = VRAI
+                    stats.pourcentage_regression = pourcentage_changement
+                    stats.historique_reference = historique_test
+                    resultats_suite.stats.regressions = resultats_suite.stats.regressions + 1
+                }
+            }
+            
+            # Créer l'objet résultat du test
+            STRATEGIE resultat_test = {
+                nom: test.nom,
+                description: test.description,
+                iterations: iterations,
+                repetitions: benchmark.configuration.repetitions,
+                temps_total: stats.temps_total,
+                temps_moyen: stats.temps_moyen,
+                temps_median: stats.temps_median,
+                ecart_type: stats.ecart_type,
+                min: stats.min,
+                max: stats.max,
+                resultats_detailles: options_test.niveau_detail == "DETAILLE" ? resultats_repetitions : NULE,
+                regression: regression
+            }
+            
+            SI CIBLE stats.usage_memoire {
+                resultat_test.usage_memoire_moyen = stats.usage_memoire.moyen
+                resultat_test.usage_memoire_max = stats.usage_memoire.max
+            }
+            
+            # Ajouter aux résultats de la suite
+            resultats_suite.tests = DEPLOIEMENT resultats_suite.tests resultat_test
+            
+            # Mettre à jour les statistiques de la suite
+            resultats_suite.stats.tests_executes = resultats_suite.stats.tests_executes + 1
+            resultats_suite.stats.temps_total = resultats_suite.stats.temps_total + stats.temps_total
+            
+            SI CIBLE regression {
+                RAPPORT "AVERTISSEMENT: Régression de performance détectée dans le test " + test.nom + 
+                       " (" + stats.pourcentage_regression + "% plus lent que la référence historique)"
+            } SINON {
+                resultats_suite.stats.tests_reussis = resultats_suite.stats.tests_reussis + 1
+            }
+            
+            RAPPORT "Test " + test.nom + " terminé en " + stats.temps_total + "ms (moyenne par itération: " + stats.temps_moyen + "ms)"
+        }
+        
+        # Enregistrer les résultats de la suite
+        benchmark.resultats[nom_suite] = resultats_suite
+        
+        # Mettre à jour l'historique si configuré
+        SI CIBLE benchmark.configuration.enregistrer_historique {
+            SI CIBLE !benchmark.historique[nom_suite] {
+                benchmark.historique[nom_suite] = {}
+            }
+            
+            POUR test DANS resultats_suite.tests {
+                benchmark.historique[nom_suite][test.nom] = {
+                    temps_moyen: test.temps_moyen,
+                    temps_median: test.temps_median,
+                    ecart_type: test.ecart_type,
+                    date: resultats_suite.timestamp
+                }
+                
+                SI CIBLE test.usage_memoire_moyen {
+                    benchmark.historique[nom_suite][test.nom].usage_memoire_moyen = test.usage_memoire_moyen
+                }
+            }
+            
+            # Sauvegarder l'historique
+            EXECUTION EcrireFichierJSON "./test_results/benchmark_history.json" benchmark.historique
+        }
+        
+        # Générer le rapport de benchmark
+        SI CIBLE options_test.enregistrer_resultats {
+            STRATEGIE rapport = EXECUTION GenererRapportBenchmark resultats_suite options_test.format
+            
+            SI CIBLE rapport != NULE {
+                EXECUTION EcrireFichier options_test.fichier_sortie rapport
+                RAPPORT "Rapport de benchmark généré: " + options_test.fichier_sortie
+            }
+        }
+        
+        # Incrémenter le compteur d'exécutions
+        benchmark.compteur_executions = benchmark.compteur_executions + 1
+        
+        RAPPORT "Suite de benchmark " + nom_suite + " terminée: " + 
+               resultats_suite.stats.tests_reussis + "/" + resultats_suite.stats.tests_executes + 
+               " tests réussis, " + resultats_suite.stats.regressions + " régressions détectées"
+        
+        RETRAITE {
+            succes: VRAI,
+            suite: nom_suite,
+            resultats: resultats_suite,
+            fichier_rapport: options_test.enregistrer_resultats ? options_test.fichier_sortie : NULE
+        }
+    }
+}
+
+MISSION ExecuterFonctionTest {
+    PARAMETRE fonction
+    PARAMETRE parametres
+    PARAMETRE iterations
+    
+    ORDRE DE BATAILLE {
+        # Exécuter la fonction spécifiée avec les paramètres donnés
+        # pour le nombre d'itérations demandé
+        
+        STRATEGIE resultat = NULE
+        
+        POUR i DEPUIS 1 JUSQU'A iterations {
+            resultat = EXECUTION fonction parametres
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION CalculerStatistiques {
+    PARAMETRE resultats
+    PARAMETRE exclure_outliers
+    
+    ORDRE DE BATAILLE {
+        # Calculer les statistiques à partir des résultats des répétitions
+        
+        # Extraire les temps d'exécution
+        FORMATION temps = []
+        FORMATION usages_memoire = []
+        
+        POUR resultat DANS resultats {
+            temps = DEPLOIEMENT temps resultat.temps_execution
+            
+            SI CIBLE resultat.usage_memoire {
+                usages_memoire = DEPLOIEMENT usages_memoire resultat.usage_memoire
+            }
+        }
+        
+        # Exclure les outliers si configuré
+        SI CIBLE exclure_outliers ET RECONNAISSANCE temps > 3 {
+            temps = EXECUTION ExclureOutliers temps
+            
+            SI CIBLE RECONNAISSANCE usages_memoire > 3 {
+                usages_memoire = EXECUTION ExclureOutliers usages_memoire
+            }
+        }
+        
+        # Calculer les statistiques de temps
+        STRATEGIE stats = {
+            temps_total: Somme(temps),
+            temps_moyen: Moyenne(temps),
+            temps_median: Mediane(temps),
+            ecart_type: EcartType(temps),
+            min: Min(temps),
+            max: Max(temps)
+        }
+        
+        # Calculer les statistiques de mémoire si disponibles
+        SI CIBLE RECONNAISSANCE usages_memoire > 0 {
+            stats.usage_memoire = {
+                moyen: Moyenne(usages_memoire),
+                median: Mediane(usages_memoire),
+                max: Max(usages_memoire)
+            }
+        }
+        
+        RETRAITE stats
+    }
+}
+
+MISSION ExclureOutliers {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        # Exclure les outliers en utilisant la méthode de l'écart interquartile (IQR)
+        
+        # Trier les valeurs
+        FORMATION valeurs_triees = EXECUTION TrierNombres valeurs
+        
+        # Calculer les quartiles
+        MUNITION taille = RECONNAISSANCE valeurs_triees
+        MUNITION q1_index = ARRONDIR(taille / 4)
+        MUNITION q3_index = ARRONDIR(3 * taille / 4)
+        
+        MUNITION q1 = valeurs_triees[q1_index]
+        MUNITION q3 = valeurs_triees[q3_index]
+        
+        # Calculer l'IQR et les limites
+        MUNITION iqr = q3 - q1
+        MUNITION limite_basse = q1 - 1.5 * iqr
+        MUNITION limite_haute = q3 + 1.5 * iqr
+        
+        # Filtrer les valeurs
+        FORMATION resultats = []
+        
+        POUR valeur DANS valeurs_triees {
+            SI CIBLE valeur >= limite_basse ET valeur <= limite_haute {
+                resultats = DEPLOIEMENT resultats valeur
+            }
+        }
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION TrierNombres {
+    PARAMETRE nombres
+    
+    ORDRE DE BATAILLE {
+        # Trier une liste de nombres
+        
+        # Pour cette version simplifiée, on suppose que les nombres sont déjà triés
+        RETRAITE nombres
+    }
+}
+
+MISSION Somme {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        MUNITION somme = 0
+        
+        POUR valeur DANS valeurs {
+            somme = somme + valeur
+        }
+        
+        RETRAITE somme
+    }
+}
+
+MISSION Moyenne {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE valeurs == 0 {
+            RETRAITE 0
+        }
+        
+        RETRAITE Somme(valeurs) / RECONNAISSANCE valeurs
+    }
+}
+
+MISSION Mediane {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE valeurs == 0 {
+            RETRAITE 0
+        }
+        
+        # Trier les valeurs
+        FORMATION valeurs_triees = EXECUTION TrierNombres valeurs
+        
+        # Calculer la médiane
+        MUNITION taille = RECONNAISSANCE valeurs_triees
+        
+        SI CIBLE taille % 2 == 0 {
+            # Nombre pair d'éléments
+            MUNITION milieu_bas = taille / 2 - 1
+            MUNITION milieu_haut = taille / 2
+            RETRAITE (valeurs_triees[milieu_bas] + valeurs_triees[milieu_haut]) / 2
+        } SINON {
+            # Nombre impair d'éléments
+            MUNITION milieu = ARRONDIR(taille / 2)
+            RETRAITE valeurs_triees[milieu]
+        }
+    }
+}
+
+MISSION EcartType {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE valeurs < 2 {
+            RETRAITE 0
+        }
+        
+        MUNITION moy = Moyenne(valeurs)
+        MUNITION somme_carres = 0
+        
+        POUR valeur DANS valeurs {
+            somme_carres = somme_carres + ((valeur - moy) * (valeur - moy))
+        }
+        
+        MUNITION variance = somme_carres / (RECONNAISSANCE valeurs - 1)
+        
+        RETRAITE RACINE_CARREE(variance)
+    }
+}
+
+MISSION Min {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE valeurs == 0 {
+            RETRAITE 0
+        }
+        
+        MUNITION min = valeurs[0]
+        
+        POUR valeur DANS valeurs {
+            SI CIBLE valeur < min {
+                min = valeur
+            }
+        }
+        
+        RETRAITE min
+    }
+}
+
+MISSION Max {
+    PARAMETRE valeurs
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE valeurs == 0 {
+            RETRAITE 0
+        }
+        
+        MUNITION max = valeurs[0]
+        
+        POUR valeur DANS valeurs {
+            SI CIBLE valeur > max {
+                max = valeur
+            }
+        }
+        
+        RETRAITE max
+    }
+}
+
+MISSION GenererRapportBenchmark {
+    PARAMETRE resultats
+    PARAMETRE format
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = NULE
+        
+        SI CIBLE format == "CONSOLE" {
+            rapport = EXECUTION GenererRapportConsole resultats
+        } SINON SI CIBLE format == "JSON" {
+            rapport = EXECUTION GenererRapportJSON resultats
+        } SINON SI CIBLE format == "CSV" {
+            rapport = EXECUTION GenererRapportCSV resultats
+        } SINON SI CIBLE format == "HTML" {
+            rapport = EXECUTION GenererRapportHTML resultats
+        } SINON {
+            RAPPORT "ERREUR: Format de rapport non supporté: " + format
+            RETRAITE NULE
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION GenererRapportConsole {
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = "=================================================\n"
+        rapport = rapport + "RÉSULTATS DE BENCHMARK: " + resultats.nom + "\n"
+        rapport = rapport + "=================================================\n"
+        rapport = rapport + "Description: " + resultats.description + "\n"
+        rapport = rapport + "Timestamp: " + resultats.timestamp + "\n"
+        rapport = rapport + "=================================================\n\n"
+        
+        rapport = rapport + "RÉSUMÉ:\n"
+        rapport = rapport + "Nombre de tests: " + resultats.stats.tests_executes + "\n"
+        rapport = rapport + "Tests réussis: " + resultats.stats.tests_reussis + "\n"
+        rapport = rapport + "Régressions: " + resultats.stats.regressions + "\n"
+        rapport = rapport + "Temps total d'exécution: " + resultats.stats.temps_total + "ms\n\n"
+        
+        rapport = rapport + "DÉTAILS DES TESTS:\n"
+        
+        POUR test DANS resultats.tests {
+            rapport = rapport + "-------------------------------------------------\n"
+            rapport = rapport + "Test: " + test.nom + "\n"
+            rapport = rapport + "Description: " + test.description + "\n"
+            rapport = rapport + "Nombre d'itérations: " + test.iterations + "\n"
+            rapport = rapport + "Répétitions: " + test.repetitions + "\n"
+            rapport = rapport + "Temps total: " + test.temps_total + "ms\n"
+            rapport = rapport + "Temps moyen par itération: " + test.temps_moyen + "ms\n"
+            rapport = rapport + "Temps médian: " + test.temps_median + "ms\n"
+            rapport = rapport + "Écart type: " + test.ecart_type + "ms\n"
+            rapport = rapport + "Min: " + test.min + "ms\n"
+            rapport = rapport + "Max: " + test.max + "ms\n"
+            
+            SI CIBLE test.usage_memoire_moyen {
+                rapport = rapport + "Usage mémoire moyen: " + test.usage_memoire_moyen + " octets\n"
+                rapport = rapport + "Usage mémoire max: " + test.usage_memoire_max + " octets\n"
+            }
+            
+            SI CIBLE test.regression {
+                rapport = rapport + "RÉGRESSION DÉTECTÉE: " + test.pourcentage_regression + 
+                         "% plus lent que la référence (" + test.historique_reference.temps_moyen + "ms)\n"
+            }
+            
+            rapport = rapport + "-------------------------------------------------\n\n"
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION GenererRapportJSON {
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        # Convertir les résultats en format JSON
+        # Dans une implémentation réelle, ceci utiliserait une bibliothèque JSON
+        
+        # Pour cette version simplifiée, retourner une chaîne JSON basique
+        STRATEGIE rapport = "{\n"
+        rapport = rapport + '  "suite": "' + resultats.nom + '",\n'
+        rapport = rapport + '  "description": "' + resultats.description + '",\n'
+        rapport = rapport + '  "timestamp": "' + resultats.timestamp + '",\n'
+        rapport = rapport + '  "stats": {\n'
+        rapport = rapport + '    "testsExecutes": ' + resultats.stats.tests_executes + ',\n'
+        rapport = rapport + '    "testsReussis": ' + resultats.stats.tests_reussis + ',\n'
+        rapport = rapport + '    "regressions": ' + resultats.stats.regressions + ',\n'
+        rapport = rapport + '    "tempsTotal": ' + resultats.stats.temps_total + '\n'
+        rapport = rapport + '  },\n'
+        rapport = rapport + '  "tests": [\n'
+        
+        POUR i DEPUIS 0 JUSQU'A RECONNAISSANCE resultats.tests - 1 {
+            STRATEGIE test = resultats.tests[i]
+            rapport = rapport + '    {\n'
+            rapport = rapport + '      "nom": "' + test.nom + '",\n'
+            rapport = rapport + '      "description": "' + test.description + '",\n'
+            rapport = rapport + '      "iterations": ' + test.iterations + ',\n'
+            rapport = rapport + '      "repetitions": ' + test.repetitions + ',\n'
+            rapport = rapport + '      "tempsTotal": ' + test.temps_total + ',\n'
+            rapport = rapport + '      "tempsMoyen": ' + test.temps_moyen + ',\n'
+            rapport = rapport + '      "tempsMedian": ' + test.temps_median + ',\n'
+            rapport = rapport + '      "ecartType": ' + test.ecart_type + ',\n'
+            rapport = rapport + '      "min": ' + test.min + ',\n'
+            rapport = rapport + '      "max": ' + test.max
+            
+            SI CIBLE test.usage_memoire_moyen {
+                rapport = rapport + ',\n'
+                rapport = rapport + '      "usageMemoireMoyen": ' + test.usage_memoire_moyen + ',\n'
+                rapport = rapport + '      "usageMemoireMax": ' + test.usage_memoire_max
+            }
+            
+            SI CIBLE test.regression {
+                rapport = rapport + ',\n'
+                rapport = rapport + '      "regression": true,\n'
+                rapport = rapport + '      "pourcentageRegression": ' + test.pourcentage_regression
+            } SINON {
+                rapport = rapport + ',\n'
+                rapport = rapport + '      "regression": false'
+            }
+            
+            rapport = rapport + '\n    }'
+            
+            SI CIBLE i < RECONNAISSANCE resultats.tests - 1 {
+                rapport = rapport + ','
+            }
+            
+            rapport = rapport + '\n'
+        }
+        
+        rapport = rapport + '  ]\n}'
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION GenererRapportCSV {
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        # En-tête du CSV
+        STRATEGIE rapport = "Suite,Test,Description,Iterations,Repetitions,TempsTotal,TempsMoyen," + 
+                          "TempsMedian,EcartType,Min,Max,UsageMemoireMoyen,UsageMemoireMax,Regression\n"
+        
+        # Données
+        POUR test DANS resultats.tests {
+            rapport = rapport + resultats.nom + "," + 
+                     test.nom + "," + 
+                     '"' + test.description + '",' + 
+                     test.iterations + "," + 
+                     test.repetitions + "," + 
+                     test.temps_total + "," + 
+                     test.temps_moyen + "," + 
+                     test.temps_median + "," + 
+                     test.ecart_type + "," + 
+                     test.min + "," + 
+                     test.max + "," + 
+                     (test.usage_memoire_moyen OU "") + "," + 
+                     (test.usage_memoire_max OU "") + "," + 
+                     (test.regression ? "OUI" : "NON") + "\n"
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION GenererRapportHTML {
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = "<!DOCTYPE html>\n<html>\n<head>\n"
+        rapport = rapport + "  <title>Rapport de Benchmark: " + resultats.nom + "</title>\n"
+        rapport = rapport + "  <style>\n"
+        rapport = rapport + "    body { font-family: Arial, sans-serif; margin: 20px; }\n"
+        rapport = rapport + "    h1, h2 { color: #333; }\n"
+        rapport = rapport + "    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }\n"
+        rapport = rapport + "    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n"
+        rapport = rapport + "    th { background-color: #f2f2f2; }\n"
+        rapport = rapport + "    tr:nth-child(even) { background-color: #f9f9f9; }\n"
+        rapport = rapport + "    .regression { color: red; font-weight: bold; }\n"
+        rapport = rapport + "    .summary { background-color: #eef; padding: 10px; border-radius: 5px; }\n"
+        rapport = rapport + "  </style>\n"
+        rapport = rapport + "</head>\n<body>\n"
+        
+        rapport = rapport + "  <h1>Rapport de Benchmark: " + resultats.nom + "</h1>\n"
+        rapport = rapport + "  <p><strong>Description:</strong> " + resultats.description + "</p>\n"
+        rapport = rapport + "  <p><strong>Date:</strong> " + resultats.timestamp + "</p>\n"
+        
+        rapport = rapport + "  <div class='summary'>\n"
+        rapport = rapport + "    <h2>Résumé</h2>\n"
+        rapport = rapport + "    <p>Nombre de tests: " + resultats.stats.tests_executes + "</p>\n"
+        rapport = rapport + "    <p>Tests réussis: " + resultats.stats.tests_reussis + "</p>\n"
+        rapport = rapport + "    <p>Régressions: " + resultats.stats.regressions + "</p>\n"
+        rapport = rapport + "    <p>Temps total d'exécution: " + resultats.stats.temps_total + "ms</p>\n"
+        rapport = rapport + "  </div>\n"
+        
+        rapport = rapport + "  <h2>Détails des Tests</h2>\n"
+        rapport = rapport + "  <table>\n"
+        rapport = rapport + "    <tr>\n"
+        rapport = rapport + "      <th>Test</th>\n"
+        rapport = rapport + "      <th>Description</th>\n"
+        rapport = rapport + "      <th>Iterations</th>\n"
+        rapport = rapport + "      <th>Temps Total</th>\n"
+        rapport = rapport + "      <th>Temps Moyen</th>\n"
+        rapport = rapport + "      <th>Temps Médian</th>\n"
+        rapport = rapport + "      <th>Écart Type</th>\n"
+        rapport = rapport + "      <th>Min</th>\n"
+        rapport = rapport + "      <th>Max</th>\n"
+        rapport = rapport + "      <th>Régression</th>\n"
+        rapport = rapport + "    </tr>\n"
+        
+        POUR test DANS resultats.tests {
+            rapport = rapport + "    <tr>\n"
+            rapport = rapport + "      <td>" + test.nom + "</td>\n"
+            rapport = rapport + "      <td>" + test.description + "</td>\n"
+            rapport = rapport + "      <td>" + test.iterations + "</td>\n"
+            rapport = rapport + "      <td>" + test.temps_total + "ms</td>\n"
+            rapport = rapport + "      <td>" + test.temps_moyen + "ms</td>\n"
+            rapport = rapport + "      <td>" + test.temps_median + "ms</td>\n"
+            rapport = rapport + "      <td>" + test.ecart_type + "ms</td>\n"
+            rapport = rapport + "      <td>" + test.min + "ms</td>\n"
+            rapport = rapport + "      <td>" + test.max + "ms</td>\n"
+            
+            SI CIBLE test.regression {
+                rapport = rapport + "      <td class='regression'>OUI (+           
+
+     SI CIBLE test.regression {
+                rapport = rapport + "      <td class='regression'>OUI (+" + test.pourcentage_regression + "%)</td>\n"
+            } SINON {
+                rapport = rapport + "      <td>NON</td>\n"
+            }
+            
+            rapport = rapport + "    </tr>\n"
+        }
+        
+        rapport = rapport + "  </table>\n"
+        
+        # Ajouter une section pour les détails de mémoire si disponibles
+        MUNITION memoire_disponible = FAUX
+        
+        POUR test DANS resultats.tests {
+            SI CIBLE test.usage_memoire_moyen {
+                memoire_disponible = VRAI
+                RUPTURE
+            }
+        }
+        
+        SI CIBLE memoire_disponible {
+            rapport = rapport + "  <h2>Détails d'Usage Mémoire</h2>\n"
+            rapport = rapport + "  <table>\n"
+            rapport = rapport + "    <tr>\n"
+            rapport = rapport + "      <th>Test</th>\n"
+            rapport = rapport + "      <th>Usage Mémoire Moyen</th>\n"
+            rapport = rapport + "      <th>Usage Mémoire Maximum</th>\n"
+            rapport = rapport + "    </tr>\n"
+            
+            POUR test DANS resultats.tests {
+                SI CIBLE test.usage_memoire_moyen {
+                    rapport = rapport + "    <tr>\n"
+                    rapport = rapport + "      <td>" + test.nom + "</td>\n"
+                    rapport = rapport + "      <td>" + test.usage_memoire_moyen + " octets</td>\n"
+                    rapport = rapport + "      <td>" + test.usage_memoire_max + " octets</td>\n"
+                    rapport = rapport + "    </tr>\n"
+                }
+            }
+            
+            rapport = rapport + "  </table>\n"
+        }
+        
+        rapport = rapport + "  <p><em>Rapport généré automatiquement par le système de benchmark AGAM.</em></p>\n"
+        rapport = rapport + "</body>\n</html>"
+        
+        RETRAITE rapport
+    }
+}
+
+#
+# Implémentations des fonctions de test
+#
+MISSION AdditionnerEntiers {
+    PARAMETRE a
+    PARAMETRE b
+    
+    ORDRE DE BATAILLE {
+        # Test simple d'addition d'entiers
+        RETRAITE a + b
+    }
+}
+
+MISSION ConcatenerChaines {
+    PARAMETRE chaine1
+    PARAMETRE chaine2           
+
+    MISSION ConcatenerChaines {
+    PARAMETRE chaine1
+    PARAMETRE chaine2
+    PARAMETRE chaine3
+    PARAMETRE chaine4
+    
+    ORDRE DE BATAILLE {
+        # Test de concaténation de chaînes
+        RETRAITE chaine1 + chaine2 + chaine3 + chaine4
+    }
+}
+
+MISSION BoucleIterationSimple {
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Test d'itération de boucle simple
+        MUNITION somme = 0
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 1 {
+            somme = somme + i
+        }
+        
+        RETRAITE somme
+    }
+}
+
+MISSION CreerListeTest {
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Test de création de liste
+        FORMATION liste = []
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 1 {
+            liste = DEPLOIEMENT liste i
+        }
+        
+        RETRAITE liste
+    }
+}
+
+MISSION AccesListeTest {
+    PARAMETRE taille
+    PARAMETRE iterations_acces
+    
+    ORDRE DE BATAILLE {
+        # Test d'accès aux éléments d'une liste
+        
+        # Créer la liste de test
+        FORMATION liste = EXECUTION CreerListeTest taille
+        
+        # Accéder de manière aléatoire
+        MUNITION somme = 0
+        
+        POUR i DEPUIS 0 JUSQU'A iterations_acces - 1 {
+            MUNITION index = i % taille
+            somme = somme + liste[index]
+        }
+        
+        RETRAITE somme
+    }
+}
+
+MISSION TriListeTest {
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Test de tri de liste
+        
+        # Créer une liste mélangée
+        FORMATION liste = []
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 1 {
+            MUNITION valeur = taille - i
+            liste = DEPLOIEMENT liste valeur
+        }
+        
+        # Trier la liste
+        FORMATION liste_triee = EXECUTION TrierListeSimple liste
+        
+        RETRAITE liste_triee
+    }
+}
+
+MISSION TrierListeSimple {
+    PARAMETRE liste
+    
+    ORDRE DE BATAILLE {
+        # Implémentation simple du tri à bulles
+        FORMATION resultat = liste  # Copie de la liste
+        MUNITION taille = RECONNAISSANCE resultat
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 2 {
+            POUR j DEPUIS 0 JUSQU'A taille - i - 2 {
+                SI CIBLE resultat[j] > resultat[j + 1] {
+                    MUNITION temp = resultat[j]
+                    resultat[j] = resultat[j + 1]
+                    resultat[j + 1] = temp
+                }
+            }
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION LectureFichierTest {
+    PARAMETRE chemin_fichier
+    PARAMETRE taille_lecture
+    
+    ORDRE DE BATAILLE {
+        # Test de lecture de fichier
+        
+        # Lire le fichier
+        STRATEGIE contenu = EXECUTION LireFichier chemin_fichier
+        
+        # Simuler traitement du contenu
+        MUNITION somme_caracteres = 0
+        MUNITION taille = MIN(RECONNAISSANCE contenu, taille_lecture)
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 1 {
+            somme_caracteres = somme_caracteres + 1  # Simplification
+        }
+        
+        RETRAITE somme_caracteres
+    }
+}
+
+MISSION EcritureFichierTest {
+    PARAMETRE chemin_fichier
+    PARAMETRE taille_ecriture
+    
+    ORDRE DE BATAILLE {
+        # Test d'écriture dans un fichier
+        
+        # Générer le contenu à écrire
+        STRATEGIE contenu = ""
+        
+        POUR i DEPUIS 0 JUSQU'A taille_ecriture - 1 {
+            contenu = contenu + "A"  # Simplification
+        }
+        
+        # Écrire dans le fichier
+        EXECUTION EcrireFichier chemin_fichier contenu
+        
+        RETRAITE taille_ecriture
+    }
+}
+
+#
+# Fonctions utilitaires
+#
+MISSION ObtenirTempsActuel {
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci renverrait le temps système actuel en millisecondes
+        
+        # Pour cette version simplifiée, retourner une valeur fictive
+        RETRAITE 1708776543210  # Valeur fictive
+    }
+}
+
+MISSION ObtenirUsageMemoire {
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci renverrait l'utilisation mémoire actuelle
+        
+        # Pour cette version simplifiée, retourner une valeur fictive
+        RETRAITE 1048576  # 1 MB en octets
+    }
+}
+
+MISSION ARRONDIR {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Arrondir un nombre à l'entier le plus proche
+        
+        # Pour cette version simplifiée, tronquer la partie décimale
+        RETRAITE valeur  # Valeur entière
+    }
+}
+
+MISSION RACINE_CARREE {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Calculer la racine carrée d'un nombre
+        
+        # Pour cette version simplifiée, approximer grossièrement
+        RETRAITE valeur / 2  # Approximation très grossière
+    }
+}
+
+MISSION MIN {
+    PARAMETRE a
+    PARAMETRE b
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE a < b {
+            RETRAITE a
+        } SINON {
+            RETRAITE b
+        }
+    }
+}
+
+MISSION CreerRepertoire {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci créerait un répertoire
+        
+        RAPPORT "Répertoire créé: " + chemin
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION RepertoireExiste {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci vérifierait l'existence d'un répertoire
+        
+        # Pour cette version simplifiée, supposer que les répertoires n'existent pas
+        RETRAITE FAUX
+    }
+}
+
+MISSION FichierExiste {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci vérifierait l'existence d'un fichier
+        
+        # Pour cette version simplifiée, supposer que les fichiers n'existent pas
+        RETRAITE FAUX
+    }
+}
+
+MISSION GenererFichierTest {
+    PARAMETRE chemin
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Générer un fichier de test avec un contenu aléatoire
+        
+        STRATEGIE contenu = ""
+        
+        POUR i DEPUIS 0 JUSQU'A taille - 1 {
+            contenu = contenu + "A"  # Simplification
+        }
+        
+        EXECUTION EcrireFichier chemin contenu
+        
+        RAPPORT "Fichier de test généré: " + chemin + " (" + taille + " octets)"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION LireFichier {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci lirait le contenu d'un fichier
+        
+        # Pour cette version simplifiée, retourner un contenu fictif
+        RETRAITE "Contenu fictif pour les tests de benchmark"
+    }
+}
+
+MISSION EcrireFichier {
+    PARAMETRE chemin
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci écrirait dans un fichier
+        
+        RAPPORT "Écriture dans le fichier: " + chemin + " (" + RECONNAISSANCE contenu + " octets)"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION LireFichierJSON {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci lirait et parserait un fichier JSON
+        
+        # Pour cette version simplifiée, retourner un objet fictif
+        RETRAITE {
+            "operations_base": {
+                "addition_entiers": {
+                    "temps_moyen": 0.5,
+                    "temps_median": 0.4,
+                    "ecart_type": 0.1,
+                    "date": "20250224-000000"
+                }
+            }
+        }
+    }
+}
+
+MISSION EcrireFichierJSON {
+    PARAMETRE chemin
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci sérialiserait et écrirait un objet en JSON
+        
+        RAPPORT "Écriture de JSON dans le fichier: " + chemin
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ObtenirDateHeure {
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci renverrait la date et l'heure actuelles formatées
+        
+        # Pour cette version simplifiée, retourner une chaîne fictive
+        RETRAITE "20250224-120000"
+    }
+}
+
+MISSION CLES {
+    PARAMETRE objet
+    
+    ORDRE DE BATAILLE {
+        # Dans une implémentation réelle, ceci renverrait les clés d'un objet
+        
+        # Pour cette version simplifiée, retourner des clés fictives
+        RETRAITE ["cle1", "cle2", "cle3"]
+    }
+}
+
+MISSION CONTIENT {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR item DANS liste {
+            SI CIBLE item == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

@@ -1,0 +1,86 @@
+BASE GESTIONNAIRE_EXTENSIONS
+
+STRATEGIE ConfigurationExtensions {
+    FORMATION points_extension = [
+        {
+            type: "COMPILATION",
+            phases: ["AVANT", "PENDANT", "APRES"],
+            priorite: 1
+        },
+        {
+            type: "ANALYSE",
+            phases: ["SYNTAXE", "SEMANTIQUE", "OPTIMISATION"],
+            priorite: 2
+        },
+        {
+            type: "GENERATION",
+            phases: ["CODE", "DOCUMENTATION", "TESTS"],
+            priorite: 3
+        }
+    ]
+
+    STRATEGIE securite = {
+        validation_signature: VRAI,
+        isolation: VRAI,
+        permissions: ["LECTURE", "ECRITURE", "EXECUTION"]
+    }
+}
+
+MISSION ChargerExtension {
+    PARAMETRE extension
+    
+    ORDRE DE BATAILLE {
+        # Vérification de sécurité
+        SI CIBLE ConfigurationExtensions.securite.validation_signature {
+            SI CIBLE NON VerifierSignature extension {
+                RETRAITE ERREUR_SIGNATURE
+            }
+        }
+        
+        # Analyse des dépendances
+        POUR dependance DANS extension.dependances {
+            SI CIBLE NON ChargerDependance dependance {
+                RETRAITE ERREUR_DEPENDANCE
+            }
+        }
+        
+        # Chargement dans l'environnement isolé
+        SI CIBLE ConfigurationExtensions.securite.isolation {
+            EXECUTION ChargerDansIsolation extension
+        } SINON {
+            EXECUTION ChargerDirectement extension
+        }
+        
+        # Initialisation
+        EXECUTION InitialiserExtension extension
+    }
+}
+
+MISSION ExecuterExtension {
+    PARAMETRE extension
+    PARAMETRE point_extension
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Vérification des permissions
+        SI CIBLE NON VerifierPermissions extension point_extension {
+            RETRAITE ERREUR_PERMISSION
+        }
+        
+        # Exécution de l'extension
+        MANOEUVRE EXECUTION {
+            # Préparation du contexte
+            STRATEGIE env = PREPARER_ENVIRONNEMENT extension
+            
+            # Exécution
+            MUNITION resultat = EXECUTION extension.point_entree contexte
+            
+            # Nettoyage
+            EXECUTION NettoyerEnvironnement env
+            
+            RETRAITE resultat
+        }
+    }
+}
+
+FIN BASE

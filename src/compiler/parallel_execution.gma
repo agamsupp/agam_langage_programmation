@@ -1,0 +1,84 @@
+BASE EXECUTION_PARALLELE
+
+STRATEGIE GestionnaireParallele {
+    FORMATION threads = []
+    FORMATION taches = []
+    MUNITION nb_coeurs = 4
+}
+
+MISSION InitialiserParallele {
+    ORDRE DE BATAILLE {
+        # Initialisation des threads
+        POUR i DANS SEQUENCE 0 À GestionnaireParallele.nb_coeurs {
+            STRATEGIE nouveau_thread = {
+                id: i,
+                statut: "PRET",
+                tache_courante: VIDE
+            }
+            GestionnaireParallele.threads = DEPLOIEMENT GestionnaireParallele.threads nouveau_thread
+        }
+        
+        # Configuration du pool de tâches
+        STRATEGIE pool_taches = {
+            taches_attente: [],
+            taches_execution: [],
+            taches_terminees: []
+        }
+    }
+}
+
+MISSION DistribuerTaches {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        # Analyse des dépendances
+        FORMATION sections_paralleles = EXECUTION IdentifierSectionsParalleles code_source
+        
+        # Distribution des tâches
+        POUR section DANS sections_paralleles {
+            STRATEGIE nouvelle_tache = {
+                code: section,
+                dependances: EXECUTION AnalyserDependances section,
+                priorite: EXECUTION CalculerPriorite section
+            }
+            
+            EXECUTION AjouterTache nouvelle_tache
+        }
+    }
+}
+
+MISSION ExecuterThreads {
+    ORDRE DE BATAILLE {
+        MANOEUVRE EXECUTION_PARALLELE {
+            POUR thread DANS GestionnaireParallele.threads {
+                SI CIBLE thread.statut VERIFICATION "PRET" {
+                    MUNITION tache = EXECUTION ObtenirProchaineTache
+                    SI CIBLE tache NON VIDE {
+                        thread.tache_courante = tache
+                        thread.statut = "EXECUTION"
+                        EXECUTION LancerThread thread
+                    }
+                }
+            }
+        }
+    }
+}
+
+MISSION SynchroniserThreads {
+    ORDRE DE BATAILLE {
+        STRATEGIE barriere = {
+            compteur: 0,
+            seuil: GestionnaireParallele.nb_coeurs
+        }
+        
+        TANT_QUE barriere.compteur < barriere.seuil {
+            POUR thread DANS GestionnaireParallele.threads {
+                SI CIBLE thread.statut VERIFICATION "TERMINE" {
+                    barriere.compteur = barriere.compteur ASSAUT 1
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

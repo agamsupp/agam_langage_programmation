@@ -1,0 +1,508 @@
+BASE STDLIB_COLLECTIONS
+
+# Bibliothèque standard d'AGAM - Module Collections
+# Implémentation des structures de données essentielles et opérations associées
+
+STRATEGIE ConfigurationCollections {
+    capacite_defaut: 16,
+    facteur_croissance: 1.5,
+    max_recursion: 100,
+    activer_optimisations: VRAI
+}
+
+#
+# Implémentation de Liste Dynamique
+#
+MISSION CreerListe {
+    ORDRE DE BATAILLE {
+        STRATEGIE liste = {
+            elements: [],
+            taille: 0,
+            capacite: ConfigurationCollections.capacite_defaut
+        }
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ListeAjouter {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si nous devons augmenter la capacité
+        SI CIBLE liste.taille >= liste.capacite {
+            EXECUTION ListeAugmenterCapacite liste
+        }
+        
+        # Ajouter l'élément
+        liste.elements = DEPLOIEMENT liste.elements element
+        liste.taille = liste.taille + 1
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ListeAugmenterCapacite {
+    PARAMETRE liste
+    
+    ORDRE DE BATAILLE {
+        # Augmenter la capacité selon le facteur de croissance
+        MUNITION nouvelle_capacite = liste.capacite * ConfigurationCollections.facteur_croissance
+        liste.capacite = nouvelle_capacite
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ListeObtenir {
+    PARAMETRE liste
+    PARAMETRE index
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les limites
+        SI CIBLE index < 0 OU index >= liste.taille {
+            RETRAITE NULE
+        }
+        
+        RETRAITE liste.elements[index]
+    }
+}
+
+MISSION ListeDefinir {
+    PARAMETRE liste
+    PARAMETRE index
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les limites
+        SI CIBLE index < 0 OU index >= liste.taille {
+            RETRAITE FAUX
+        }
+        
+        liste.elements[index] = valeur
+        RETRAITE VRAI
+    }
+}
+
+MISSION ListeSupprimer {
+    PARAMETRE liste
+    PARAMETRE index
+    
+    ORDRE DE BATAILLE {
+        # Vérifier les limites
+        SI CIBLE index < 0 OU index >= liste.taille {
+            RETRAITE FAUX
+        }
+        
+        # Supprimer en décalant les éléments
+        POUR i DEPUIS index JUSQU'A liste.taille - 2 {
+            liste.elements[i] = liste.elements[i + 1]
+        }
+        
+        # Supprimer le dernier élément qui est maintenant dupliqué
+        liste.elements = EXTRACTION liste.elements 0 (liste.taille - 1)
+        liste.taille = liste.taille - 1
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ListeTaille {
+    PARAMETRE liste
+    
+    ORDRE DE BATAILLE {
+        RETRAITE liste.taille
+    }
+}
+
+MISSION ListeVide {
+    PARAMETRE liste
+    
+    ORDRE DE BATAILLE {
+        RETRAITE liste.taille == 0
+    }
+}
+
+MISSION ListeContient {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A liste.taille - 1 {
+            SI CIBLE liste.elements[i] == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION ListeTrier {
+    PARAMETRE liste
+    PARAMETRE comparateur
+    
+    ORDRE DE BATAILLE {
+        # Si aucun comparateur n'est fourni, utiliser une comparaison par défaut
+        SI CIBLE comparateur == NULE {
+            EXECUTION ListeTriQuick liste 0 (liste.taille - 1) ComparateurDefaut
+        } SINON {
+            EXECUTION ListeTriQuick liste 0 (liste.taille - 1) comparateur
+        }
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ListeTriQuick {
+    PARAMETRE liste
+    PARAMETRE debut
+    PARAMETRE fin
+    PARAMETRE comparateur
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE debut < fin {
+            MUNITION pivot = EXECUTION ListePartitionner liste debut fin comparateur
+            EXECUTION ListeTriQuick liste debut (pivot - 1) comparateur
+            EXECUTION ListeTriQuick liste (pivot + 1) fin comparateur
+        }
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ListePartitionner {
+    PARAMETRE liste
+    PARAMETRE debut
+    PARAMETRE fin
+    PARAMETRE comparateur
+    
+    ORDRE DE BATAILLE {
+        MUNITION pivot = liste.elements[fin]
+        MUNITION i = debut - 1
+        
+        POUR j DEPUIS debut JUSQU'A fin - 1 {
+            SI CIBLE comparateur(liste.elements[j], pivot) <= 0 {
+                i = i + 1
+                EXECUTION ListeEchanger liste i j
+            }
+        }
+        
+        EXECUTION ListeEchanger liste (i + 1) fin
+        RETRAITE i + 1
+    }
+}
+
+MISSION ListeEchanger {
+    PARAMETRE liste
+    PARAMETRE i
+    PARAMETRE j
+    
+    ORDRE DE BATAILLE {
+        MUNITION temp = liste.elements[i]
+        liste.elements[i] = liste.elements[j]
+        liste.elements[j] = temp
+        
+        RETRAITE liste
+    }
+}
+
+MISSION ComparateurDefaut {
+    PARAMETRE a
+    PARAMETRE b
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE a < b {
+            RETRAITE -1
+        } SINON SI CIBLE a > b {
+            RETRAITE 1
+        } SINON {
+            RETRAITE 0
+        }
+    }
+}
+
+#
+# Implémentation de Dictionnaire (Map)
+#
+MISSION CreerDictionnaire {
+    ORDRE DE BATAILLE {
+        STRATEGIE dictionnaire = {
+            entrees: [],
+            taille: 0
+        }
+        
+        RETRAITE dictionnaire
+    }
+}
+
+MISSION DictionnaireAjouter {
+    PARAMETRE dictionnaire
+    PARAMETRE cle
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si la clé existe déjà
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            SI CIBLE dictionnaire.entrees[i].cle == cle {
+                # Mettre à jour la valeur
+                dictionnaire.entrees[i].valeur = valeur
+                RETRAITE dictionnaire
+            }
+        }
+        
+        # Ajouter nouvelle entrée
+        dictionnaire.entrees = DEPLOIEMENT dictionnaire.entrees {
+            cle: cle,
+            valeur: valeur
+        }
+        dictionnaire.taille = dictionnaire.taille + 1
+        
+        RETRAITE dictionnaire
+    }
+}
+
+MISSION DictionnaireObtenir {
+    PARAMETRE dictionnaire
+    PARAMETRE cle
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            SI CIBLE dictionnaire.entrees[i].cle == cle {
+                RETRAITE dictionnaire.entrees[i].valeur
+            }
+        }
+        
+        RETRAITE NULE
+    }
+}
+
+MISSION DictionnaireSupprimer {
+    PARAMETRE dictionnaire
+    PARAMETRE cle
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            SI CIBLE dictionnaire.entrees[i].cle == cle {
+                # Supprimer en décalant les entrées
+                POUR j DEPUIS i JUSQU'A dictionnaire.taille - 2 {
+                    dictionnaire.entrees[j] = dictionnaire.entrees[j + 1]
+                }
+                
+                # Supprimer la dernière entrée qui est maintenant dupliquée
+                dictionnaire.entrees = EXTRACTION dictionnaire.entrees 0 (dictionnaire.taille - 1)
+                dictionnaire.taille = dictionnaire.taille - 1
+                
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION DictionnaireContientCle {
+    PARAMETRE dictionnaire
+    PARAMETRE cle
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            SI CIBLE dictionnaire.entrees[i].cle == cle {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION DictionnaireObtenirCles {
+    PARAMETRE dictionnaire
+    
+    ORDRE DE BATAILLE {
+        FORMATION cles = []
+        
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            cles = DEPLOIEMENT cles dictionnaire.entrees[i].cle
+        }
+        
+        RETRAITE cles
+    }
+}
+
+MISSION DictionnaireObtenirValeurs {
+    PARAMETRE dictionnaire
+    
+    ORDRE DE BATAILLE {
+        FORMATION valeurs = []
+        
+        POUR i DEPUIS 0 JUSQU'A dictionnaire.taille - 1 {
+            valeurs = DEPLOIEMENT valeurs dictionnaire.entrees[i].valeur
+        }
+        
+        RETRAITE valeurs
+    }
+}
+
+MISSION DictionnaireTaille {
+    PARAMETRE dictionnaire
+    
+    ORDRE DE BATAILLE {
+        RETRAITE dictionnaire.taille
+    }
+}
+
+MISSION DictionnaireVide {
+    PARAMETRE dictionnaire
+    
+    ORDRE DE BATAILLE {
+        RETRAITE dictionnaire.taille == 0
+    }
+}
+
+#
+# Implémentation d'Ensemble (Set)
+#
+MISSION CreerEnsemble {
+    ORDRE DE BATAILLE {
+        STRATEGIE ensemble = {
+            elements: [],
+            taille: 0
+        }
+        
+        RETRAITE ensemble
+    }
+}
+
+MISSION EnsembleAjouter {
+    PARAMETRE ensemble
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si l'élément existe déjà
+        SI CIBLE EXECUTION EnsembleContient ensemble element {
+            RETRAITE FAUX
+        }
+        
+        # Ajouter l'élément
+        ensemble.elements = DEPLOIEMENT ensemble.elements element
+        ensemble.taille = ensemble.taille + 1
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION EnsembleSupprimer {
+    PARAMETRE ensemble
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A ensemble.taille - 1 {
+            SI CIBLE ensemble.elements[i] == element {
+                # Supprimer en décalant les éléments
+                POUR j DEPUIS i JUSQU'A ensemble.taille - 2 {
+                    ensemble.elements[j] = ensemble.elements[j + 1]
+                }
+                
+                # Supprimer le dernier élément qui est maintenant dupliqué
+                ensemble.elements = EXTRACTION ensemble.elements 0 (ensemble.taille - 1)
+                ensemble.taille = ensemble.taille - 1
+                
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION EnsembleContient {
+    PARAMETRE ensemble
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR i DEPUIS 0 JUSQU'A ensemble.taille - 1 {
+            SI CIBLE ensemble.elements[i] == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION EnsembleUnion {
+    PARAMETRE ensemble1
+    PARAMETRE ensemble2
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = EXECUTION CreerEnsemble
+        
+        # Ajouter tous les éléments du premier ensemble
+        POUR i DEPUIS 0 JUSQU'A ensemble1.taille - 1 {
+            EXECUTION EnsembleAjouter resultat ensemble1.elements[i]
+        }
+        
+        # Ajouter tous les éléments du deuxième ensemble
+        POUR i DEPUIS 0 JUSQU'A ensemble2.taille - 1 {
+            EXECUTION EnsembleAjouter resultat ensemble2.elements[i]
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION EnsembleIntersection {
+    PARAMETRE ensemble1
+    PARAMETRE ensemble2
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = EXECUTION CreerEnsemble
+        
+        # Ajouter les éléments communs
+        POUR i DEPUIS 0 JUSQU'A ensemble1.taille - 1 {
+            SI CIBLE EXECUTION EnsembleContient ensemble2 ensemble1.elements[i] {
+                EXECUTION EnsembleAjouter resultat ensemble1.elements[i]
+            }
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION EnsembleDifference {
+    PARAMETRE ensemble1
+    PARAMETRE ensemble2
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = EXECUTION CreerEnsemble
+        
+        # Ajouter les éléments du premier ensemble qui ne sont pas dans le deuxième
+        POUR i DEPUIS 0 JUSQU'A ensemble1.taille - 1 {
+            SI CIBLE !EXECUTION EnsembleContient ensemble2 ensemble1.elements[i] {
+                EXECUTION EnsembleAjouter resultat ensemble1.elements[i]
+            }
+        }
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION EnsembleTaille {
+    PARAMETRE ensemble
+    
+    ORDRE DE BATAILLE {
+        RETRAITE ensemble.taille
+    }
+}
+
+MISSION EnsembleVide {
+    PARAMETRE ensemble
+    
+    ORDRE DE BATAILLE {
+        RETRAITE ensemble.taille == 0
+    }
+}
+
+FIN BASE

@@ -1,0 +1,534 @@
+BASE GESTIONNAIRE_PROCESSUS_TACTIQUE
+    // Module de gestion des processus et du changement de contexte
+    // Fournit les mécanismes pour créer, planifier et exécuter des processus
+
+    //----------------------------------------------
+    // CONSTANTES ET STRUCTURES
+    //----------------------------------------------
+    
+    MUNITION MAX_PROCESSUS = 128
+    MUNITION TAILLE_PILE_KERNEL = 8192    // 8KB
+    MUNITION TAILLE_PILE_USER = 65536     // 64KB
+    
+    MUNITION ETAT_INACTIF = 0
+    MUNITION ETAT_PRET = 1
+    MUNITION ETAT_EXECUTION = 2
+    MUNITION ETAT_BLOQUE = 3
+    MUNITION ETAT_ZOMBIE = 4
+    
+    MUNITION PRIORITE_BASSE = 0
+    MUNITION PRIORITE_NORMALE = 1
+    MUNITION PRIORITE_HAUTE = 2
+    MUNITION PRIORITE_TEMPS_REEL = 3
+    
+    STRATEGIE REGISTRES_CPU
+        MUNITION eax, ebx, ecx, edx ENTIER
+        MUNITION esi, edi, ebp, esp ENTIER
+        MUNITION eip ENTIER
+        MUNITION eflags ENTIER
+        MUNITION cs, ds, es, fs, gs, ss ENTIER
+    FIN STRATEGIE
+    
+    STRATEGIE CONTEXTE_PROCESSUS
+        MUNITION registres REGISTRES_CPU
+        MUNITION cr3 ENTIER             // Registre de pagination
+    FIN STRATEGIE
+    
+    STRATEGIE PROCESSUS
+        MUNITION pid ENTIER             // Identifiant du processus
+        MUNITION parent_pid ENTIER      // PID du processus parent
+        MUNITION priorite ENTIER        // Niveau de priorité
+        MUNITION etat ENTIER            // État actuel
+        MUNITION contexte CONTEXTE_PROCESSUS
+        MUNITION pile_noyau POINTEUR    // Pile en mode noyau
+        MUNITION pile_user POINTEUR     // Pile en mode utilisateur
+        MUNITION taille_pile_noyau ENTIER
+        MUNITION taille_pile_user ENTIER
+        MUNITION dir_pages POINTEUR     // Répertoire de pages (espace mémoire)
+        MUNITION temps_creation ENTIER  // Quand le processus a été créé
+        MUNITION temps_cpu ENTIER       // Temps CPU total utilisé
+        MUNITION quantum ENTIER         // Quantum de temps alloué
+        MUNITION nom FORMATION[32]      // Nom du processus
+        MUNITION est_noyau BOOLEEN      // Processus kernel ou utilisateur
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // VARIABLES GLOBALES
+    //----------------------------------------------
+    
+    MUNITION processus_liste FORMATION[MAX_PROCESSUS]
+    MUNITION processus_actuel ENTIER = -1   // PID du processus actuel
+    MUNITION prochain_pid = 0
+    MUNITION temps_system_ticks = 0        // Compteur d'interruptions d'horloge
+    
+    //----------------------------------------------
+    // INITIALISATION ET CRÉATION DE PROCESSUS
+    //----------------------------------------------
+    
+    MISSION PROCESSUS_INITIALISER
+        ORDRE DE BATAILLE
+            // Initialiser tous les emplacements de processus
+            MANOEUVRE POUR i DE 0 A MAX_PROCESSUS - 1
+                processus_liste[i].etat = ETAT_INACTIF
+                processus_liste[i].pid = -1
+            FIN MANOEUVRE
+            
+            // Initialiser l'ordonnanceur
+            EXECUTION ORDONNANCEUR_INITIALISER
+            
+            // Créer le processus noyau initial (PID 0)
+            MUNITION pid_kernel = EXECUTION PROCESSUS_CREER_NOYAU "kernel_main", PRIORITE_HAUTE
+            
+            SI CIBLE pid_kernel != 0
+                RAPPORT "ERREUR: Échec d'initialisation du processus noyau"
+                RETRAITE FAUX
+            FIN SI
+            
+            processus_actuel = 0
+            processus_liste[0].etat = ETAT_EXECUTION
+            
+            RAPPORT "Gestionnaire de processus initialisé"
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PROCESSUS_CREER_NOYAU
+        PARAMETRE fonction_entree POINTEUR
+        PARAMETRE priorite ENTIER
+        
+        ORDRE DE BATAILLE
+            // Rechercher un slot disponible
+            MUNITION pid = -1
+            
+            MANOEUVRE POUR i DE 0 A MAX_PROCESSUS - 1
+                SI CIBLE processus_liste[i].etat == ETAT_INACTIF
+                    pid = i
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            SI CIBLE pid == -1
+                RAPPORT "ERREUR: Nombre maximum de processus atteint"
+                RETRAITE -1
+            FIN SI
+            
+            // Initialiser le processus
+            MUNITION proc = processus_liste[pid]
+            proc.pid = prochain_pid
+            prochain_pid = prochain_pid + 1
+            proc.parent_pid = processus_actuel
+            proc.priorite = priorite
+            proc.etat = ETAT_PRET
+            proc.est_noyau = VRAI
+            proc.temps_creation = temps_system_ticks
+            proc.temps_cpu = 0
+            proc.quantum = 5 * (PRIORITE_TEMPS_REEL - priorite + 1)  // Quantum basé sur la priorité
+            
+            // Allouer la pile noyau
+            proc.taille_pile_noyau = TAILLE_PILE_KERNEL
+            proc.pile_noyau = EXECUTION MEMOIRE_ALLOUER proc.taille_pile_noyau
+            
+            SI CIBLE proc.pile_noyau == 0
+                RAPPORT "ERREUR: Échec d'allocation de pile noyau"
+                RETRAITE -1
+            FIN SI
+            
+            // Configurer le contexte initial
+            EXECUTION CONTEXTE_INITIALISER proc, fonction_entree
+            
+            // Copier le nom du processus
+            MANOEUVRE POUR i DE 0 A 31
+                SI CIBLE i < RECONNAISSANCE("kernel")
+                    proc.nom[i] = "kernel"[i]
+                SINON
+                    proc.nom[i] = 0
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            RAPPORT "Processus noyau créé: PID " + TEXTE(proc.pid)
+            RETRAITE proc.pid
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PROCESSUS_CREER
+        PARAMETRE fonction_entree POINTEUR
+        PARAMETRE nom TEXTE
+        PARAMETRE priorite ENTIER
+        PARAMETRE est_noyau BOOLEEN
+        
+        ORDRE DE BATAILLE
+            // Similaire à PROCESSUS_CREER_NOYAU mais pour les processus utilisateur
+            // [Code similaire à PROCESSUS_CREER_NOYAU avec quelques différences]
+            
+            // Pour les processus utilisateur, allouer aussi une pile utilisateur
+            SI CIBLE !est_noyau
+                proc.taille_pile_user = TAILLE_PILE_USER
+                proc.pile_user = EXECUTION MEMOIRE_ALLOUER proc.taille_pile_user
+                
+                SI CIBLE proc.pile_user == 0
+                    EXECUTION MEMOIRE_LIBERER proc.pile_noyau
+                    RAPPORT "ERREUR: Échec d'allocation de pile utilisateur"
+                    RETRAITE -1
+                FIN SI
+                
+                // Créer un nouvel espace d'adressage
+                EXECUTION PROCESSUS_CREER_ESPACE_ADRESSAGE proc
+            FIN SI
+            
+            // Reste du code similaire à PROCESSUS_CREER_NOYAU
+            
+            RETRAITE proc.pid
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTEXTE_INITIALISER
+        PARAMETRE proc POINTEUR
+        PARAMETRE fonction_entree POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Initialiser les registres avec des valeurs par défaut
+            proc.contexte.registres.eax = 0
+            proc.contexte.registres.ebx = 0
+            proc.contexte.registres.ecx = 0
+            proc.contexte.registres.edx = 0
+            proc.contexte.registres.esi = 0
+            proc.contexte.registres.edi = 0
+            
+            // Configurer les registres de segment
+            SI CIBLE proc.est_noyau
+                proc.contexte.registres.cs = 0x08  // Sélecteur de segment de code noyau
+                proc.contexte.registres.ds = 0x10  // Sélecteur de segment de données noyau
+                proc.contexte.registres.es = 0x10
+                proc.contexte.registres.fs = 0x10
+                proc.contexte.registres.gs = 0x10
+                proc.contexte.registres.ss = 0x10
+                
+                // Configurer la pile
+                proc.contexte.registres.esp = proc.pile_noyau + proc.taille_pile_noyau - 4
+                proc.contexte.registres.ebp = proc.contexte.registres.esp
+            SINON
+                proc.contexte.registres.cs = 0x1B  // Sélecteur de segment de code utilisateur + RPL 3
+                proc.contexte.registres.ds = 0x23  // Sélecteur de segment de données utilisateur + RPL 3
+                proc.contexte.registres.es = 0x23
+                proc.contexte.registres.fs = 0x23
+                proc.contexte.registres.gs = 0x23
+                proc.contexte.registres.ss = 0x23
+                
+                // Configurer la pile utilisateur
+                proc.contexte.registres.esp = proc.pile_user + proc.taille_pile_user - 4
+                proc.contexte.registres.ebp = proc.contexte.registres.esp
+            FIN SI
+            
+            // Configurer le registre EIP (pointeur d'instruction) avec la fonction d'entrée
+            proc.contexte.registres.eip = (ENTIER)fonction_entree
+            
+            // Configurer EFLAGS (IF=1 pour permettre les interruptions)
+            proc.contexte.registres.eflags = 0x202
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PROCESSUS_CREER_ESPACE_ADRESSAGE
+        PARAMETRE proc POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Créer un nouveau répertoire de pages pour le processus
+            proc.dir_pages = EXECUTION MEMOIRE_ALLOUER 4096  // Taille d'une page
+            
+            SI CIBLE proc.dir_pages == 0
+                RETRAITE FAUX
+            FIN SI
+            
+            // Initialiser le répertoire de pages
+            EXECUTION MEMOIRE_ZERO proc.dir_pages, 4096
+            
+            // Mapper l'espace noyau (identique pour tous les processus)
+            // Cette fonction varierait selon l'architecture et le design de l'OS
+            EXECUTION MEMOIRE_MAPPER_NOYAU proc.dir_pages
+            
+            // Sauvegarder l'adresse physique du répertoire pour CR3
+            proc.contexte.cr3 = EXECUTION MEMOIRE_VIRTUEL_VERS_PHYSIQUE proc.dir_pages
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // CHANGEMENT DE CONTEXTE ET ORDONNANCEMENT
+    //----------------------------------------------
+    
+    MISSION PROCESSUS_CHANGER_CONTEXTE
+        PARAMETRE ancien_pid ENTIER
+        PARAMETRE nouveau_pid ENTIER
+        
+        ORDRE DE BATAILLE
+            // Vérifier les PID
+            SI CIBLE ancien_pid < 0 || ancien_pid >= MAX_PROCESSUS || 
+                nouveau_pid < 0 || nouveau_pid >= MAX_PROCESSUS
+                RETRAITE FAUX
+            FIN SI
+            
+            SI CIBLE processus_liste[nouveau_pid].etat != ETAT_PRET
+                RETRAITE FAUX
+            FIN SI
+            
+            // Sauvegarder le contexte du processus actuel si valide
+            SI CIBLE ancien_pid >= 0 && processus_liste[ancien_pid].etat == ETAT_EXECUTION
+                processus_liste[ancien_pid].etat = ETAT_PRET
+            FIN SI
+            
+            // Mettre à jour le processus actuel
+            processus_actuel = nouveau_pid
+            processus_liste[nouveau_pid].etat = ETAT_EXECUTION
+            
+            // Charger le nouveau contexte (si différent espace d'adressage)
+            SI CIBLE processus_liste[ancien_pid].dir_pages != processus_liste[nouveau_pid].dir_pages
+                // Charger CR3 avec le répertoire de pages du nouveau processus
+                ASM {
+                    mov eax, [processus_liste[nouveau_pid].contexte.cr3]
+                    mov cr3, eax
+                }
+            FIN SI
+            
+            // Effectuer le changement de contexte complet
+            EXECUTION CONTEXTE_CHANGER processus_liste[ancien_pid].contexte, processus_liste[nouveau_pid].contexte
+            
+            // Note: On ne devrait jamais atteindre ce point car CONTEXTE_CHANGER modifie le flux d'exécution
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ORDONNANCEUR_INITIALISER
+        ORDRE DE BATAILLE
+            // Initialiser les structures de l'ordonnanceur
+            // [À implémenter selon la politique d'ordonnancement]
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ORDONNANCEUR_EXECUTION
+        ORDRE DE BATAILLE
+            SI CIBLE processus_actuel < 0
+                // Aucun processus actif, chercher le premier processus prêt
+                MANOEUVRE POUR i DE 0 A MAX_PROCESSUS - 1
+                    SI CIBLE processus_liste[i].etat == ETAT_PRET
+                        EXECUTION PROCESSUS_CHANGER_CONTEXTE -1, i
+                        RETRAITE
+                    FIN SI
+                FIN MANOEUVRE
+                
+                // Aucun processus prêt trouvé
+                RAPPORT "ERREUR: Aucun processus prêt à exécuter"
+                EXECUTION CPU_HALT
+                RETRAITE
+            FIN SI
+            
+            // Vérifier si le processus actuel a épuisé son quantum
+            processus_liste[processus_actuel].quantum = processus_liste[processus_actuel].quantum - 1
+            
+            SI CIBLE processus_liste[processus_actuel].quantum > 0
+                // Le processus actuel continue de s'exécuter
+                RETRAITE
+            FIN SI
+            
+            // Chercher le prochain processus prêt selon la priorité
+            MUNITION suivant_pid = -1
+            MUNITION meilleur_priorite = -1
+            
+            MANOEUVRE POUR prio DE PRIORITE_TEMPS_REEL VERS PRIORITE_BASSE
+                MANOEUVRE POUR i DE 0 A MAX_PROCESSUS - 1
+                    MUNITION p = (processus_actuel + 1 + i) % MAX_PROCESSUS
+                    
+                    SI CIBLE processus_liste[p].etat == ETAT_PRET && 
+                        processus_liste[p].priorite == prio
+                        suivant_pid = p
+                        INTERROMPRE
+                    FIN SI
+                FIN MANOEUVRE
+                
+                SI CIBLE suivant_pid != -1
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            SI CIBLE suivant_pid == -1
+                // Aucun autre processus prêt, réinitialiser le quantum du processus actuel
+                processus_liste[processus_actuel].quantum = 5 * (PRIORITE_TEMPS_REEL - processus_liste[processus_actuel].priorite + 1)
+                RETRAITE
+            FIN SI
+            
+            // Réinitialiser le quantum du processus actuel
+            processus_liste[processus_actuel].quantum = 5 * (PRIORITE_TEMPS_REEL - processus_liste[processus_actuel].priorite + 1)
+            
+            // Changer de contexte
+            EXECUTION PROCESSUS_CHANGER_CONTEXTE processus_actuel, suivant_pid
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTEXTE_CHANGER
+        PARAMETRE ancien POINTEUR
+        PARAMETRE nouveau POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Ce code sera implémenté en assembleur direct
+            // car il manipule directement les registres et la pile
+            
+            ASM {
+                // Sauvegarder le contexte actuel
+                mov [ancien.registres.eax], eax
+                mov [ancien.registres.ebx], ebx
+                mov [ancien.registres.ecx], ecx
+                mov [ancien.registres.edx], edx
+                mov [ancien.registres.esi], esi
+                mov [ancien.registres.edi], edi
+                
+                // Sauvegarder EBP et ESP
+                mov [ancien.registres.ebp], ebp
+                mov [ancien.registres.esp], esp
+                
+                // Sauvegarder EIP (adresse de retour sur la pile)
+                mov eax, [esp]
+                mov [ancien.registres.eip], eax
+                
+                // Sauvegarder EFLAGS
+                pushfd
+                pop eax
+                mov [ancien.registres.eflags], eax
+                
+                // Charger le nouveau contexte
+                mov ebp, [nouveau.registres.ebp]
+                mov esp, [nouveau.registres.esp]
+                
+                // Charger les registres généraux
+                mov eax, [nouveau.registres.eax]
+                mov ebx, [nouveau.registres.ebx]
+                mov ecx, [nouveau.registres.ecx]
+                mov edx, [nouveau.registres.edx]
+                mov esi, [nouveau.registres.esi]
+                mov edi, [nouveau.registres.edi]
+                
+                // Restaurer EFLAGS
+                push [nouveau.registres.eflags]
+                popfd
+                
+                // Sauter vers la nouvelle adresse EIP
+                // Note: cela ne retournera jamais à cette fonction
+                jmp [nouveau.registres.eip]
+            }
+            
+            // On ne devrait jamais atteindre ce point
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // GESTION DES PROCESSUS
+    //----------------------------------------------
+    
+    MISSION PROCESSUS_TERMINER
+        PARAMETRE pid ENTIER
+        
+        ORDRE DE BATAILLE
+            SI CIBLE pid < 0 || pid >= MAX_PROCESSUS
+                RETRAITE FAUX
+            FIN SI
+            
+            // Vérifier que le processus existe
+            SI CIBLE processus_liste[pid].etat == ETAT_INACTIF
+                RETRAITE FAUX
+            FIN SI
+            
+            // Libérer les ressources
+            EXECUTION MEMOIRE_LIBERER processus_liste[pid].pile_noyau
+            
+            SI CIBLE !processus_liste[pid].est_noyau
+                EXECUTION MEMOIRE_LIBERER processus_liste[pid].pile_user
+                EXECUTION MEMOIRE_LIBERER processus_liste[pid].dir_pages
+            FIN SI
+            
+            // Si c'est le processus actuel, forcer un changement de contexte
+            SI CIBLE pid == processus_actuel
+                processus_liste[pid].etat = ETAT_ZOMBIE
+                
+                // Trouver un autre processus à exécuter
+                EXECUTION ORDONNANCEUR_EXECUTION
+            SINON
+                processus_liste[pid].etat = ETAT_ZOMBIE
+            FIN SI
+            
+            // Nettoyer complètement le processus
+            processus_liste[pid].etat = ETAT_INACTIF
+            processus_liste[pid].pid = -1
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PROCESSUS_BLOQUER
+        PARAMETRE pid ENTIER
+        
+        ORDRE DE BATAILLE
+            SI CIBLE pid < 0 || pid >= MAX_PROCESSUS
+                RETRAITE FAUX
+            FIN SI
+            
+            SI CIBLE processus_liste[pid].etat != ETAT_EXECUTION && 
+                processus_liste[pid].etat != ETAT_PRET
+                RETRAITE FAUX
+            FIN SI
+            
+            processus_liste[pid].etat = ETAT_BLOQUE
+            
+            // Si c'est le processus actuel, forcer un changement de contexte
+            SI CIBLE pid == processus_actuel
+                EXECUTION ORDONNANCEUR_EXECUTION
+            FIN SI
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PROCESSUS_DEBLOQUER
+        PARAMETRE pid ENTIER
+        
+        ORDRE DE BATAILLE
+            SI CIBLE pid < 0 || pid >= MAX_PROCESSUS
+                RETRAITE FAUX
+            FIN SI
+            
+            SI CIBLE processus_liste[pid].etat != ETAT_BLOQUE
+                RETRAITE FAUX
+            FIN SI
+            
+            processus_liste[pid].etat = ETAT_PRET
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION INTERRUPTION_HORLOGE
+        ORDRE DE BATAILLE
+            // Incrémenter le compteur système
+            temps_system_ticks = temps_system_ticks + 1
+            
+            // Incrémenter le temps CPU du processus actuel
+            SI CIBLE processus_actuel >= 0
+                processus_liste[processus_actuel].temps_cpu = processus_liste[processus_actuel].temps_cpu + 1
+            FIN SI
+            
+            // Exécuter l'ordonnanceur
+            EXECUTION ORDONNANCEUR_EXECUTION
+            
+            // Acquitter l'interruption
+            EXECUTION PORT_ECRIRE_OCTET 0x20, 0x20
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

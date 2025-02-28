@@ -1,0 +1,99 @@
+BASE BENCHMARK_AVANCE
+
+STRATEGIE ConfigurationBenchmark {
+    FORMATION scenarios = [
+        {
+            type: "PERFORMANCE",
+            metriques: [
+                "TEMPS_EXECUTION",
+                "UTILISATION_MEMOIRE",
+                "OPERATIONS_SECONDE"
+            ],
+            iterations: 1000
+        },
+        {
+            type: "CHARGE",
+            metriques: [
+                "LATENCE",
+                "DEBIT",
+                "ERREURS"
+            ],
+            duree: 3600  # secondes
+        },
+        {
+            type: "RESSOURCES",
+            metriques: [
+                "CPU",
+                "MEMOIRE",
+                "IO"
+            ],
+            intervalle: 100  # ms
+        }
+    ]
+
+    STRATEGIE analyse = {
+        mode: "STATISTIQUE",
+        outliers: "FILTRER",
+        comparaison: "HISTORIQUE"
+    }
+}
+
+MISSION ExecuterBenchmark {
+    PARAMETRE scenario
+    
+    ORDRE DE BATAILLE {
+        # Préparation de l'environnement
+        EXECUTION PreparerEnvironnement
+        
+        STRATEGIE resultats = {
+            metriques: [],
+            statistiques: {},
+            graphiques: []
+        }
+        
+        # Exécution des tests
+        POUR iteration DANS SEQUENCE 1 À scenario.iterations {
+            # Collecte des métriques
+            POUR metrique DANS scenario.metriques {
+                MUNITION valeur = MESURER_METRIQUE metrique
+                resultats.metriques = DEPLOIEMENT resultats.metriques {
+                    iteration: iteration,
+                    metrique: metrique,
+                    valeur: valeur
+                }
+            }
+            
+            # Analyse en temps réel
+            SI CIBLE DetecterAnomalie resultats {
+                EXECUTION SignalerAnomalie
+            }
+        }
+        
+        # Analyse statistique
+        EXECUTION AnalyserResultats resultats
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION GenererRapportBenchmark {
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            sommaire: GENERER_SOMMAIRE resultats,
+            details: GENERER_DETAILS resultats,
+            graphiques: GENERER_GRAPHIQUES resultats,
+            recommandations: GENERER_RECOMMANDATIONS resultats
+        }
+        
+        # Comparaison historique
+        SI CIBLE ConfigurationBenchmark.analyse.comparaison VERIFICATION "HISTORIQUE" {
+            rapport.comparaison = COMPARER_HISTORIQUE resultats
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

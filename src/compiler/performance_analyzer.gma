@@ -1,0 +1,104 @@
+BASE ANALYSEUR_PERFORMANCES
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION metriques = [
+        {
+            type: "TEMPS_EXECUTION",
+            echantillonnage: 100,  # ms
+            seuil_alerte: 1000     # ms
+        },
+        {
+            type: "UTILISATION_RESSOURCES",
+            echantillonnage: 500,
+            metriques: ["CPU", "MEMOIRE", "IO"]
+        },
+        {
+            type: "POINTS_CHAUDS",
+            profondeur_analyse: 5,
+            seuil_impact: 0.1      # 10% du temps total
+        }
+    ]
+
+    STRATEGIE analyse = {
+        mode: "CONTINU",
+        agregation: "MOYENNE_MOBILE",
+        periode_rapport: 5000      # 5s
+    }
+}
+
+MISSION DemarrerAnalyse {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Initialisation des collecteurs
+        POUR metrique DANS ConfigurationAnalyse.metriques {
+            EXECUTION InitialiserCollecteur metrique
+        }
+        
+        # Démarrage de la collecte
+        MANOEUVRE COLLECTE {
+            TANT_QUE ANALYSE_ACTIVE {
+                POUR metrique DANS ConfigurationAnalyse.metriques {
+                    EXECUTION CollecterMetrique metrique contexte
+                    
+                    SI CIBLE DetecterAnomalie metrique {
+                        EXECUTION AlerterAnomalie metrique
+                    }
+                }
+                
+                SI CIBLE TEMPS_ECOULE > ConfigurationAnalyse.analyse.periode_rapport {
+                    EXECUTION GenererRapportPerformance
+                }
+                
+                ATTENDRE ConfigurationAnalyse.analyse.echantillonnage
+            }
+        }
+    }
+}
+
+MISSION AnalyserPointsChauds {
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        FORMATION points_chauds = []
+        
+        # Analyse des segments de code
+        POUR segment DANS donnees.segments {
+            MUNITION impact = CalculerImpactPerformance segment
+            
+            SI CIBLE impact > ConfigurationAnalyse.metriques[2].seuil_impact {
+                points_chauds = DEPLOIEMENT points_chauds {
+                    segment: segment,
+                    impact: impact,
+                    suggestions: GenererSuggestionsOptimisation segment
+                }
+            }
+        }
+        
+        RETRAITE points_chauds
+    }
+}
+
+MISSION GenererRapportPerformance {
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            timestamp: TEMPS_ACTUEL,
+            metriques: [],
+            anomalies: [],
+            recommandations: []
+        }
+        
+        # Agrégation des métriques
+        POUR metrique DANS ConfigurationAnalyse.metriques {
+            rapport.metriques = DEPLOIEMENT rapport.metriques 
+                AgregerMetriques metrique
+        }
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiquesPerformance rapport
+        
+        RETRAITE rapport
+    }
+}
+
+FIN BASE

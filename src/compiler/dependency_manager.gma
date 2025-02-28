@@ -1,0 +1,82 @@
+BASE GESTIONNAIRE_DEPENDANCES
+
+STRATEGIE GrapheDependances {
+    FORMATION noeuds = []
+    FORMATION arcs = []
+    FORMATION cycles = []
+}
+
+MISSION AnalyserDependances {
+    PARAMETRE unite_compilation
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE noeud = {
+            id: unite_compilation.id,
+            dependances_directes: [],
+            dependances_indirectes: []
+        }
+        
+        # Analyse des dépendances directes
+        MANOEUVRE ANALYSE_DIRECTE {
+            FORMATION deps = EXTRAIRE_INCLUDES unite_compilation.contenu
+            POUR dep DANS deps {
+                noeud.dependances_directes = DEPLOIEMENT 
+                    noeud.dependances_directes 
+                    dep
+            }
+        }
+        
+        # Construction du graphe
+        EXECUTION AjouterNoeudGraphe noeud
+        
+        # Détection des cycles
+        SI CIBLE DetecterCycleDependance noeud {
+            RAPPORT "ATTENTION: Cycle de dépendance détecté"
+        }
+        
+        RETRAITE noeud
+    }
+}
+
+MISSION ResoudreDependances {
+    PARAMETRE unite_compilation
+    
+    ORDRE DE BATAILLE {
+        FORMATION ordre_compilation = []
+        FORMATION visites = []
+        
+        MISSION VisiteProfondeur {
+            PARAMETRE noeud
+            
+            SI CIBLE noeud.id DANS visites {
+                RETRAITE
+            }
+            
+            visites = DEPLOIEMENT visites noeud.id
+            
+            POUR dep DANS noeud.dependances_directes {
+                EXECUTION VisiteProfondeur OBTENIR_NOEUD dep
+            }
+            
+            ordre_compilation = DEPLOIEMENT ordre_compilation noeud
+        }
+        
+        EXECUTION VisiteProfondeur unite_compilation
+        RETRAITE ordre_compilation
+    }
+}
+
+MISSION VerifierVersions {
+    PARAMETRE dependance
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE NON VersionCompatible dependance.version_requise {
+            RAPPORT "ERREUR: Version incompatible pour " + dependance.nom
+            RETRAITE FAUX
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

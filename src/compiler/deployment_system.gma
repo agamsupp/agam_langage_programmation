@@ -1,0 +1,86 @@
+BASE SYSTEME_DEPLOIEMENT
+
+STRATEGIE ConfigurationDeploiement {
+    FORMATION environnements = [
+        {
+            nom: "PRODUCTION",
+            verification_requise: VRAI,
+            rollback_auto: VRAI
+        },
+        {
+            nom: "PREPRODUCTION",
+            verification_requise: VRAI,
+            rollback_auto: FAUX
+        },
+        {
+            nom: "TEST",
+            verification_requise: FAUX,
+            rollback_auto: FAUX
+        }
+    ]
+
+    STRATEGIE strategies = {
+        deploiement: "PROGRESSIF",
+        verification: "AUTOMATIQUE",
+        synchronisation: "ATOMIQUE"
+    }
+}
+
+MISSION ExecuterDeploiement {
+    PARAMETRE version
+    PARAMETRE environnement
+    
+    ORDRE DE BATAILLE {
+        # Vérification pré-déploiement
+        SI CIBLE environnement.verification_requise {
+            SI CIBLE NON VerifierPreRequis version environnement {
+                RETRAITE ERREUR_VERIFICATION
+            }
+        }
+        
+        # Sauvegarde de l'état actuel
+        EXECUTION SauvegarderEtatActuel environnement
+        
+        # Déploiement progressif
+        MANOEUVRE DEPLOIEMENT {
+            # Phase 1: Préparation
+            EXECUTION PreparerDeploiement version environnement
+            
+            # Phase 2: Installation
+            EXECUTION InstallerNouvelleVersion version environnement
+            
+            # Phase 3: Vérification
+            SI CIBLE NON VerifierDeploiement version environnement {
+                SI CIBLE environnement.rollback_auto {
+                    EXECUTION ExecuterRollback environnement
+                }
+                RETRAITE ERREUR_DEPLOIEMENT
+            }
+            
+            # Phase 4: Finalisation
+            EXECUTION FinaliserDeploiement version environnement
+        }
+    }
+}
+
+MISSION GererRollback {
+    PARAMETRE environnement
+    
+    ORDRE DE BATAILLE {
+        # Récupération de la dernière sauvegarde
+        STRATEGIE sauvegarde = OBTENIR_DERNIERE_SAUVEGARDE environnement
+        
+        # Restauration de l'état précédent
+        EXECUTION RestaurerEtat sauvegarde environnement
+        
+        # Vérification post-rollback
+        SI CIBLE NON VerifierRestauration environnement {
+            RAPPORT "ERREUR: Échec de la restauration"
+            RETRAITE ECHEC
+        }
+        
+        RETRAITE SUCCES
+    }
+}
+
+FIN BASE

@@ -1,0 +1,89 @@
+BASE GESTIONNAIRE_PROCESSUS
+
+STRATEGIE ConfigurationProcessus {
+    MUNITION nb_processus_max = 64
+    FORMATION processus_actifs = []
+    
+    STRATEGIE etats = {
+        PRET: "PRET",
+        EXECUTION: "EXECUTION",
+        BLOQUE: "BLOQUE",
+        TERMINE: "TERMINE"
+    }
+    
+    FORMATION priorites = [
+        {niveau: 0, nom: "BASSE", quantum: 10},
+        {niveau: 1, nom: "NORMALE", quantum: 20},
+        {niveau: 2, nom: "HAUTE", quantum: 30}
+    ]
+}
+
+MISSION CreerProcessus {
+    PARAMETRE code
+    PARAMETRE priorite
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE RECONNAISSANCE ConfigurationProcessus.processus_actifs >= 
+            ConfigurationProcessus.nb_processus_max {
+            RAPPORT "ERREUR: Limite de processus atteinte"
+            RETRAITE VIDE
+        }
+        
+        STRATEGIE nouveau_processus = {
+            pid: GENERER_PID,
+            code: code,
+            priorite: priorite,
+            etat: ConfigurationProcessus.etats.PRET,
+            memoire: ALLOUER_MEMOIRE_PROCESSUS,
+            contexte: CREER_CONTEXTE_PROCESSUS
+        }
+        
+        ConfigurationProcessus.processus_actifs = DEPLOIEMENT 
+            ConfigurationProcessus.processus_actifs 
+            nouveau_processus
+            
+        RETRAITE nouveau_processus
+    }
+}
+
+MISSION OrdonnancerProcessus {
+    ORDRE DE BATAILLE {
+        # Tri des processus par priorité
+        FORMATION processus_prets = FILTRER ConfigurationProcessus.processus_actifs 
+            AVEC etat ConfigurationProcessus.etats.PRET
+            
+        processus_prets = TRIER_DECROISSANT processus_prets PAR priorite.niveau
+        
+        POUR processus DANS processus_prets {
+            # Attribution du quantum de temps
+            MUNITION quantum = OBTENIR_QUANTUM processus.priorite
+            
+            # Exécution du processus
+            processus.etat = ConfigurationProcessus.etats.EXECUTION
+            EXECUTION ExecuterProcessus processus quantum
+            
+            # Vérification fin quantum
+            SI CIBLE processus.etat VERIFICATION ConfigurationProcessus.etats.EXECUTION {
+                processus.etat = ConfigurationProcessus.etats.PRET
+            }
+        }
+    }
+}
+
+MISSION SuspendreProcessus {
+    PARAMETRE pid
+    
+    ORDRE DE BATAILLE {
+        POUR processus DANS ConfigurationProcessus.processus_actifs {
+            SI CIBLE processus.pid VERIFICATION pid {
+                processus.etat = ConfigurationProcessus.etats.BLOQUE
+                EXECUTION SauvegarderContexte processus
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

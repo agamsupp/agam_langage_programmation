@@ -1,0 +1,111 @@
+BASE VALIDATEUR_CODE_AVANCE
+
+STRATEGIE ConfigurationValidation {
+    FORMATION niveaux = [
+        {
+            type: "SYNTAXE",
+            regles: [
+                "STRUCTURE",
+                "FORMATAGE",
+                "COMPLETUDE"
+            ],
+            severite: "ERREUR"
+        },
+        {
+            type: "SEMANTIQUE",
+            regles: [
+                "TYPAGE",
+                "PORTEE",
+                "COHERENCE"
+            ],
+            severite: "ERREUR"
+        },
+        {
+            type: "QUALITE",
+            regles: [
+                "COMPLEXITE",
+                "MAINTENABILITE",
+                "CONVENTION"
+            ],
+            severite: "AVERTISSEMENT"
+        }
+    ]
+
+    STRATEGIE personnalisation = {
+        regles_custom: VRAI,
+        seuils_ajustables: VRAI,
+        rapports_detailles: VRAI
+    }
+}
+
+MISSION ValiderCodeAvance {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            erreurs: [],
+            avertissements: [],
+            suggestions: []
+        }
+        
+        # Analyse syntaxique approfondie
+        POUR regle DANS ConfigurationValidation.niveaux[0].regles {
+            EXECUTION ValiderSyntaxe code_source regle rapport
+        }
+        
+        # Analyse sémantique
+        SI CIBLE RECONNAISSANCE rapport.erreurs == 0 {
+            POUR regle DANS ConfigurationValidation.niveaux[1].regles {
+                EXECUTION ValiderSemantique code_source regle rapport
+            }
+        }
+        
+        # Analyse de qualité
+        SI CIBLE RECONNAISSANCE rapport.erreurs == 0 {
+            POUR regle DANS ConfigurationValidation.niveaux[2].regles {
+                EXECUTION ValiderQualite code_source regle rapport
+            }
+        }
+        
+        # Génération des suggestions d'amélioration
+        SI CIBLE ConfigurationValidation.personnalisation.rapports_detailles {
+            EXECUTION GenererSuggestionsDetaillees rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION VerifierCoherence {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Analyse de cohérence sémantique
+        STRATEGIE analyse = {
+            declarations: [],
+            utilisations: [],
+            inconsistances: []
+        }
+        
+        # Collecte des déclarations
+        EXECUTION CollecterDeclarations code analyse
+        
+        # Vérification des utilisations
+        EXECUTION VerifierUtilisations code analyse
+        
+        # Détection des inconsistances
+        POUR declaration DANS analyse.declarations {
+            POUR utilisation DANS analyse.utilisations {
+                SI CIBLE UtilisationInconsistante declaration utilisation {
+                    analyse.inconsistances = DEPLOIEMENT 
+                        analyse.inconsistances 
+                        {declaration: declaration, utilisation: utilisation}
+                }
+            }
+        }
+        
+        RETRAITE analyse.inconsistances
+    }
+}
+
+FIN BASE

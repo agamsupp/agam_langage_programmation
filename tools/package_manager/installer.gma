@@ -1,0 +1,633 @@
+BASE GESTIONNAIRE_PAQUETS_INSTALLATEUR
+
+STRATEGIE ConfigurationInstallateur {
+    rep_installation: "/usr/local/lib/agam",
+    rep_temporaire: "/tmp/agam-install",
+    verification_signature: VRAI,
+    verification_checksum: VRAI,
+    sauvegarde_avant_maj: VRAI,
+    installation_parallele: VRAI,
+    niveau_log: "INFO",
+    permissions_par_defaut: "644"
+}
+
+MISSION InstallateurInitialiser {
+    PARAMETRE registre
+    PARAMETRE resolveur
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'installateur de paquets AGAM"
+        
+        # Configurer l'installateur avec les options par défaut
+        STRATEGIE config = ConfigurationInstallateur
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet installateur
+        STRATEGIE installateur = {
+            configuration: config,
+            registre: registre,
+            resolveur: resolveur,
+            historique_installations: [],
+            installations_en_cours: 0
+        }
+        
+        # Vérifier l'existence des répertoires nécessaires
+        SI CIBLE !RepertoireExiste config.rep_installation {
+            EXECUTION RepertoireCreer config.rep_installation
+        }
+        
+        SI CIBLE !RepertoireExiste config.rep_temporaire {
+            EXECUTION RepertoireCreer config.rep_temporaire
+        }
+        
+        RAPPORT "Installateur initialisé"
+        
+        RETRAITE installateur
+    }
+}
+
+MISSION InstallationPaquet {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Installation du paquet: " + nom_paquet + " (version " + version + ")"
+        
+        # Options par défaut
+        STRATEGIE options_installation = {
+            force: FAUX,                 # Forcer la réinstallation même si déjà installé
+            ignorer_dependances: FAUX,   # Ne pas installer les dépendances
+            verification: VRAI           # Vérifier la signature et le checksum
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_installation[cle] = options[cle]
+            }
+        }
+        
+        # Vérifier si le paquet est déjà installé
+        SI CIBLE !options_installation.force ET EXECUTION EstPaquetInstalle installateur nom_paquet version {
+            RAPPORT "Paquet déjà installé: " + nom_paquet + " (version " + version + ")"
+            RETRAITE {
+                succes: VRAI,
+                statut: "DEJA_INSTALLE",
+                paquet: nom_paquet,
+                version:BASE GESTIONNAIRE_PAQUETS_INSTALLATEUR
+
+STRATEGIE ConfigurationInstallateur {
+    rep_installation: "/usr/local/lib/agam",
+    rep_temporaire: "/tmp/agam-install",
+    verification_signature: VRAI,
+    verification_checksum: VRAI,
+    sauvegarde_avant_maj: VRAI,
+    installation_parallele: VRAI,
+    niveau_log: "INFO",
+    permissions_par_defaut: "644"
+}
+
+MISSION InstallateurInitialiser {
+    PARAMETRE registre
+    PARAMETRE resolveur
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation de l'installateur de paquets AGAM"
+        
+        # Configurer l'installateur avec les options par défaut
+        STRATEGIE config = ConfigurationInstallateur
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet installateur
+        STRATEGIE installateur = {
+            configuration: config,
+            registre: registre,
+            resolveur: resolveur,
+            historique_installations: [],
+            installations_en_cours: 0
+        }
+        
+        # Vérifier l'existence des répertoires nécessaires
+        SI CIBLE !RepertoireExiste config.rep_installation {
+            EXECUTION RepertoireCreer config.rep_installation
+        }
+        
+        SI CIBLE !RepertoireExiste config.rep_temporaire {
+            EXECUTION RepertoireCreer config.rep_temporaire
+        }
+        
+        RAPPORT "Installateur initialisé"
+        
+        RETRAITE installateur
+    }
+}
+
+MISSION InstallationPaquet {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Installation du paquet: " + nom_paquet + " (version " + version + ")"
+        
+        # Options par défaut
+        STRATEGIE options_installation = {
+            force: FAUX,                 # Forcer la réinstallation même si déjà installé
+            ignorer_dependances: FAUX,   # Ne pas installer les dépendances
+            verification: VRAI           # Vérifier la signature et le checksum
+        }
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                options_installation[cle] = options[cle]
+            }
+        }
+        
+        # Vérifier si le paquet est déjà installé
+        SI CIBLE !options_installation.force ET EXECUTION EstPaquetInstalle installateur nom_paquet version {
+            RAPPORT "Paquet déjà installé: " + nom_paquet + " (version " + version + ")"
+            RETRAITE {
+                succes: VRAI,
+                statut: "DEJA_INSTALLE",
+                paquet: nom_paquet,
+                version: version
+            }
+        }
+        
+        # Résoudre les dépendances si nécessaire
+        FORMATION dependances_a_installer = []
+        
+        SI CIBLE !options_installation.ignorer_dependances {
+            # Obtenir les informations du paquet
+            STRATEGIE infos_paquet = EXECUTION ObtenirInfosPaquetVersion installateur.registre nom_paquet version
+            
+            SI CIBLE infos_paquet != NULE ET RECONNAISSANCE infos_paquet.dependances > 0 {
+                # Résoudre les dépendances
+                STRATEGIE resolution = EXECUTION ResoudreDependances installateur.resolveur infos_paquet.dependances
+                
+                SI CIBLE !resolution.resolu {
+                    RAPPORT "ERREUR: Impossible de résoudre les dépendances: " + resolution.erreur
+                    RETRAITE {
+                        succes: FAUX,
+                        statut: "ERREUR_DEPENDANCES",
+                        erreur: resolution.erreur
+                    }
+                }
+                
+                dependances_a_installer = resolution.dependances
+            }
+        }
+        
+        # Installer les dépendances d'abord
+        POUR dep DANS dependances_a_installer {
+            STRATEGIE resultat_dep = EXECUTION InstallationPaquet installateur dep.nom dep.version options_installation
+            
+            SI CIBLE !resultat_dep.succes {
+                RAPPORT "ERREUR: Échec de l'installation de la dépendance: " + dep.nom
+                RETRAITE {
+                    succes: FAUX,
+                    statut: "ERREUR_DEPENDANCE",
+                    dependance: dep.nom,
+                    erreur: resultat_dep.erreur
+                }
+            }
+        }
+        
+        # Télécharger le paquet
+        STRATEGIE paquet_telecharge = EXECUTION TelechargerPaquet installateur nom_paquet version
+        
+        SI CIBLE paquet_telecharge == NULE {
+            RAPPORT "ERREUR: Échec du téléchargement du paquet: " + nom_paquet
+            RETRAITE {
+                succes: FAUX,
+                statut: "ERREUR_TELECHARGEMENT"
+            }
+        }
+        
+        # Vérifier l'intégrité du paquet si demandé
+        SI CIBLE options_installation.verification {
+            SI CIBLE installateur.configuration.verification_signature {
+                SI CIBLE !EXECUTION VerifierSignaturePaquet paquet_telecharge {
+                    RAPPORT "ERREUR: Signature du paquet invalide: " + nom_paquet
+                    RETRAITE {
+                        succes: FAUX,
+                        statut: "ERREUR_SIGNATURE"
+                    }
+                }
+            }
+            
+            SI CIBLE installateur.configuration.verification_checksum {
+                SI CIBLE !EXECUTION VerifierChecksumPaquet paquet_telecharge {
+                    RAPPORT "ERREUR: Checksum du paquet invalide: " + nom_paquet
+                    RETRAITE {
+                        succes: FAUX,
+                        statut: "ERREUR_CHECKSUM"
+                    }
+                }
+            }
+        }
+        
+        # Extraire le paquet
+        STRATEGIE chemin_extraction = installateur.configuration.rep_temporaire + "/" + nom_paquet + "-" + version
+        
+        SI CIBLE !EXECUTION ExtrairePaquet paquet_telecharge chemin_extraction {
+            RAPPORT "ERREUR: Échec de l'extraction du paquet: " + nom_paquet
+            RETRAITE {
+                succes: FAUX,
+                statut: "ERREUR_EXTRACTION"
+            }
+        }
+        
+        # Sauvegarder la version existante si nécessaire
+        SI CIBLE installateur.configuration.sauvegarde_avant_maj {
+            STRATEGIE chemin_installation = ObtenirCheminInstallation installateur nom_paquet
+            
+            SI CIBLE RepertoireExiste chemin_installation {
+                EXECUTION SauvegarderRepertoire chemin_installation
+            }
+        }
+        
+        # Installer les fichiers
+        STRATEGIE chemin_destination = ObtenirCheminInstallation installateur nom_paquet
+        
+        SI CIBLE !EXECUTION InstallerFichiers chemin_extraction chemin_destination {
+            RAPPORT "ERREUR: Échec de l'installation des fichiers: " + nom_paquet
+            RETRAITE {
+                succes: FAUX,
+                statut: "ERREUR_INSTALLATION_FICHIERS"
+            }
+        }
+        
+        # Exécuter les scripts post-installation si présents
+        SI CIBLE FichierExiste chemin_extraction + "/post-install.gma" {
+            SI CIBLE !EXECUTION ExecuterScriptPostInstallation chemin_extraction + "/post-install.gma" {
+                RAPPORT "AVERTISSEMENT: Échec du script post-installation pour: " + nom_paquet
+            }
+        }
+        
+        # Nettoyer les fichiers temporaires
+        EXECUTION NettoyerFichiersTemporaires installateur nom_paquet version
+        
+        # Enregistrer l'installation dans l'historique
+        installateur.historique_installations = DEPLOIEMENT installateur.historique_installations {
+            paquet: nom_paquet,
+            version: version,
+            date: ObtenirTempsActuel(),
+            succes: VRAI
+        }
+        
+        RAPPORT "Installation réussie: " + nom_paquet + " (version " + version + ")"
+        
+        RETRAITE {
+            succes: VRAI,
+            statut: "INSTALLE",
+            paquet: nom_paquet,
+            version: version
+        }
+    }
+}
+
+MISSION EstPaquetInstalle {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si un paquet est déjà installé
+        STRATEGIE chemin_installation = ObtenirCheminInstallation installateur nom_paquet
+        
+        # Vérifier l'existence du répertoire d'installation
+        SI CIBLE !RepertoireExiste chemin_installation {
+            RETRAITE FAUX
+        }
+        
+        # Vérifier la version installée
+        STRATEGIE version_installee = EXECUTION ObtenirVersionInstallee installateur nom_paquet
+        
+        SI CIBLE version_installee == NULE {
+            RETRAITE FAUX
+        }
+        
+        # Si version est NULE, on vérifie juste si le paquet est installé
+        SI CIBLE version == NULE {
+            RETRAITE VRAI
+        }
+        
+        # Sinon, on vérifie si la version installée correspond
+        RETRAITE version_installee == version
+    }
+}
+
+MISSION ObtenirVersionInstallee {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    
+    ORDRE DE BATAILLE {
+        # Obtenir la version installée d'un paquet
+        STRATEGIE chemin_installation = ObtenirCheminInstallation installateur nom_paquet
+        
+        # Vérifier l'existence du fichier de version
+        SI CIBLE !FichierExiste chemin_installation + "/version.txt" {
+            RETRAITE NULE
+        }
+        
+        # Lire le fichier de version
+        STRATEGIE contenu = EXECUTION FichierLire chemin_installation + "/version.txt" NULE
+        
+        # Retourner la version (sans les espaces et sauts de ligne)
+        RETRAITE AFFINER contenu
+    }
+}
+
+MISSION ObtenirCheminInstallation {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    
+    ORDRE DE BATAILLE {
+        # Construire le chemin d'installation pour un paquet
+        RETRAITE installateur.configuration.rep_installation + "/" + nom_paquet
+    }
+}
+
+MISSION TelechargerPaquet {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Téléchargement du paquet: " + nom_paquet + " (version " + version + ")"
+        
+        # Construire l'URL de téléchargement
+        STRATEGIE url = installateur.registre.configuration.url_serveur + "/packages/" + 
+                       nom_paquet + "-" + version + ".tar.gz"
+        
+        # Construire le chemin local où sauvegarder le fichier
+        STRATEGIE chemin_local = installateur.configuration.rep_temporaire + "/" + 
+                               nom_paquet + "-" + version + ".tar.gz"
+        
+        # Simuler le téléchargement
+        # Dans un système réel, ceci utiliserait des API HTTP
+        
+        RAPPORT "Paquet téléchargé: " + url + " -> " + chemin_local
+        
+        # Retourner le chemin du fichier téléchargé
+        RETRAITE chemin_local
+    }
+}
+
+MISSION VerifierSignaturePaquet {
+    PARAMETRE chemin_paquet
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Vérification de la signature du paquet: " + chemin_paquet
+        
+        # Simuler la vérification de la signature
+        # Dans un système réel, ceci utiliserait des API cryptographiques
+        
+        # Pour la simulation, supposer que la signature est valide
+        RETRAITE VRAI
+    }
+}
+
+MISSION VerifierChecksumPaquet {
+    PARAMETRE chemin_paquet
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Vérification du checksum du paquet: " + chemin_paquet
+        
+        # Simuler la vérification du checksum
+        # Dans un système réel, ceci calculerait un hash (MD5, SHA-256, etc.)
+        # et le comparerait avec la valeur attendue
+        
+        # Pour la simulation, supposer que le checksum est valide
+        RETRAITE VRAI
+    }
+}
+
+MISSION ExtrairePaquet {
+    PARAMETRE chemin_paquet
+    PARAMETRE chemin_destination
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Extraction du paquet: " + chemin_paquet + " -> " + chemin_destination
+        
+        # Vérifier si le répertoire de destination existe déjà
+        SI CIBLE RepertoireExiste chemin_destination {
+            # Supprimer le répertoire existant
+            EXECUTION RepertoireSupprimer chemin_destination VRAI
+        }
+        
+        # Créer le répertoire de destination
+        EXECUTION RepertoireCreer chemin_destination
+        
+        # Simuler l'extraction d'une archive
+        # Dans un système réel, ceci utiliserait des API d'archives (tar, zip, etc.)
+        
+        RAPPORT "Paquet extrait avec succès"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION SauvegarderRepertoire {
+    PARAMETRE chemin_repertoire
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Sauvegarde du répertoire: " + chemin_repertoire
+        
+        # Construire le nom du répertoire de sauvegarde
+        STRATEGIE backup_suffix = "." + ObtenirTempsActuel() + ".backup"
+        STRATEGIE chemin_sauvegarde = chemin_repertoire + backup_suffix
+        
+        # Simuler la copie du répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Répertoire sauvegardé: " + chemin_repertoire + " -> " + chemin_sauvegarde
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION InstallerFichiers {
+    PARAMETRE chemin_source
+    PARAMETRE chemin_destination
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Installation des fichiers: " + chemin_source + " -> " + chemin_destination
+        
+        # Vérifier si le répertoire de destination existe
+        SI CIBLE !RepertoireExiste chemin_destination {
+            EXECUTION RepertoireCreer chemin_destination
+        }
+        
+        # Simuler la copie des fichiers
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Fichiers installés avec succès"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ExecuterScriptPostInstallation {
+    PARAMETRE chemin_script
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Exécution du script post-installation: " + chemin_script
+        
+        # Simuler l'exécution d'un script
+        # Dans un système réel, ceci exécuterait le script AGAM
+        
+        RAPPORT "Script post-installation exécuté avec succès"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION NettoyerFichiersTemporaires {
+    PARAMETRE installateur
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Nettoyage des fichiers temporaires"
+        
+        # Supprimer le fichier d'archive téléchargé
+        STRATEGIE chemin_archive = installateur.configuration.rep_temporaire + "/" + 
+                                 nom_paquet + "-" + version + ".tar.gz"
+        
+        SI CIBLE FichierExiste chemin_archive {
+            EXECUTION FichierSupprimer chemin_archive
+        }
+        
+        # Supprimer le répertoire d'extraction temporaire
+        STRATEGIE chemin_extraction = installateur.configuration.rep_temporaire + "/" + 
+                                    nom_paquet + "-" + version
+        
+        SI CIBLE RepertoireExiste chemin_extraction {
+            EXECUTION RepertoireSupprimer chemin_extraction VRAI
+        }
+        
+        RAPPORT "Fichiers temporaires nettoyés avec succès"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierExiste {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        # Simuler la vérification de l'existence d'un fichier
+        # Dans un système réel, ceci utiliserait des API système
+        
+        # Pour la simulation, supposer que certains fichiers existent
+        SI CIBLE chemin_fichier CONTIENT "version.txt" OU chemin_fichier CONTIENT "post-install.gma" {
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION RepertoireExiste {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Simuler la vérification de l'existence d'un répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        # Pour la simulation, supposer que certains répertoires existent
+        SI CIBLE chemin CONTIENT "agam" OU chemin CONTIENT "tmp" {
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION RepertoireCreer {
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Simuler la création d'un répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Répertoire créé: " + chemin
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION RepertoireSupprimer {
+    PARAMETRE chemin
+    PARAMETRE recursif
+    
+    ORDRE DE BATAILLE {
+        # Simuler la suppression d'un répertoire
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Répertoire supprimé: " + chemin + (recursif ? " (récursivement)" : "")
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierLire {
+    PARAMETRE chemin_fichier
+    PARAMETRE encodage
+    
+    ORDRE DE BATAILLE {
+        # Simuler la lecture d'un fichier
+        # Dans un système réel, ceci utiliserait des API système
+        
+        # Pour la simulation, retourner un contenu fictif
+        SI CIBLE chemin_fichier CONTIENT "version.txt" {
+            RETRAITE "1.0.0"
+        }
+        
+        RETRAITE "Contenu simulé"
+    }
+}
+
+MISSION FichierSupprimer {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        # Simuler la suppression d'un fichier
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RAPPORT "Fichier supprimé: " + chemin_fichier
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION ObtenirTempsActuel {
+    ORDRE DE BATAILLE {
+        # Simuler l'obtention du temps actuel
+        # Dans un système réel, ceci utiliserait des API système
+        
+        RETRAITE "20250224"
+    }
+}
+
+FIN BASE

@@ -1,0 +1,76 @@
+BASE SECURITE_AVANCEE
+
+STRATEGIE ConfigurationSecurite {
+    FORMATION niveaux_acces = [
+        {
+            niveau: "NOYAU",
+            permissions: ["LECTURE", "ECRITURE", "EXECUTION"],
+            priorite: 0
+        },
+        {
+            niveau: "SYSTEME",
+            permissions: ["LECTURE", "EXECUTION"],
+            priorite: 1
+        },
+        {
+            niveau: "UTILISATEUR",
+            permissions: ["LECTURE"],
+            priorite: 2
+        }
+    ]
+
+    STRATEGIE politique_securite = {
+        validation_stricte: VRAI,
+        audit_actif: VRAI,
+        detection_intrusion: VRAI
+    }
+}
+
+MISSION VerifierSecurite {
+    PARAMETRE operation
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Vérification du niveau d'accès
+        MUNITION niveau_requis = OBTENIR_NIVEAU_REQUIS operation
+        MUNITION niveau_actuel = OBTENIR_NIVEAU_ACTUEL contexte
+        
+        SI CIBLE NON AutorisationSuffisante niveau_actuel niveau_requis {
+            EXECUTION JournaliserViolation operation contexte
+            RETRAITE ERREUR_AUTORISATION
+        }
+        
+        # Validation des paramètres
+        SI CIBLE ConfigurationSecurite.politique_securite.validation_stricte {
+            SI CIBLE NON ValiderParametres operation contexte {
+                EXECUTION JournaliserViolation operation contexte
+                RETRAITE ERREUR_VALIDATION
+            }
+        }
+        
+        # Audit de sécurité
+        SI CIBLE ConfigurationSecurite.politique_securite.audit_actif {
+            EXECUTION AuditerOperation operation contexte
+        }
+        
+        RETRAITE SUCCES
+    }
+}
+
+MISSION DetecterIntrusion {
+    ORDRE DE BATAILLE {
+        SI CIBLE ConfigurationSecurite.politique_securite.detection_intrusion {
+            # Analyse des patterns suspects
+            POUR operation DANS HISTORIQUE_OPERATIONS {
+                SI CIBLE EstPatternSuspect operation {
+                    EXECUTION AlerteIntrusion operation
+                }
+            }
+            
+            # Vérification des signatures
+            EXECUTION VerifierSignatures
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,62 @@
+BASE DEBOGUEUR
+
+STRATEGIE PointsArret {
+    FORMATION points = []
+    FORMATION variables_surveillees = []
+    MUNITION mode_pas_a_pas = FAUX
+}
+
+MISSION InitialiserDebogueur {
+    ORDRE DE BATAILLE {
+        STRATEGIE EtatDebug {
+            MUNITION actif = VRAI
+            MUNITION ligne_courante = 0
+            FORMATION pile_appels = []
+        }
+    }
+}
+
+MISSION AjouterPointArret {
+    PARAMETRE fichier
+    PARAMETRE ligne
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE nouveau_point = {
+            fichier: fichier,
+            ligne: ligne,
+            actif: VRAI
+        }
+        
+        PointsArret.points = DEPLOIEMENT PointsArret.points nouveau_point
+    }
+}
+
+MISSION SurveillanceVariable {
+    PARAMETRE nom_variable
+    
+    ORDRE DE BATAILLE {
+        FORMATION valeurs = []
+        
+        MANOEUVRE SURVEILLANCE {
+            MUNITION valeur_actuelle = LIRE_VARIABLE nom_variable
+            valeurs = DEPLOIEMENT valeurs valeur_actuelle
+            
+            SI CIBLE CHANGEMENT_DETECTE valeur_actuelle {
+                RAPPORT "Variable " + nom_variable + " modifiée: " + valeur_actuelle
+            }
+        }
+    }
+}
+
+MISSION ExecutionPasAPas {
+    ORDRE DE BATAILLE {
+        PointsArret.mode_pas_a_pas = VRAI
+        
+        TANT_QUE PointsArret.mode_pas_a_pas {
+            EXECUTION ProchainePas
+            ATTENDRE_COMMANDE
+        }
+    }
+}
+
+FIN BASE

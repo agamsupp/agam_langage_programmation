@@ -1,0 +1,81 @@
+BASE GESTIONNAIRE_PLUGINS
+
+STRATEGIE RegistrePlugins {
+    FORMATION plugins_actifs = []
+    FORMATION points_extension = [
+        "AVANT_COMPILATION",
+        "APRES_LEXER",
+        "APRES_PARSER",
+        "AVANT_GENERATION",
+        "APRES_COMPILATION"
+    ]
+}
+
+MISSION ChargerPlugin {
+    PARAMETRE chemin_plugin
+    
+    ORDRE DE BATAILLE {
+        # Vérification de sécurité
+        SI CIBLE NON VerifierSignature chemin_plugin {
+            RAPPORT "ERREUR: Signature de plugin invalide"
+            RETRAITE FAUX
+        }
+        
+        # Chargement du plugin
+        STRATEGIE plugin = {
+            nom: EXTRAIRE_NOM chemin_plugin,
+            points_accroche: [],
+            configuration: {},
+            statut: "INACTIF"
+        }
+        
+        # Initialisation du plugin
+        MISSION InitialiserPlugin {
+            plugin.configuration = CHARGER_CONFIG chemin_plugin
+            plugin.points_accroche = IDENTIFIER_POINTS_ACCROCHE plugin
+            
+            SI CIBLE VerifierCompatibilite plugin {
+                plugin.statut = "ACTIF"
+                RegistrePlugins.plugins_actifs = DEPLOIEMENT RegistrePlugins.plugins_actifs plugin
+                RETRAITE VRAI
+            }
+        }
+        
+        EXECUTION InitialiserPlugin
+    }
+}
+
+MISSION ExecuterPlugins {
+    PARAMETRE point_extension
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        POUR plugin DANS RegistrePlugins.plugins_actifs {
+            SI CIBLE point_extension DANS plugin.points_accroche {
+                EXECUTION ExecuterHook plugin point_extension contexte
+            }
+        }
+    }
+}
+
+MISSION VerifierCompatibilite {
+    PARAMETRE plugin
+    
+    ORDRE DE BATAILLE {
+        # Vérification de la version AGAM
+        SI CIBLE NON VersionCompatible plugin.version_requise {
+            RETRAITE FAUX
+        }
+        
+        # Vérification des dépendances
+        POUR dep DANS plugin.dependances {
+            SI CIBLE NON PluginInstalle dep {
+                RETRAITE FAUX
+            }
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

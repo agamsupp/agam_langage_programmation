@@ -1,0 +1,103 @@
+BASE COMPILATEUR_INCREMENTAL_AVANCE
+
+STRATEGIE ConfigurationIncrementale {
+    FORMATION strategies = [
+        {
+            type: "DETECTION_CHANGEMENTS",
+            modes: [
+                "TIMESTAMP",
+                "HASH",
+                "SEMANTIQUE"
+            ],
+            priorite: 1
+        },
+        {
+            type: "ANALYSE_DEPENDANCES",
+            modes: [
+                "STATIQUE",
+                "DYNAMIQUE",
+                "HEURISTIQUE"
+            ],
+            priorite: 2
+        },
+        {
+            type: "CACHE",
+            modes: [
+                "MEMOIRE",
+                "DISQUE",
+                "DISTRIBUE"
+            ],
+            priorite: 3
+        }
+    ]
+
+    STRATEGIE parametres = {
+        detection_precise: VRAI,
+        invalidation_selective: VRAI,
+        cache_hierarchique: VRAI
+    }
+}
+
+MISSION CompilationIncrementale {
+    PARAMETRE code_source
+    PARAMETRE cache_precedent
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contexte = {
+            fichiers_modifies: [],
+            dependances_impactees: [],
+            resultats_compilation: []
+        }
+        
+        # Phase 1: Détection intelligente des changements
+        EXECUTION DetecterChangements code_source cache_precedent contexte
+        
+        # Phase 2: Analyse précise des dépendances
+        EXECUTION AnalyserImpactChangements contexte
+        
+        # Phase 3: Recompilation sélective
+        MANOEUVRE RECOMPILATION {
+            POUR fichier DANS contexte.fichiers_modifies {
+                # Compilation directe
+                EXECUTION CompilerFichier fichier
+            }
+            
+            POUR fichier DANS contexte.dependances_impactees {
+                # Vérification du cache
+                SI CIBLE NON ResultatEnCache fichier {
+                    EXECUTION CompilerFichier fichier
+                }
+            }
+        }
+        
+        # Phase 4: Mise à jour du cache
+        SI CIBLE ConfigurationIncrementale.parametres.cache_hierarchique {
+            EXECUTION MettreAJourCacheHierarchique contexte
+        }
+        
+        RETRAITE contexte.resultats_compilation
+    }
+}
+
+MISSION AnalyserImpactChangements {
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Construction du graphe de dépendances
+        STRATEGIE graphe = EXECUTION ConstruireGrapheDependances
+        
+        # Analyse de l'impact des modifications
+        POUR fichier DANS contexte.fichiers_modifies {
+            FORMATION dependants = EXECUTION TrouverDependants fichier graphe
+            contexte.dependances_impactees = UNION 
+                contexte.dependances_impactees 
+                dependants
+        }
+        
+        # Optimisation: Élimination des doublons
+        contexte.dependances_impactees = ELIMINER_DOUBLONS 
+            contexte.dependances_impactees
+    }
+}
+
+FIN BASE

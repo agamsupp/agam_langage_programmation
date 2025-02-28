@@ -1,0 +1,1223 @@
+BASE SYSTEME_DOCUMENTATION_AUTOMATIQUE
+
+STRATEGIE ConfigurationDocAuto {
+    formats_sortie: ["MARKDOWN", "HTML", "PDF"],
+    extraction_commentaires: VRAI,
+    extraction_signatures: VRAI,
+    inclure_exemples: VRAI,
+    generer_diagrammes: VRAI,
+    format_modele_doc: "templates/documentation/",
+    niveau_detail: "STANDARD",  # MINIMAL, STANDARD, COMPLET
+    inclure_code_source: FAUX,
+    lien_code_source: VRAI,
+    ordre_sections: [
+        "INTRODUCTION",
+        "BASES",
+        "MISSIONS",
+        "STRATEGIES",
+        "FORMATIONS",
+        "EXEMPLES",
+        "INDEX"
+    ]
+}
+
+MISSION InitialiserGenerateurDoc {
+    PARAMETRE options
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Initialisation du générateur de documentation automatique AGAM"
+        
+        # Configurer le générateur avec les options par défaut
+        STRATEGIE config = ConfigurationDocAuto
+        
+        # Fusionner avec les options spécifiées
+        SI CIBLE options != NULE {
+            POUR cle DANS CLES(options) {
+                config[cle] = options[cle]
+            }
+        }
+        
+        # Créer l'objet générateur
+        STRATEGIE generateur = {
+            configuration: config,
+            modeles: {},
+            cache_fichiers: {},
+            index: {
+                bases: {},
+                missions: {},
+                strategies: {},
+                formations: {}
+            }
+        }
+        
+        # Charger les modèles de documentation
+        EXECUTION ChargerModelesDoc generateur
+        
+        RAPPORT "Générateur de documentation initialisé"
+        
+        RETRAITE generateur
+    }
+}
+
+MISSION ChargerModelesDoc {
+    PARAMETRE generateur
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Chargement des modèles de documentation"
+        
+        # Définir les modèles de base pour les formats supportés
+        STRATEGIE modeles = {
+            MARKDOWN: {
+                entete: "# Documentation AGAM\n\n",
+                pied_page: "\n---\nGénéré automatiquement par le générateur de documentation AGAM.",
+                section: "## {titre}\n\n{contenu}\n\n",
+                base: "### Base: {nom}\n\n{description}\n\n",
+                mission: "#### Mission: {nom}\n\n{description}\n\n**Signature:** `{signature}`\n\n**Paramètres:**\n{parametres}\n\n**Retour:** {retour}\n\n",
+                parametre: "- `{nom}`: {description}\n",
+                strategie: "#### Stratégie: {nom}\n\n{description}\n\n**Champs:**\n{champs}\n\n",
+                champ: "- `{nom}`: {description}\n",
+                code: "```gma\n{code}\n```\n",
+                table: "| {entetes} |\n| {separateurs} |\n{lignes}",
+                ligne_table: "| {cellules} |",
+                lien: "[{texte}]({url})",
+                image: "![{alt}]({url})"
+            },
+            HTML: {
+                entete: "<!DOCTYPE html>\n<html>\n<head>\n<title>Documentation AGAM</title>\n<style>\nbody { font-family: Arial, sans-serif; margin: 20px; }\nh1 { color: #333; }\n</style>\n</head>\n<body>\n<h1>Documentation AGAM</h1>\n",
+                pied_page: "<footer>\n<hr>\n<p>Généré automatiquement par le générateur de documentation AGAM.</p>\n</footer>\n</body>\n</html>",
+                section: "<h2>{titre}</h2>\n<div>\n{contenu}\n</div>\n",
+                base: "<h3>Base: {nom}</h3>\n<div>\n<p>{description}</p>\n</div>\n",
+                mission: "<h4>Mission: {nom}</h4>\n<div>\n<p>{description}</p>\n<p><strong>Signature:</strong> <code>{signature}</code></p>\n<p><strong>Paramètres:</strong></p>\n<ul>\n{parametres}\n</ul>\n<p><strong>Retour:</strong> {retour}</p>\n</div>\n",
+                parametre: "<li><code>{nom}</code>: {description}</li>\n",
+                strategie: "<h4>Stratégie: {nom}</h4>\n<div>\n<p>{description}</p>\n<p><strong>Champs:</strong></p>\n<ul>\n{champs}\n</ul>\n</div>\n",
+                champ: "<li><code>{nom}</code>: {description}</li>\n",
+                code: "<pre><code class=\"language-gma\">{code}</code></pre>\n",
+                table: "<table>\n<thead>\n<tr>\n{entetes}\n</tr>\n</thead>\n<tbody>\n{lignes}\n</tbody>\n</table>",
+                ligne_table: "<tr>\n{cellules}\n</tr>",
+                cellule_entete: "<th>{contenu}</th>",
+                cellule: "<td>{contenu}</td>",
+                lien: "<a href=\"{url}\">{texte}</a>",
+                image: "<img src=\"{url}\" alt=\"{alt}\">"
+            }
+        }
+        
+        generateur.modeles = modeles
+        
+        RETRAITE generateur
+    }
+}
+
+MISSION GenererDoc {
+    PARAMETRE generateur
+    PARAMETRE chemin_fichier
+    PARAMETRE format_sortie
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération de documentation pour: " + chemin_fichier
+        
+        # Vérifier le format de sortie
+        SI CIBLE !CONTIENT generateur.configuration.formats_sortie format_sortie {
+            RAPPORT "ERREUR: Format de sortie non supporté: " + format_sortie
+            RETRAITE NULE
+        }
+        
+        # Analyser le fichier source
+        STRATEGIE ast = EXECUTION AnalyserFichierSource chemin_fichier
+        
+        SI CIBLE ast == NULE {
+            RAPPORT "ERREUR: Échec de l'analyse du fichier source: " + chemin_fichier
+            RETRAITE NULE
+        }
+        
+        # Extraire la documentation
+        STRATEGIE doc = EXECUTION ExtraireDocumentation ast generateur.configuration
+        
+        # Générer la documentation dans le format spécifié
+        STRATEGIE contenu_doc = EXECUTION GenererContenuDoc doc generateur.modeles[format_sortie] generateur.configuration
+        
+        # Ajouter à l'index global
+        EXECUTION MettreAJourIndex generateur.index doc
+        
+        # Écrire le fichier de documentation
+        STRATEGIE chemin_sortie = ConstruireChemin chemin_fichier format_sortie
+        
+        SI CIBLE !EXECUTION EcrireFichier chemin_sortie contenu_doc {
+            RAPPORT "ERREUR: Échec de l'écriture du fichier de documentation: " + chemin_sortie
+            RETRAITE NULE
+        }
+        
+        RAPPORT "Documentation générée avec succès: " + chemin_sortie
+        
+        RETRAITE {
+            fichier_source: chemin_fichier,
+            fichier_sortie: chemin_sortie,
+            format: format_sortie,
+            doc: doc
+        }
+    }
+}
+
+MISSION GenererDocRepertoire {
+    PARAMETRE generateur
+    PARAMETRE chemin_repertoire
+    PARAMETRE format_sortie
+    PARAMETRE recursif
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération de documentation pour le répertoire: " + chemin_repertoire + (recursif ? " (récursivement)" : "")
+        
+        # Lister les fichiers AGAM dans le répertoire
+        FORMATION fichiers = EXECUTION ListerFichiersAGAM chemin_repertoire recursif
+        
+        SI CIBLE RECONNAISSANCE fichiers == 0 {
+            RAPPORT "Aucun fichier AGAM trouvé dans le répertoire: " + chemin_repertoire
+            RETRAITE {
+                repertoire: chemin_repertoire,
+                statut: "AUCUN_FICHIER",
+                message: "Aucun fichier AGAM trouvé"
+            }
+        }
+        
+        # Résultats de la génération
+        FORMATION resultats = []
+        
+        # Générer la documentation pour chaque fichier
+        POUR fichier DANS fichiers {
+            resultats = DEPLOIEMENT resultats EXECUTION GenererDoc generateur fichier format_sortie
+        }
+        
+        # Générer l'index global
+        SI CIBLE generateur.configuration.ordre_sections CONTIENT "INDEX" {
+            EXECUTION GenererIndex generateur chemin_repertoire format_sortie
+        }
+        
+        RAPPORT "Génération de documentation terminée pour le répertoire: " + chemin_repertoire
+        
+        RETRAITE {
+            repertoire: chemin_repertoire,
+            format: format_sortie,
+            resultats: resultats
+        }
+    }
+}
+
+MISSION AnalyserFichierSource {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Analyse du fichier source: " + chemin_fichier
+        
+        # Lire le contenu du fichier
+        STRATEGIE contenu = EXECUTION LireFichier chemin_fichier "UTF-8"
+        
+        SI CIBLE contenu == NULE {
+            RAPPORT "ERREUR: Impossible de lire le fichier: " + chemin_fichier
+            RETRAITE NULE
+        }
+        
+        # Analyser le code source pour créer l'AST (Abstract Syntax Tree)
+        ESSAYER {
+            STRATEGIE ast = EXECUTION AnalyserSyntaxeAGAM contenu
+            
+            # Vérifier si l'analyse a produit des erreurs
+            SI CIBLE ast.erreurs ET RECONNAISSANCE ast.erreurs > 0 {
+                RAPPORT "ERREUR: Erreurs de syntaxe dans le fichier: " + chemin_fichier
+                RETRAITE NULE
+            }
+            
+            RETRAITE ast
+        } CAPTURER erreur {
+            RAPPORT "ERREUR: Exception lors de l'analyse syntaxique: " + erreur
+            RETRAITE NULE
+        }
+    }
+}
+
+MISSION ExtraireDocumentation {
+    PARAMETRE ast
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Extraction de la documentation depuis l'AST"
+        
+        # Structure pour stocker la documentation extraite
+        STRATEGIE doc = {
+            bases: [],
+            titre: ast.nom_fichier OU "Documentation",
+            description: "",
+            meta: {
+                date_generation: ObtenirDateActuelle(),
+                version: "1.0"
+            }
+        }
+        
+        # Extraire les commentaires de fichier (en-tête)
+        SI CIBLE ast.commentaires_fichier {
+            doc.description = ExtraireDescription ast.commentaires_fichier
+        }
+        
+        # Extraire la documentation pour chaque base
+        POUR base DANS ast.bases {
+            # Structure pour la documentation de la base
+            STRATEGIE doc_base = {
+                nom: base.nom,
+                description: "",
+                missions: [],
+                strategies: [],
+                formations: []
+            }
+            
+            # Extraire la description de la base depuis les commentaires
+            SI CIBLE base.commentaires ET configuration.extraction_commentaires {
+                doc_base.description = ExtraireDescription base.commentaires
+            }
+            
+            # Extraire la documentation pour chaque mission
+            SI CIBLE base.missions {
+                POUR mission DANS base.missions {
+                    STRATEGIE doc_mission = EXECUTION ExtraireDocMission mission configuration
+                    doc_base.missions = DEPLOIEMENT doc_base.missions doc_mission
+                }
+            }
+            
+            # Extraire la documentation pour chaque stratégie
+            SI CIBLE base.strategies {
+                POUR strategie DANS base.strategies {
+                    STRATEGIE doc_strategie = EXECUTION ExtraireDocStrategie strategie configuration
+                    doc_base.strategies = DEPLOIEMENT doc_base.strategies doc_strategie
+                }
+            }
+            
+            # Extraire la documentation pour chaque formation
+            SI CIBLE base.formations {
+                POUR formation DANS base.formations {
+                    STRATEGIE doc_formation = EXECUTION ExtraireDocFormation formation configuration
+                    doc_base.formations = DEPLOIEMENT doc_base.formations doc_formation
+                }
+            }
+            
+            # Ajouter la documentation de la base au résultat
+            doc.bases = DEPLOIEMENT doc.bases doc_base
+        }
+        
+        RETRAITE doc
+    }
+}
+
+MISSION ExtraireDocMission {
+    PARAMETRE mission
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Structure pour la documentation de la mission
+        STRATEGIE doc_mission = {
+            nom: mission.nom,
+            description: "",
+            signature: "",
+            parametres: [],
+            retour: "Aucune information de retour disponible",
+            code: configuration.inclure_code_source ? mission.code : NULE,
+            ligne: mission.position.ligne
+        }
+        
+        # Extraire la description de la mission depuis les commentaires
+        SI CIBLE mission.commentaires ET configuration.extraction_commentaires {
+            doc_mission.description = ExtraireDescription mission.commentaires
+        }
+        
+        # Construire la signature de la mission
+        SI CIBLE configuration.extraction_signatures {
+            STRATEGIE signature = mission.nom + "("
+            
+            # Ajouter les paramètres à la signature
+            SI CIBLE mission.parametres {
+                POUR i DEPUIS 0 JUSQU'A RECONNAISSANCE mission.parametres - 1 {
+                    SI CIBLE i > 0 {
+                        signature = signature + ", "
+                    }
+                    signature = signature + mission.parametres[i].nom
+                }
+            }
+            
+            signature = signature + ")"
+            doc_mission.signature = signature
+        }
+        
+        # Extraire la documentation pour chaque paramètre
+        SI CIBLE mission.parametres {
+            POUR parametre DANS mission.parametres {
+                STRATEGIE doc_parametre = {
+                    nom: parametre.nom,
+                    description: ExtraireDescriptionParametre parametre mission.commentaires OU "Aucune description disponible"
+                }
+                
+                doc_mission.parametres = DEPLOIEMENT doc_mission.parametres doc_parametre
+            }
+        }
+        
+        # Extraire l'information de retour
+        SI CIBLE mission.commentaires {
+            STRATEGIE retour = ExtraireRetour mission.commentaires
+            SI CIBLE retour {
+                doc_mission.retour = retour
+            }
+        }
+        
+        RETRAITE doc_mission
+    }
+}
+
+MISSION ExtraireDocStrategie {
+    PARAMETRE strategie
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Structure pour la documentation de la stratégie
+        STRATEGIE doc_strategie = {
+            nom: strategie.nom,
+            description: "",
+            champs: [],
+            code: configuration.inclure_code_source ? strategie.code : NULE,
+            ligne: strategie.position.ligne
+        }
+        
+        # Extraire la description de la stratégie depuis les commentaires
+        SI CIBLE strategie.commentaires ET configuration.extraction_commentaires {
+            doc_strategie.description = ExtraireDescription strategie.commentaires
+        }
+        
+        # Extraire la documentation pour chaque champ
+        SI CIBLE strategie.champs {
+            POUR champ DANS strategie.champs {
+                STRATEGIE doc_champ = {
+                    nom: champ.nom,
+                    description: ExtraireDescriptionChamp champ strategie.commentaires OU "Aucune description disponible",
+                    type: InfererType champ.valeur
+                }
+                
+                doc_strategie.champs = DEPLOIEMENT doc_strategie.champs doc_champ
+            }
+        }
+        
+        RETRAITE doc_strategie
+    }
+}
+
+MISSION ExtraireDocFormation {
+    PARAMETRE formation
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Structure pour la documentation de la formation
+        STRATEGIE doc_formation = {
+            nom: formation.nom,
+            description: "",
+            elements: [],
+            code: configuration.inclure_code_source ? formation.code : NULE,
+            ligne: formation.position.ligne
+        }
+        
+        # Extraire la description de la formation depuis les commentaires
+        SI CIBLE formation.commentaires ET configuration.extraction_commentaires {
+            doc_formation.description = ExtraireDescription formation.commentaires
+        }
+        
+        # Analyser les éléments de la formation si disponibles
+        SI CIBLE formation.elements {
+            POUR element DANS formation.elements {
+                doc_formation.elements = DEPLOIEMENT doc_formation.elements {
+                    valeur: element,
+                    type: InfererType element
+                }
+            }
+        }
+        
+        RETRAITE doc_formation
+    }
+}
+
+MISSION GenererContenuDoc {
+    PARAMETRE doc
+    PARAMETRE modele
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération du contenu de documentation"
+        
+        # Commencer avec l'en-tête
+        STRATEGIE contenu = modele.entete.remplacer("{titre}", doc.titre)
+        
+        # Générer les sections selon l'ordre configuré
+        POUR section DANS configuration.ordre_sections {
+            SI CIBLE section == "INTRODUCTION" {
+                contenu = contenu + EXECUTION GenererSectionIntroduction doc modele
+            } SINON SI CIBLE section == "BASES" {
+                contenu = contenu + EXECUTION GenererSectionBases doc modele
+            } SINON SI CIBLE section == "MISSIONS" {
+                contenu = contenu + EXECUTION GenererSectionMissions doc modele
+            } SINON SI CIBLE section == "STRATEGIES" {
+                contenu = contenu + EXECUTION GenererSectionStrategies doc modele
+            } SINON SI CIBLE section == "FORMATIONS" {
+                contenu = contenu + EXECUTION GenererSectionFormations doc modele
+            } SINON SI CIBLE section == "EXEMPLES" ET configuration.inclure_exemples {
+                contenu = contenu + EXECUTION GenererSectionExemples doc modele
+            } SINON SI CIBLE section == "INDEX" {
+                contenu = contenu + EXECUTION GenererSectionIndex doc modele
+            }
+        }
+        
+        # Ajouter le pied de page
+        contenu = contenu + modele.pied_page
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION GenererSectionIntroduction {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Introduction")
+        
+        # Ajouter la description du fichier
+        STRATEGIE contenu = doc.description OU "Aucune description disponible."
+        
+        # Ajouter les métadonnées
+        contenu = contenu + "\n\n**Généré le:** " + doc.meta.date_generation
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionBases {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Bases")
+        
+        # Générer la documentation pour chaque base
+        STRATEGIE contenu = ""
+        
+        SI CIBLE RECONNAISSANCE doc.bases == 0 {
+            contenu = "Aucune base définie dans ce fichier."
+        } SINON {
+            POUR base DANS doc.bases {
+                contenu = contenu + modele.base.remplacer("{nom}", base.nom).remplacer("{description}", base.description OU "Aucune description disponible.")
+            }
+        }
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionMissions {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Missions")
+        
+        # Générer la documentation pour chaque mission de chaque base
+        STRATEGIE contenu = ""
+        MUNITION missions_totales = 0
+        
+        POUR base DANS doc.bases {
+            SI CIBLE base.missions ET RECONNAISSANCE base.missions > 0 {
+                contenu = contenu + "### Missions de la base " + base.nom + "\n\n"
+                
+                POUR mission DANS base.missions {
+                    # Générer la liste des paramètres formatés
+                    STRATEGIE params_formatte = ""
+                    
+                    POUR parametre DANS mission.parametres {
+                        params_formatte = params_formatte + modele.parametre.remplacer("{nom}", parametre.nom).remplacer("{description}", parametre.description)
+                    }
+                    
+                    # Générer la documentation de la mission
+                    contenu = contenu + modele.mission
+                        .remplacer("{nom}", mission.nom)
+                        .remplacer("{description}", mission.description OU "Aucune description disponible.")
+                        .remplacer("{signature}", mission.signature)
+                        .remplacer("{parametres}", params_formatte OU "Aucun paramètre.")
+                        .remplacer("{retour}", mission.retour)
+                    
+                    # Ajouter le code source si configuré
+                    SI CIBLE mission.code {
+                        contenu = contenu + modele.code.remplacer("{code}", mission.code)
+                    }
+                    
+                    missions_totales = missions_totales + 1
+                }
+            }
+        }
+        
+        SI CIBLE missions_totales == 0 {
+            contenu = "Aucune mission définie dans ce fichier."
+        }
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionStrategies {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Stratégies")
+        
+        # Générer la documentation pour chaque stratégie de chaque base
+        STRATEGIE contenu = ""
+        MUNITION strategies_totales = 0
+        
+        POUR base DANS doc.bases {
+            SI CIBLE base.strategies ET RECONNAISSANCE base.strategies > 0 {
+                contenu = contenu + "### Stratégies de la base " + base.nom + "\n\n"
+                
+                POUR strategie DANS base.strategies {
+                    # Générer la liste des champs formatés
+                    STRATEGIE champs_formatte = ""
+                    
+                    POUR champ DANS strategie.champs {
+                        champs_formatte = champs_formatte + modele.champ.remplacer("{nom}", champ.nom).remplacer("{description}", champ.description)
+                    }
+                    
+                    # Générer la documentation de la stratégie
+                    contenu = contenu + modele.strategie
+                        .remplacer("{nom}", strategie.nom)
+                        .remplacer("{description}", strategie.description OU "Aucune description disponible.")
+                        .remplacer("{champs}", champs_formatte OU "Aucun champ.")
+                    
+                    # Ajouter le code source si configuré
+                    SI CIBLE strategie.code {
+                        contenu = contenu + modele.code.remplacer("{code}", strategie.code)
+                    }
+                    
+                    strategies_totales = strategies_totales + 1
+                }
+            }
+        }
+        
+        SI CIBLE strategies_totales == 0 {
+            contenu = "Aucune stratégie définie dans ce fichier."
+        }
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionFormations {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Formations")
+        
+        # Générer la documentation pour chaque formation de chaque base
+        STRATEGIE contenu = ""
+        MUNITION formations_totales = 0
+        
+        POUR base DANS doc.bases {
+            SI CIBLE base.formations ET RECONNAISSANCE base.formations > 0 {
+                contenu = contenu + "### Formations de la base " + base.nom + "\n\n"
+                
+                POUR formation DANS base.formations {
+                    # Générer la documentation de la formation
+                    contenu = contenu + "#### Formation: " + formation.nom + "\n\n"
+                    contenu = contenu + (formation.description OU "Aucune description disponible.") + "\n\n"
+                    
+                    # Ajouter les éléments si disponibles
+                    SI CIBLE formation.elements ET RECONNAISSANCE formation.elements > 0 {
+                        contenu = contenu + "**Éléments:**\n\n"
+                        
+                        POUR element DANS formation.elements {
+                            contenu = contenu + "- Type: " + element.type + ", Valeur: " + element.valeur + "\n"
+                        }
+                        contenu = contenu + "\n"
+                    }
+                    
+                    # Ajouter le code source si configuré
+                    SI CIBLE formation.code {
+                        contenu = contenu + modele.code.remplacer("{code}", formation.code)
+                    }
+                    
+                    formations_totales = formations_totales + 1
+                }
+            }
+        }
+        
+        SI CIBLE formations_totales == 0 {
+            contenu = "Aucune formation définie dans ce fichier."
+        }
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionExemples {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Exemples")
+        
+        # Cette section dépend de l'extraction d'exemples qui n'est pas encore implémentée
+        # Pour cette version, utiliser un message placeholder
+        STRATEGIE contenu = "Les exemples d'utilisation seront ajoutés dans une version future de la documentation."
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION GenererSectionIndex {
+    PARAMETRE doc
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE section = modele.section.remplacer("{titre}", "Index")
+        
+        # Générer un index des éléments documentés
+        STRATEGIE contenu = "### Index des éléments documentés\n\n"
+        
+        # Index des bases
+        contenu = contenu + "#### Bases\n\n"
+        POUR base DANS doc.bases {
+            contenu = contenu + "- " + base.nom + "\n"
+        }
+        contenu = contenu + "\n"
+        
+        # Index des missions
+        contenu = contenu + "#### Missions\n\n"
+        POUR base DANS doc.bases {
+            POUR mission DANS base.missions {
+                contenu = contenu + "- " + mission.nom + " (Base: " + base.nom + ")\n"
+            }
+        }
+        contenu = contenu + "\n"
+        
+        # Index des stratégies
+        contenu = contenu + "#### Stratégies\n\n"
+        POUR base DANS doc.bases {
+            POUR strategie DANS base.strategies {
+                contenu = contenu + "- " + strategie.nom + " (Base: " + base.nom + ")\n"
+            }
+        }
+        contenu = contenu + "\n"
+        
+        RETRAITE section.remplacer("{contenu}", contenu)
+    }
+}
+
+MISSION MettreAJourIndex {
+    PARAMETRE index_global
+    PARAMETRE doc
+    
+    ORDRE DE BATAILLE {
+        # Mettre à jour l'index global avec les éléments documentés
+        POUR base DANS doc.bases {
+            # Indexer la base
+            index_global.bases[base.nom] = {
+                description: base.description,
+                fichier: doc.titre
+            }
+            
+            # Indexer les missions
+            POUR mission DANS base.missions {
+                index_global.missions[mission.nom] = {
+                    description: mission.description,
+                    base: base.nom,
+                    fichier: doc.titre
+                }
+            }
+            
+            # Indexer les stratégies
+            POUR strategie DANS base.strategies {
+                index_global.strategies[strategie.nom] = {
+                    description: strategie.description,
+                    base: base.nom,
+                    fichier: doc.titre
+                }
+            }
+            
+            # Indexer les formations
+            POUR formation DANS base.formations {
+                index_global.formations[formation.nom] = {
+                    description: formation.description,
+                    base: base.nom,
+                    fichier: doc.titre
+                }
+            }
+        }
+        
+        RETRAITE index_global
+    }
+}
+
+MISSION GenererIndex {
+    PARAMETRE generateur
+    PARAMETRE chemin_repertoire
+    PARAMETRE format_sortie
+    
+    ORDRE DE BATAILLE {
+        RAPPORT "Génération de l'index global"
+        
+        # Utiliser le modèle approprié
+        STRATEGIE modele = generateur.modeles[format_sortie]
+        
+        # Créer le contenu de l'index
+        STRATEGIE contenu = modele.entete.remplacer("{titre}", "Index de la Documentation AGAM")
+        
+        # Section pour les bases
+        contenu = contenu + modele.section
+            .remplacer("{titre}", "Index des Bases")
+            .remplacer("{contenu}", EXECUTION GenererIndexBases generateur.index.bases modele)
+        
+        # Section pour les missions
+        contenu = contenu + modele.section
+            .remplacer("{titre}", "Index des Missions")
+            .remplacer("{contenu}", EXECUTION GenererIndexMissions generateur.index.missions modele)
+        
+        # Section pour les stratégies
+        contenu = contenu + modele.section
+            .remplacer("{titre}", "IndexMISSION GenererIndexBases {
+    PARAMETRE bases
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu = ""
+        
+        # Vérifier s'il y a des bases à indexer
+        SI CIBLE RECONNAISSANCE CLES(bases) == 0 {
+            contenu = "Aucune base documentée."
+            RETRAITE contenu
+        }
+        
+        # Générer une liste des bases
+        SI CIBLE modele.table {
+            # Format tabulaire
+            STRATEGIE entetes = "Nom | Description | Fichier"
+            STRATEGIE separateurs = "--- | --- | ---"
+            STRATEGIE lignes = ""
+            
+            POUR cle DANS CLES(bases) {
+                STRATEGIE base = bases[cle]
+                STRATEGIE ligne = cle + " | " + (base.description OU "Aucune description") + " | " + base.fichier
+                lignes = lignes + modele.ligne_table.remplacer("{cellules}", ligne) + "\n"
+            }
+            
+            contenu = modele.table
+                .remplacer("{entetes}", entetes)
+                .remplacer("{separateurs}", separateurs)
+                .remplacer("{lignes}", lignes)
+        } SINON {
+            # Format simple
+            POUR cle DANS CLES(bases) {
+                STRATEGIE base = bases[cle]
+                contenu = contenu + "- **" + cle + "**: " + (base.description OU "Aucune description") + " (Fichier: " + base.fichier + ")\n"
+            }
+        }
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION GenererIndexMissions {
+    PARAMETRE missions
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu = ""
+        
+        # Vérifier s'il y a des missions à indexer
+        SI CIBLE RECONNAISSANCE CLES(missions) == 0 {
+            contenu = "Aucune mission documentée."
+            RETRAITE contenu
+        }
+        
+        # Générer une liste des missions
+        SI CIBLE modele.table {
+            # Format tabulaire
+            STRATEGIE entetes = "Nom | Description | Base | Fichier"
+            STRATEGIE separateurs = "--- | --- | --- | ---"
+            STRATEGIE lignes = ""
+            
+            POUR cle DANS CLES(missions) {
+                STRATEGIE mission = missions[cle]
+                STRATEGIE ligne = cle + " | " + (mission.description OU "Aucune description") + " | " + mission.base + " | " + mission.fichier
+                lignes = lignes + modele.ligne_table.remplacer("{cellules}", ligne) + "\n"
+            }
+            
+            contenu = modele.table
+                .remplacer("{entetes}", entetes)
+                .remplacer("{separateurs}", separateurs)
+                .remplacer("{lignes}", lignes)
+        } SINON {
+            # Format simple
+            POUR cle DANS CLES(missions) {
+                STRATEGIE mission = missions[cle]
+                contenu = contenu + "- **" + cle + "**: " + (mission.description OU "Aucune description") + " (Base: " + mission.base + ", Fichier: " + mission.fichier + ")\n"
+            }
+        }
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION GenererIndexStrategies {
+    PARAMETRE strategies
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu = ""
+        
+        # Vérifier s'il y a des stratégies à indexer
+        SI CIBLE RECONNAISSANCE CLES(strategies) == 0 {
+            contenu = "Aucune stratégie documentée."
+            RETRAITE contenu
+        }
+        
+        # Générer une liste des stratégies
+        SI CIBLE modele.table {
+            # Format tabulaire
+            STRATEGIE entetes = "Nom | Description | Base | Fichier"
+            STRATEGIE separateurs = "--- | --- | --- | ---"
+            STRATEGIE lignes = ""
+            
+            POUR cle DANS CLES(strategies) {
+                STRATEGIE strategie = strategies[cle]
+                STRATEGIE ligne = cle + " | " + (strategie.description OU "Aucune description") + " | " + strategie.base + " | " + strategie.fichier
+                lignes = lignes + modele.ligne_table.remplacer("{cellules}", ligne) + "\n"
+            }
+            
+            contenu = modele.table
+                .remplacer("{entetes}", entetes)
+                .remplacer("{separateurs}", separateurs)
+                .remplacer("{lignes}", lignes)
+        } SINON {
+            # Format simple
+            POUR cle DANS CLES(strategies) {
+                STRATEGIE strategie = strategies[cle]
+                contenu = contenu + "- **" + cle + "**: " + (strategie.description OU "Aucune description") + " (Base: " + strategie.base + ", Fichier: " + strategie.fichier + ")\n"
+            }
+        }
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION GenererIndexFormations {
+    PARAMETRE formations
+    PARAMETRE modele
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE contenu = ""
+        
+        # Vérifier s'il y a des formations à indexer
+        SI CIBLE RECONNAISSANCE CLES(formations) == 0 {
+            contenu = "Aucune formation documentée."
+            RETRAITE contenu
+        }
+        
+        # Générer une liste des formations
+        SI CIBLE modele.table {
+            # Format tabulaire
+            STRATEGIE entetes = "Nom | Description | Base | Fichier"
+            STRATEGIE separateurs = "--- | --- | --- | ---"
+            STRATEGIE lignes = ""
+            
+            POUR cle DANS CLES(formations) {
+                STRATEGIE formation = formations[cle]
+                STRATEGIE ligne = cle + " | " + (formation.description OU "Aucune description") + " | " + formation.base + " | " + formation.fichier
+                lignes = lignes + modele.ligne_table.remplacer("{cellules}", ligne) + "\n"
+            }
+            
+            contenu = modele.table
+                .remplacer("{entetes}", entetes)
+                .remplacer("{separateurs}", separateurs)
+                .remplacer("{lignes}", lignes)
+        } SINON {
+            # Format simple
+            POUR cle DANS CLES(formations) {
+                STRATEGIE formation = formations[cle]
+                contenu = contenu + "- **" + cle + "**: " + (formation.description OU "Aucune description") + " (Base: " + formation.base + ", Fichier: " + formation.fichier + ")\n"
+            }
+        }
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION ExtraireDescription {
+    PARAMETRE commentaires
+    
+    ORDRE DE BATAILLE {
+        # Extraire la description depuis les commentaires
+        # Dans une implémentation réelle, ceci analyserait les commentaires
+        # pour extraire les balises spécifiques comme @description, etc.
+        
+        # Pour cette version simplifiée, utiliser le texte complet des commentaires
+        RETRAITE commentaires
+    }
+}
+
+MISSION ExtraireDescriptionParametre {
+    PARAMETRE parametre
+    PARAMETRE commentaires_mission
+    
+    ORDRE DE BATAILLE {
+        # Extraire la description du paramètre depuis les commentaires de la mission
+        # Dans une implémentation réelle, ceci rechercherait les balises @param
+        # et extrairait la description correspondante
+        
+        # Pour cette version simplifiée, retourner une description générique
+        RETRAITE "Paramètre de la mission"
+    }
+}
+
+MISSION ExtraireDescriptionChamp {
+    PARAMETRE champ
+    PARAMETRE commentaires_strategie
+    
+    ORDRE DE BATAILLE {
+        # Extraire la description du champ depuis les commentaires de la stratégie
+        # Dans une implémentation réelle, ceci rechercherait les balises @champ
+        # et extrairait la description correspondante
+        
+        # Pour cette version simplifiée, retourner une description générique
+        RETRAITE "Champ de la stratégie"
+    }
+}
+
+MISSION ExtraireRetour {
+    PARAMETRE commentaires
+    
+    ORDRE DE BATAILLE {
+        # Extraire la description du retour depuis les commentaires
+        # Dans une implémentation réelle, ceci rechercherait les balises @retour
+        # et extrairait la description correspondante
+        
+        # Pour cette version simplifiée, retourner une description générique
+        RETRAITE "Valeur de retour de la mission"
+    }
+}
+
+MISSION InfererType {
+    PARAMETRE valeur
+    
+    ORDRE DE BATAILLE {
+        # Inférer le type d'une valeur
+        # Dans une implémentation réelle, ceci analyserait la valeur
+        # pour déterminer son type (chaîne, nombre, booléen, objet, etc.)
+        
+        # Pour cette version simplifiée, utiliser une logique basique
+        SI CIBLE valeur == NULE {
+            RETRAITE "NULE"
+        } SINON SI CIBLE TYPEDE valeur == "NOMBRE" {
+            RETRAITE "NOMBRE"
+        } SINON SI CIBLE TYPEDE valeur == "CHAINE" {
+            RETRAITE "CHAINE"
+        } SINON SI CIBLE TYPEDE valeur == "BOOLEEN" {
+            RETRAITE "BOOLEEN"
+        } SINON SI CIBLE TYPEDE valeur == "OBJET" {
+            RETRAITE "OBJET"
+        } SINON SI CIBLE TYPEDE valeur == "FORMATION" {
+            RETRAITE "FORMATION"
+        } SINON {
+            RETRAITE "INCONNU"
+        }
+    }
+}
+
+MISSION ListerFichiersAGAM {
+    PARAMETRE chemin_repertoire
+    PARAMETRE recursif
+    
+    ORDRE DE BATAILLE {
+        # Lister les fichiers AGAM dans un répertoire
+        # Dans une implémentation réelle, ceci utiliserait des API système
+        # pour parcourir le répertoire et filtrer les fichiers .gma
+        
+        # Pour cette version simplifiée, simuler une liste de fichiers
+        FORMATION fichiers = [
+            chemin_repertoire + "/fichier1.gma",
+            chemin_repertoire + "/fichier2.gma",
+            chemin_repertoire + "/sous-rep/fichier3.gma"
+        ]
+        
+        RETRAITE fichiers
+    }
+}
+
+MISSION AnalyserSyntaxeAGAM {
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Analyser la syntaxe AGAM pour créer un AST
+        # Dans une implémentation réelle, ceci utiliserait un analyseur syntaxique
+        # pour transformer le code source en arbre syntaxique abstrait
+        
+        # Pour cette version simplifiée, simuler un AST basique
+        STRATEGIE ast = {
+            nom_fichier: "exemple.gma",
+            commentaires_fichier: "Ceci est un exemple de fichier AGAM.",
+            bases: [
+                {
+                    nom: "EXEMPLE_BASE",
+                    commentaires: "Ceci est un exemple de base.",
+                    missions: [
+                        {
+                            nom: "MissionExemple",
+                            commentaires: "Ceci est un exemple de mission.",
+                            parametres: [
+                                {
+                                    nom: "param1",
+                                    type: "CHAINE"
+                                },
+                                {
+                                    nom: "param2",
+                                    type: "NOMBRE"
+                                }
+                            ],
+                            code: "MISSION MissionExemple {\n    PARAMETRE param1\n    PARAMETRE param2\n    \n    ORDRE DE BATAILLE {\n        # Code de la mission\n        RETRAITE VRAI\n    }\n}",
+                            position: {
+                                ligne: 10,
+                                colonne: 1
+                            }
+                        }
+                    ],
+                    strategies: [
+                        {
+                            nom: "StrategieExemple",
+                            commentaires: "Ceci est un exemple de stratégie.",
+                            champs: [
+                                {
+                                    nom: "champ1",
+                                    valeur: "valeur1"
+                                },
+                                {
+                                    nom: "champ2",
+                                    valeur: 42
+                                }
+                            ],
+                            code: "STRATEGIE StrategieExemple = {\n    champ1: \"valeur1\",\n    champ2: 42\n}",
+                            position: {
+                                ligne: 20,
+                                colonne: 1
+                            }
+                        }
+                    ],
+                    formations: [
+                        {
+                            nom: "FormationExemple",
+                            commentaires: "Ceci est un exemple de formation.",
+                            elements: [
+                                "element1",
+                                "element2",
+                                42
+                            ],
+                            code: "FORMATION FormationExemple = [\n    \"element1\",\n    \"element2\",\n    42\n]",
+                            position: {
+                                ligne: 30,
+                                colonne: 1
+                            }
+                        }
+                    ]
+                }
+            ],
+            erreurs: []
+        }
+        
+        RETRAITE ast
+    }
+}
+
+MISSION ConstruireChemin {
+    PARAMETRE chemin_fichier
+    PARAMETRE format_sortie
+    
+    ORDRE DE BATAILLE {
+        # Construire le chemin du fichier de documentation
+        # En remplaçant l'extension .gma par l'extension du format de sortie
+        
+        SI CIBLE format_sortie == "MARKDOWN" {
+            RETRAITE chemin_fichier.remplacer(".gma", ".md")
+        } SINON SI CIBLE format_sortie == "HTML" {
+            RETRAITE chemin_fichier.remplacer(".gma", ".html")
+        } SINON SI CIBLE format_sortie == "PDF" {
+            RETRAITE chemin_fichier.remplacer(".gma", ".pdf")
+        } SINON {
+            RETRAITE chemin_fichier + ".doc"
+        }
+    }
+}
+
+MISSION ObtenirDateActuelle {
+    ORDRE DE BATAILLE {
+        # Obtenir la date actuelle formatée
+        # Dans une implémentation réelle, ceci utiliserait des API système
+        
+        # Pour cette version simplifiée, retourner une date fixe
+        RETRAITE "2025-02-24"
+    }
+}
+
+MISSION EcrireFichier {
+    PARAMETRE chemin_fichier
+    PARAMETRE contenu
+    
+    ORDRE DE BATAILLE {
+        # Écrire le contenu dans un fichier
+        # Dans une implémentation réelle, ceci utiliserait des API système
+        
+        RAPPORT "Écriture du fichier: " + chemin_fichier
+        
+        # Simuler une écriture réussie
+        RETRAITE VRAI
+    }
+}
+
+MISSION LireFichier {
+    PARAMETRE chemin_fichier
+    PARAMETRE encodage
+    
+    ORDRE DE BATAILLE {
+        # Lire le contenu d'un fichier
+        # Dans une implémentation réelle, ceci utiliserait des API système
+        
+        RAPPORT "Lecture du fichier: " + chemin_fichier
+        
+        # Simuler une lecture réussie avec un contenu d'exemple
+        RETRAITE "BASE EXEMPLE\n\n# Ceci est un exemple de contenu de fichier AGAM\n\nMISSION Exemple {\n    # Code de la mission\n}\n\nFIN BASE"
+    }
+}
+
+MISSION CONTIENT {
+    PARAMETRE liste
+    PARAMETRE element
+    
+    ORDRE DE BATAILLE {
+        POUR item DANS liste {
+            SI CIBLE item == element {
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION CLES {
+    PARAMETRE objet
+    
+    ORDRE DE BATAILLE {
+        # Obtenir les clés d'un objet
+        # Dans une implémentation réelle, ceci utiliserait la fonction Object.keys()
+        
+        # Pour cette version simplifiée, simuler quelques clés
+        RETRAITE ["cle1", "cle2", "cle3"]
+    }
+}
+
+FIN BASE

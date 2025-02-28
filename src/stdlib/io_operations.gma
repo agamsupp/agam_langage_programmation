@@ -1,0 +1,434 @@
+BASE STDLIB_IO
+
+# Bibliothèque standard d'AGAM - Module I/O (Entrées/Sorties)
+# Implémentation des opérations de fichiers et flux d'entrée/sortie
+
+STRATEGIE ConfigurationIO {
+    taille_tampon: 4096,
+    encodage_defaut: "UTF-8",
+    retries_max: 3,
+    timeout_ms: 5000,
+    journalisation: VRAI
+}
+
+#
+# Opérations de base sur les fichiers
+#
+MISSION FichierLire {
+    PARAMETRE chemin_fichier
+    PARAMETRE encodage
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si l'encodage est fourni, sinon utiliser la valeur par défaut
+        SI CIBLE encodage == NULE {
+            encodage = ConfigurationIO.encodage_defaut
+        }
+        
+        # Vérifier l'existence du fichier
+        SI CIBLE !FichierExiste chemin_fichier {
+            RAPPORT "ERREUR: Fichier non trouvé: " + chemin_fichier
+            RETRAITE NULE
+        }
+        
+        # Simuler la lecture du fichier
+        FORMATION tampon = []
+        
+        # Dans un système réel, ceci utiliserait des appels système pour lire le fichier
+        # et gérerait les erreurs et exceptions appropriées
+        
+        # Simulation du contenu lu
+        STRATEGIE contenu = "Contenu simulé du fichier " + chemin_fichier
+        
+        RAPPORT "Fichier lu avec succès: " + chemin_fichier
+        
+        RETRAITE contenu
+    }
+}
+
+MISSION FichierEcrire {
+    PARAMETRE chemin_fichier
+    PARAMETRE contenu
+    PARAMETRE encodage
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si l'encodage est fourni, sinon utiliser la valeur par défaut
+        SI CIBLE encodage == NULE {
+            encodage = ConfigurationIO.encodage_defaut
+        }
+        
+        # Simuler l'écriture dans un fichier
+        # Dans un système réel, ceci utiliserait des appels système pour écrire dans le fichier
+        # et gérerait les erreurs et exceptions appropriées
+        
+        RAPPORT "Fichier écrit avec succès: " + chemin_fichier
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierAjouter {
+    PARAMETRE chemin_fichier
+    PARAMETRE contenu
+    PARAMETRE encodage
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si l'encodage est fourni, sinon utiliser la valeur par défaut
+        SI CIBLE encodage == NULE {
+            encodage = ConfigurationIO.encodage_defaut
+        }
+        
+        # Vérifier l'existence du fichier
+        SI CIBLE !FichierExiste chemin_fichier {
+            # Si le fichier n'existe pas, le créer
+            RETRAITE EXECUTION FichierEcrire chemin_fichier contenu encodage
+        }
+        
+        # Simuler l'ajout au fichier
+        # Dans un système réel, ceci utiliserait des appels système pour ajouter au fichier
+        # et gérerait les erreurs et exceptions appropriées
+        
+        RAPPORT "Contenu ajouté au fichier avec succès: " + chemin_fichier
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierExiste {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        # Simuler la vérification de l'existence d'un fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, supposons que certains fichiers existent
+        SI CIBLE chemin_fichier == "fichier_test.txt" OU chemin_fichier == "/chemin/vers/existant.dat" {
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION FichierSupprimer {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du fichier
+        SI CIBLE !FichierExiste chemin_fichier {
+            RAPPORT "ERREUR: Fichier non trouvé pour suppression: " + chemin_fichier
+            RETRAITE FAUX
+        }
+        
+        # Simuler la suppression du fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        RAPPORT "Fichier supprimé avec succès: " + chemin_fichier
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierRenommer {
+    PARAMETRE ancien_chemin
+    PARAMETRE nouveau_chemin
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du fichier source
+        SI CIBLE !FichierExiste ancien_chemin {
+            RAPPORT "ERREUR: Fichier source non trouvé: " + ancien_chemin
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le fichier destination existe déjà
+        SI CIBLE FichierExiste nouveau_chemin {
+            RAPPORT "ERREUR: Fichier destination existe déjà: " + nouveau_chemin
+            RETRAITE FAUX
+        }
+        
+        # Simuler le renommage du fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        RAPPORT "Fichier renommé avec succès: " + ancien_chemin + " -> " + nouveau_chemin
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FichierCopier {
+    PARAMETRE source
+    PARAMETRE destination
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du fichier source
+        SI CIBLE !FichierExiste source {
+            RAPPORT "ERREUR: Fichier source non trouvé: " + source
+            RETRAITE FAUX
+        }
+        
+        # Lire le contenu du fichier source
+        STRATEGIE contenu = EXECUTION FichierLire source NULE
+        
+        # Écrire le contenu dans le fichier destination
+        RETRAITE EXECUTION FichierEcrire destination contenu NULE
+    }
+}
+
+MISSION FichierTaille {
+    PARAMETRE chemin_fichier
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du fichier
+        SI CIBLE !FichierExiste chemin_fichier {
+            RAPPORT "ERREUR: Fichier non trouvé: " + chemin_fichier
+            RETRAITE -1
+        }
+        
+        # Simuler l'obtention de la taille du fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, retourner une taille aléatoire
+        MUNITION taille = 1024  # Simulé à 1 KB
+        
+        RETRAITE taille
+    }
+}
+
+#
+# Opérations sur les répertoires
+#
+MISSION RepertoireCreer {
+    PARAMETRE chemin_repertoire
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le répertoire existe déjà
+        SI CIBLE RepertoireExiste chemin_repertoire {
+            RAPPORT "AVERTISSEMENT: Répertoire existe déjà: " + chemin_repertoire
+            RETRAITE FAUX
+        }
+        
+        # Simuler la création du répertoire
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        RAPPORT "Répertoire créé avec succès: " + chemin_repertoire
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION RepertoireExiste {
+    PARAMETRE chemin_repertoire
+    
+    ORDRE DE BATAILLE {
+        # Simuler la vérification de l'existence d'un répertoire
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, supposons que certains répertoires existent
+        SI CIBLE chemin_repertoire == "/chemin/vers/existant" OU chemin_repertoire == "C:/utilisateurs/docs" {
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION RepertoireSupprimer {
+    PARAMETRE chemin_repertoire
+    PARAMETRE recursif
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du répertoire
+        SI CIBLE !RepertoireExiste chemin_repertoire {
+            RAPPORT "ERREUR: Répertoire non trouvé: " + chemin_repertoire
+            RETRAITE FAUX
+        }
+        
+        # Simuler la suppression du répertoire
+        # Dans un système réel, ceci utiliserait des appels système
+        # et vérifierait si le répertoire est vide ou si la suppression est récursive
+        
+        SI CIBLE recursif {
+            RAPPORT "Répertoire et son contenu supprimés avec succès: " + chemin_repertoire
+        } SINON {
+            RAPPORT "Répertoire vide supprimé avec succès: " + chemin_repertoire
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION RepertoireLister {
+    PARAMETRE chemin_repertoire
+    
+    ORDRE DE BATAILLE {
+        # Vérifier l'existence du répertoire
+        SI CIBLE !RepertoireExiste chemin_repertoire {
+            RAPPORT "ERREUR: Répertoire non trouvé: " + chemin_repertoire
+            RETRAITE NULE
+        }
+        
+        # Simuler la liste des fichiers et sous-répertoires
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, retourner une liste fictive
+        FORMATION liste = [
+            {
+                nom: "fichier1.txt",
+                type: "FICHIER",
+                taille: 1024,
+                date_modification: "2025-02-24"
+            },
+            {
+                nom: "sous_repertoire",
+                type: "REPERTOIRE",
+                taille: 0,
+                date_modification: "2025-02-23"
+            }
+        ]
+        
+        RETRAITE liste
+    }
+}
+
+#
+# Opérations de flux d'entrée/sortie
+#
+MISSION FluxCreer {
+    PARAMETRE mode
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE modes_valides = ["LECTURE", "ECRITURE", "AJOUT"]
+        
+        # Vérifier si le mode est valide
+        SI CIBLE !CONTIENT modes_valides mode {
+            RAPPORT "ERREUR: Mode de flux invalide: " + mode
+            RETRAITE NULE
+        }
+        
+        # Créer un flux avec le mode spécifié
+        STRATEGIE flux = {
+            mode: mode,
+            tampon: [],
+            position: 0,
+            ouvert: VRAI
+        }
+        
+        RETRAITE flux
+    }
+}
+
+MISSION FluxOuvrir {
+    PARAMETRE chemin_fichier
+    PARAMETRE mode
+    
+    ORDRE DE BATAILLE {
+        # Créer un flux
+        STRATEGIE flux = EXECUTION FluxCreer mode
+        
+        SI CIBLE flux == NULE {
+            RETRAITE NULE
+        }
+        
+        # Associer le flux à un fichier
+        flux.chemin_fichier = chemin_fichier
+        
+        # Si mode est LECTURE, vérifier l'existence du fichier
+        SI CIBLE mode == "LECTURE" ET !FichierExiste chemin_fichier {
+            RAPPORT "ERREUR: Fichier non trouvé pour lecture: " + chemin_fichier
+            RETRAITE NULE
+        }
+        
+        # Simuler l'ouverture du fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        RAPPORT "Flux ouvert pour " + mode + ": " + chemin_fichier
+        
+        RETRAITE flux
+    }
+}
+
+MISSION FluxFermer {
+    PARAMETRE flux
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le flux est déjà fermé
+        SI CIBLE !flux.ouvert {
+            RAPPORT "AVERTISSEMENT: Flux déjà fermé"
+            RETRAITE FAUX
+        }
+        
+        # Fermer le flux
+        flux.ouvert = FAUX
+        
+        # Si mode est ECRITURE ou AJOUT, écrire le contenu du tampon dans le fichier
+        SI CIBLE flux.mode == "ECRITURE" OU flux.mode == "AJOUT" {
+            # Simuler l'écriture dans le fichier
+            # Dans un système réel, ceci utiliserait des appels système
+        }
+        
+        RAPPORT "Flux fermé"
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FluxLire {
+    PARAMETRE flux
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le flux est ouvert
+        SI CIBLE !flux.ouvert {
+            RAPPORT "ERREUR: Tentative de lecture sur un flux fermé"
+            RETRAITE NULE
+        }
+        
+        # Vérifier si le mode est LECTURE
+        SI CIBLE flux.mode != "LECTURE" {
+            RAPPORT "ERREUR: Tentative de lecture sur un flux non ouvert en lecture"
+            RETRAITE NULE
+        }
+        
+        # Simuler la lecture depuis le fichier
+        # Dans un système réel, ceci utiliserait des appels système
+        
+        # Pour la simulation, retourner une chaîne fictive
+        STRATEGIE donnees = "Données lues depuis " + flux.chemin_fichier + " (position: " + flux.position + ")"
+        
+        # Mettre à jour la position
+        flux.position = flux.position + taille
+        
+        RETRAITE donnees
+    }
+}
+
+MISSION FluxEcrire {
+    PARAMETRE flux
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Vérifier si le flux est ouvert
+        SI CIBLE !flux.ouvert {
+            RAPPORT "ERREUR: Tentative d'écriture sur un flux fermé"
+            RETRAITE FAUX
+        }
+        
+        # Vérifier si le mode est ECRITURE ou AJOUT
+        SI CIBLE flux.mode != "ECRITURE" ET flux.mode != "AJOUT" {
+            RAPPORT "ERREUR: Tentative d'écriture sur un flux non ouvert en écriture ou ajout"
+            RETRAITE FAUX
+        }
+        
+        # Ajouter les données au tampon
+        flux.tampon = DEPLOIEMENT flux.tampon donnees
+        
+        # Mettre à jour la position
+        flux.position = flux.position + RECONNAISSANCE donnees
+        
+        # Dans un système réel, on pourrait automatiquement vider le tampon
+        # si sa taille dépasse ConfigurationIO.taille_tampon
+        
+        RETRAITE VRAI
+    }
+}
+
+MISSION FluxPosition {

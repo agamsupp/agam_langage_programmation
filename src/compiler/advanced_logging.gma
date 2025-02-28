@@ -1,0 +1,87 @@
+BASE JOURNALISATION_AVANCEE
+
+STRATEGIE ConfigurationJournalisation {
+    FORMATION niveaux = [
+        {
+            nom: "DEBUG",
+            priorite: 0,
+            couleur: "GRIS"
+        },
+        {
+            nom: "INFO",
+            priorite: 1,
+            couleur: "BLANC"
+        },
+        {
+            nom: "AVERTISSEMENT",
+            priorite: 2,
+            couleur: "JAUNE"
+        },
+        {
+            nom: "ERREUR",
+            priorite: 3,
+            couleur: "ROUGE"
+        }
+    ]
+
+    FORMATION destinations = [
+        {
+            type: "FICHIER",
+            chemin: "/var/log/agam.log",
+            rotation: VRAI,
+            taille_max: 10 * 1024 * 1024  # 10MB
+        },
+        {
+            type: "CONSOLE",
+            coloration: VRAI,
+            format: "DETAILLE"
+        }
+    ]
+}
+
+MISSION EnregistrerLog {
+    PARAMETRE niveau
+    PARAMETRE message
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE entree = {
+            timestamp: TEMPS_ACTUEL,
+            niveau: niveau,
+            message: message,
+            contexte: contexte,
+            thread: THREAD_COURANT,
+            pile: OBTENIR_PILE_APPELS
+        }
+        
+        # Formatage du message
+        POUR destination DANS ConfigurationJournalisation.destinations {
+            SELON destination.type {
+                CAS "FICHIER":
+                    EXECUTION EcrireFichierLog destination entree
+                CAS "CONSOLE":
+                    EXECUTION EcrireConsoleLog destination entree
+            }
+        }
+        
+        # Rotation des logs si nécessaire
+        POUR destination DANS ConfigurationJournalisation.destinations {
+            SI CIBLE destination.rotation {
+                EXECUTION VerifierRotationLog destination
+            }
+        }
+    }
+}
+
+MISSION RotationLog {
+    PARAMETRE destination
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE TailleFichier destination.chemin > destination.taille_max {
+            EXECUTION ArchiverLog destination
+            EXECUTION CreerNouveauLog destination
+        }
+    }
+}
+
+FIN BASE

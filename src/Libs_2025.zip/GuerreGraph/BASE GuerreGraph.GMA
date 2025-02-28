@@ -1,0 +1,83 @@
+BASE GuerreGraph
+
+STRATEGIE ConfigurationGraphique {
+    MUNITION LARGEUR = 80
+    MUNITION HAUTEUR = 25
+    STRATEGIE COULEURS {
+        MUNITION ROUGE = 1
+        MUNITION VERT = 2
+        MUNITION ROUGE_ROSE = 3
+    }
+    FORMATION messages = []
+    MUNITION position_y = 0
+}
+
+MISSION InitialiserEcranTactique {
+    ORDRE DE BATAILLE {
+        EFFACER_ECRAN
+        AFFICHER "ÉCRAN TACTIQUE INITIALISÉ (" FUSION ConfigurationGraphique.LARGEUR "x" FUSION ConfigurationGraphique.HAUTEUR ")" ConfigurationGraphique.COULEURS.ROUGE
+    }
+}
+
+MISSION AfficherTexteStrategique {
+    PARAMETRE texte
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {
+        DEPLOIEMENT texte DANS ConfigurationGraphique.messages
+        SI CIBLE RECONNAISSANCE ConfigurationGraphique.messages > ConfigurationGraphique.HAUTEUR - 1 {
+            RETRAIT ConfigurationGraphique.messages 0
+        }
+        EXECUTION RedessinerEcran
+    }
+}
+
+MISSION RedessinerEcran {
+    ORDRE DE BATAILLE {
+        EFFACER_ECRAN
+        POUR message DANS ConfigurationGraphique.messages {
+            AFFICHER message ConfigurationGraphique.COULEURS.ROUGE
+        }
+        AFFICHER "> " ConfigurationGraphique.COULEURS.VERT
+    }
+}
+
+MISSION AttendreTransmission {
+    PARAMETRE millisecondes
+    ORDRE DE BATAILLE {
+        ATTENDRE millisecondes
+    }
+}
+
+MISSION EffetMatrixTactique {
+    PARAMETRE duree
+    ORDRE DE BATAILLE {
+        EXECUTION AfficherTexteStrategique "SIMULATION EFFET MATRIX..." ConfigurationGraphique.COULEURS.VERT
+        MUNITION temps_debut = TEMPS_ACTUEL
+        MANOEUVRE TEMPS_ACTUEL - temps_debut < duree {
+            FORMATION caracteres = "アカサタナABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            MUNITION ligne = ""
+            POUR i DANS SEQUENCE 0 À 20 {
+                MUNITION idx = ALEATOIRE 0 RECONNAISSANCE caracteres
+                ligne = FUSION ligne EXTRACTION caracteres idx
+            }
+            EXECUTION AfficherTexteStrategique ligne ConfigurationGraphique.COULEURS.VERT
+            EXECUTION AttendreTransmission 50
+        }
+    }
+}
+
+MISSION ObtenirTransmission {
+    ORDRE DE BATAILLE {
+        MUNITION entree = LIRE_ENTREE
+        RETRAITE entree
+    }
+}
+
+MISSION FermerEcranTactique {
+    ORDRE DE BATAILLE {
+        EXECUTION AfficherTexteStrategique "SYSTÈME AGAM ARRÊTÉ" ConfigurationGraphique.COULEURS.ROUGE
+        TERMINER
+    }
+}
+
+FIN BASE

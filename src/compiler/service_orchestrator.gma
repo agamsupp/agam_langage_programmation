@@ -1,0 +1,76 @@
+BASE ORCHESTRATEUR_SERVICES
+
+STRATEGIE ConfigurationServices {
+    FORMATION services = [
+        {
+            nom: "COMPILATEUR",
+            dependances: [],
+            mode: "ACTIF",
+            repliques: 2
+        },
+        {
+            nom: "OPTIMISEUR",
+            dependances: ["COMPILATEUR"],
+            mode: "ACTIF",
+            repliques: 1
+        },
+        {
+            nom: "ANALYSEUR",
+            dependances: ["COMPILATEUR"],
+            mode: "PASSIF",
+            repliques: 1
+        }
+    ]
+
+    STRATEGIE politique = {
+        haute_disponibilite: VRAI,
+        equilibrage_charge: VRAI,
+        surveillance: VRAI
+    }
+}
+
+MISSION OrchestreurServices {
+    ORDRE DE BATAILLE {
+        # Initialisation des services
+        POUR service DANS ConfigurationServices.services {
+            EXECUTION DemarrerService service
+        }
+        
+        # Surveillance continue
+        MANOEUVRE ORCHESTRATION {
+            TANT_QUE ORCHESTRATEUR_ACTIF {
+                # Vérification de l'état des services
+                POUR service DANS ConfigurationServices.services {
+                    SI CIBLE ServiceRequiertAttention service {
+                        EXECUTION TraiterService service
+                    }
+                }
+                
+                # Équilibrage de charge
+                SI CIBLE ConfigurationServices.politique.equilibrage_charge {
+                    EXECUTION EquilibrerChargeServices
+                }
+                
+                # Haute disponibilité
+                SI CIBLE ConfigurationServices.politique.haute_disponibilite {
+                    EXECUTION VerifierDisponibilite
+                }
+            }
+        }
+    }
+}
+
+MISSION GererDependances {
+    PARAMETRE service
+    
+    ORDRE DE BATAILLE {
+        POUR dependance DANS service.dependances {
+            SI CIBLE NON ServiceActif dependance {
+                EXECUTION DemarrerService dependance
+                ATTENDRE_DISPONIBILITE dependance
+            }
+        }
+    }
+}
+
+FIN BASE

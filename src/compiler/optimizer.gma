@@ -1,0 +1,88 @@
+BASE OPTIMISEUR
+
+STRATEGIE ReglesOptimisation {
+    FORMATION regles_simples = [
+        {
+            pattern: "MUNITION x = 0 ASSAUT y",
+            optimisation: "MUNITION x = y"
+        },
+        {
+            pattern: "MUNITION x = y ASSAUT 0",
+            optimisation: "MUNITION x = y"
+        },
+        {
+            pattern: "SI CIBLE VRAI { CODE }",
+            optimisation: "CODE"
+        }
+    ]
+
+    FORMATION regles_avancees = [
+        {
+            nom: "EliminationCodeMort",
+            priorite: 1
+        },
+        {
+            nom: "PropagationConstantes",
+            priorite: 2
+        },
+        {
+            nom: "FusionInstructions",
+            priorite: 3
+        }
+    ]
+}
+
+MISSION OptimiserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        MUNITION niveau_optimisation = 2
+        STRATEGIE code_optimise = code_source
+
+        # Phase 1: Optimisations simples
+        MANOEUVRE OPTIMISATION_SIMPLE {
+            POUR regle DANS ReglesOptimisation.regles_simples {
+                code_optimise = EXECUTION AppliquerRegleSimple code_optimise regle
+            }
+        }
+
+        # Phase 2: Optimisations avancées
+        SI CIBLE niveau_optimisation > 1 {
+            POUR regle DANS ReglesOptimisation.regles_avancees {
+                code_optimise = EXECUTION AppliquerRegleAvancee code_optimise regle
+            }
+        }
+
+        RETRAITE code_optimise
+    }
+}
+
+MISSION AppliquerRegleSimple {
+    PARAMETRE code
+    PARAMETRE regle
+    
+    ORDRE DE BATAILLE {
+        TANT_QUE TrouverPattern code regle.pattern {
+            code = RemplacerPattern code regle.pattern regle.optimisation
+        }
+        RETRAITE code
+    }
+}
+
+MISSION PropagationConstantes {
+    ORDRE DE BATAILLE {
+        STRATEGIE constantes = {}
+        
+        MANOEUVRE ANALYSE {
+            POUR instruction DANS code {
+                SI CIBLE EstDeclarationConstante instruction {
+                    constantes[instruction.nom] = instruction.valeur
+                }
+            }
+        }
+        
+        RETRAITE constantes
+    }
+}
+
+FIN BASE

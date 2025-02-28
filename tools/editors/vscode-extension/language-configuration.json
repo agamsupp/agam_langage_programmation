@@ -1,0 +1,28 @@
+{
+  "comments": {
+    "lineComment": "//"
+  },
+  "brackets": [
+    ["BASE", "FIN BASE"],
+    ["SI CIBLE", "FIN CIBLE"],
+    ["CHAIN DE COMMANDE", "FIN COMMANDE"],
+    ["MANOEUVRE", "FIN MANOEUVRE"]
+  ],
+  "autoClosingPairs": [
+    { "open": "BASE", "close": "FIN BASE" },
+    { "open": "SI CIBLE", "close": "FIN CIBLE" },
+    { "open": "CHAIN DE COMMANDE", "close": "FIN COMMANDE" },
+    { "open": "MANOEUVRE", "close": "FIN MANOEUVRE" },
+    { "open": "\"", "close": "\"" }
+  ],
+  "surroundingPairs": [
+    ["\"", "\""]
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*(BASE|MANOEUVRE|SI CIBLE|CHAIN DE COMMANDE)",
+      "end": "^\\s*(FIN BASE|FIN MANOEUVRE|FIN CIBLE|FIN COMMANDE)"
+    }
+  },
+  "wordPattern": "(BASE|FIN BASE|MANOEUVRE|FIN MANOEUVRE|RAPPORT|SURVEILLANCE|SI CIBLE|FIN CIBLE|RAVITAILLEMENT|RETRAITE|MUNITION|CHAIN DE COMMANDE|FIN COMMANDE|CAS|DEFAUT|ASSAUT|REPLI|PUISSANCE DE FEU|DEPLOIEMENT|FUSION|STRATEGIE)"
+}

@@ -1,0 +1,663 @@
+BASE EFFETS_SPECIAUX_MATRIX
+    // Module d'effets spéciaux pour l'animation Matrix
+    // Fournit des effets avancés pour enrichir l'expérience visuelle
+
+    INCORPORATION "matrix/matrix_core.gma"
+    INCORPORATION "animation/animation_core.gma"
+    
+    //----------------------------------------------
+    // CONSTANTES ET TYPES
+    //----------------------------------------------
+    
+    MUNITION EFFET_GLITCH_COURT = 0
+    MUNITION EFFET_GLITCH_MOYEN = 1
+    MUNITION EFFET_GLITCH_LONG = 2
+    
+    MUNITION EFFET_PLUIE_LEGERE = 0
+    MUNITION EFFET_PLUIE_MOYENNE = 1
+    MUNITION EFFET_PLUIE_INTENSE = 2
+    
+    STRATEGIE EFFET_GLITCH
+        MUNITION est_actif BOOLEEN
+        MUNITION duree FLOTTANT
+        MUNITION intensite FLOTTANT  // 0.0 à 1.0
+        MUNITION temps_ecoule FLOTTANT
+        MUNITION intervalle FLOTTANT
+        MUNITION temps_dernier_glitch FLOTTANT
+        MUNITION decalage_x ENTIER
+        MUNITION decalage_y ENTIER
+        MUNITION inversion_couleur BOOLEEN
+        MUNITION distortion FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE EFFET_BRUITAGE
+        MUNITION est_actif BOOLEEN
+        MUNITION duree FLOTTANT
+        MUNITION intensite FLOTTANT  // 0.0 à 1.0
+        MUNITION temps_ecoule FLOTTANT
+        MUNITION densite FLOTTANT    // Proportion de l'écran affecté
+        MUNITION taille_min ENTIER
+        MUNITION taille_max ENTIER
+        MUNITION points FORMATION[100]  // Positions des bruits
+        MUNITION tailles FORMATION[100]  // Tailles des rectangles de bruit
+        MUNITION nb_points ENTIER
+    FIN STRATEGIE
+    
+    STRATEGIE EFFET_CODE_BINAIRE
+        MUNITION est_actif BOOLEEN
+        MUNITION duree FLOTTANT
+        MUNITION temps_ecoule FLOTTANT
+        MUNITION positions FORMATION[200]  // Positions du code binaire
+        MUNITION valeurs FORMATION[200]    // 0 ou 1
+        MUNITION nb_positions ENTIER
+        MUNITION couleur COULEUR_TACTIQUE
+        MUNITION taille_police ENTIER
+        MUNITION intervalle_changement FLOTTANT
+        MUNITION temps_dernier_changement FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE EFFET_PULSATION
+        MUNITION est_actif BOOLEEN
+        MUNITION duree FLOTTANT
+        MUNITION temps_ecoule FLOTTANT
+        MUNITION frequence FLOTTANT
+        MUNITION amplitude FLOTTANT
+        MUNITION couleur_base COULEUR_TACTIQUE
+        MUNITION couleur_cible COULEUR_TACTIQUE
+    FIN STRATEGIE
+    
+    STRATEGIE EFFETS_SPECIAUX
+        MUNITION glitch EFFET_GLITCH
+        MUNITION bruitage EFFET_BRUITAGE
+        MUNITION code_binaire EFFET_CODE_BINAIRE
+        MUNITION pulsation EFFET_PULSATION
+        MUNITION effet_matrix POINTEUR  // Référence à l'effet Matrix principal
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // INITIALISATION
+    //----------------------------------------------
+    
+    MISSION INITIALISER_EFFETS_SPECIAUX
+        PARAMETRE effet_matrix POINTEUR
+        
+        ORDRE DE BATAILLE
+            MUNITION effets EFFETS_SPECIAUX
+            
+            // Référence à l'effet Matrix principal
+            effets.effet_matrix = effet_matrix
+            
+            // Initialiser l'effet de glitch
+            effets.glitch.est_actif = FAUX
+            effets.glitch.duree = 0
+            effets.glitch.intensite = 0.5
+            effets.glitch.temps_ecoule = 0
+            effets.glitch.intervalle = 0.1
+            effets.glitch.temps_dernier_glitch = 0
+            effets.glitch.decalage_x = 0
+            effets.glitch.decalage_y = 0
+            effets.glitch.inversion_couleur = FAUX
+            effets.glitch.distortion = 0
+            
+            // Initialiser l'effet de bruitage
+            effets.bruitage.est_actif = FAUX
+            effets.bruitage.duree = 0
+            effets.bruitage.intensite = 0.3
+            effets.bruitage.temps_ecoule = 0
+            effets.bruitage.densite = 0.01
+            effets.bruitage.taille_min = 2
+            effets.bruitage.taille_max = 10
+            effets.bruitage.nb_points = 0
+            
+            // Initialiser l'effet de code binaire
+            effets.code_binaire.est_actif = FAUX
+            effets.code_binaire.duree = 0
+            effets.code_binaire.temps_ecoule = 0
+            effets.code_binaire.nb_positions = 0
+            effets.code_binaire.couleur = VERT_MATRIX
+            effets.code_binaire.taille_police = 24
+            effets.code_binaire.intervalle_changement = 0.1
+            effets.code_binaire.temps_dernier_changement = 0
+            
+            // Initialiser l'effet de pulsation
+            effets.pulsation.est_actif = FAUX
+            effets.pulsation.duree = 0
+            effets.pulsation.temps_ecoule = 0
+            effets.pulsation.frequence = 2
+            effets.pulsation.amplitude = 0.3
+            effets.pulsation.couleur_base = VERT_MATRIX
+            effets.pulsation.couleur_cible = VERT_BRILLANT
+            
+            RETRAITE effets
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // ACTIVATION DES EFFETS
+    //----------------------------------------------
+    
+    MISSION ACTIVER_EFFET_GLITCH
+        PARAMETRE effets POINTEUR
+        PARAMETRE type_glitch ENTIER = EFFET_GLITCH_COURT
+        PARAMETRE intensite FLOTTANT = 0.5
+        
+        ORDRE DE BATAILLE
+            // Configurer la durée selon le type
+            MUNITION duree = 0.5  // Par défaut (court)
+            
+            SELON type_glitch
+                CAS EFFET_GLITCH_MOYEN:
+                    duree = 1.5
+                    PAUSE
+                CAS EFFET_GLITCH_LONG:
+                    duree = 3.0
+                    PAUSE
+            FIN SELON
+            
+            // Activer et configurer l'effet
+            effets.glitch.est_actif = VRAI
+            effets.glitch.duree = duree
+            effets.glitch.intensite = intensite
+            effets.glitch.temps_ecoule = 0
+            effets.glitch.temps_dernier_glitch = -1  // Pour forcer un glitch immédiatement
+            
+            // Intervalle entre les glitches dépend de l'intensité
+            effets.glitch.intervalle = 0.3 - 0.25 * intensite  // 0.05 à 0.3 seconde
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_BRUITAGE
+        PARAMETRE effets POINTEUR
+        PARAMETRE duree FLOTTANT = 2.0
+        PARAMETRE intensite FLOTTANT = 0.3
+        PARAMETRE densite FLOTTANT = 0.01
+        
+        ORDRE DE BATAILLE
+            // Activer et configurer l'effet
+            effets.bruitage.est_actif = VRAI
+            effets.bruitage.duree = duree
+            effets.bruitage.intensite = intensite
+            effets.bruitage.temps_ecoule = 0
+            effets.bruitage.densite = densite
+            
+            // Générer les points de bruitage
+            MUNITION largeur = effets.effet_matrix.largeur_ecran
+            MUNITION hauteur = effets.effet_matrix.hauteur_ecran
+            MUNITION nb_points = largeur * hauteur * densite / 100  // Un pourcentage de l'écran
+            
+            SI CIBLE nb_points > 100
+                nb_points = 100  // Limitation à 100 points pour des raisons de performance
+            FIN SI
+            
+            effets.bruitage.nb_points = nb_points
+            
+            MANOEUVRE POUR i DE 0 A nb_points - 1
+                // Position aléatoire sur l'écran
+                effets.bruitage.points[i].x = EXECUTION NOMBRE_ALEATOIRE 0, largeur
+                effets.bruitage.points[i].y = EXECUTION NOMBRE_ALEATOIRE 0, hauteur
+                
+                // Taille aléatoire du rectangle de bruit
+                effets.bruitage.tailles[i].largeur = EXECUTION NOMBRE_ALEATOIRE effets.bruitage.taille_min, effets.bruitage.taille_max
+                effets.bruitage.tailles[i].hauteur = EXECUTION NOMBRE_ALEATOIRE effets.bruitage.taille_min, effets.bruitage.taille_max
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_CODE_BINAIRE
+        PARAMETRE effets POINTEUR
+        PARAMETRE duree FLOTTANT = 3.0
+        PARAMETRE nb_elements ENTIER = 100
+        
+        ORDRE DE BATAILLE
+            // Activer et configurer l'effet
+            effets.code_binaire.est_actif = VRAI
+            effets.code_binaire.duree = duree
+            effets.code_binaire.temps_ecoule = 0
+            
+            // Limiter le nombre d'éléments
+            SI CIBLE nb_elements > 200
+                nb_elements = 200
+            FIN SI
+            
+            effets.code_binaire.nb_positions = nb_elements
+            
+            MUNITION largeur = effets.effet_matrix.largeur_ecran
+            MUNITION hauteur = effets.effet_matrix.hauteur_ecran
+            
+            // Générer des positions et valeurs aléatoires
+            MANOEUVRE POUR i DE 0 A nb_elements - 1
+                effets.code_binaire.positions[i].x = EXECUTION NOMBRE_ALEATOIRE 20, largeur - 20
+                effets.code_binaire.positions[i].y = EXECUTION NOMBRE_ALEATOIRE 20, hauteur - 20
+                effets.code_binaire.valeurs[i] = EXECUTION NOMBRE_ALEATOIRE 0, 1
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_PULSATION
+        PARAMETRE effets POINTEUR
+        PARAMETRE duree FLOTTANT = 5.0
+        PARAMETRE frequence FLOTTANT = 2.0
+        PARAMETRE amplitude FLOTTANT = 0.3
+        
+        ORDRE DE BATAILLE
+            // Activer et configurer l'effet
+            effets.pulsation.est_actif = VRAI
+            effets.pulsation.duree = duree
+            effets.pulsation.temps_ecoule = 0
+            effets.pulsation.frequence = frequence
+            effets.pulsation.amplitude = amplitude
+            
+            // Sauvegarder la couleur de base actuelle
+            effets.pulsation.couleur_base = effets.effet_matrix.couleur_principale
+            
+            // Définir une couleur cible plus brillante
+            effets.pulsation.couleur_cible.rouge = MIN(255, effets.pulsation.couleur_base.rouge + 100)
+            effets.pulsation.couleur_cible.vert = MIN(255, effets.pulsation.couleur_base.vert + 100)
+            effets.pulsation.couleur_cible.bleu = MIN(255, effets.pulsation.couleur_base.bleu + 100)
+            effets.pulsation.couleur_cible.alpha = effets.pulsation.couleur_base.alpha
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_EFFET_PLUIE
+        PARAMETRE effets POINTEUR
+        PARAMETRE effet_matrix POINTEUR
+        PARAMETRE intensite ENTIER = EFFET_PLUIE_MOYENNE
+        
+        ORDRE DE BATAILLE
+            // Configurer les paramètres selon l'intensité
+            MUNITION nb_colonnes = 10  // Par défaut (légère)
+            MUNITION vitesse_min = 40
+            MUNITION vitesse_max = 150
+            
+            SELON intensite
+                CAS EFFET_PLUIE_MOYENNE:
+                    nb_colonnes = 30
+                    vitesse_min = 60
+                    vitesse_max = 200
+                    PAUSE
+                CAS EFFET_PLUIE_INTENSE:
+                    nb_colonnes = 60
+                    vitesse_min = 80
+                    vitesse_max = 300
+                    PAUSE
+            FIN SELON
+            
+            // Créer les colonnes de pluie
+            MANOEUVRE POUR i DE 0 A nb_colonnes - 1
+                MUNITION position_x = EXECUTION NOMBRE_ALEATOIRE 0, effet_matrix.largeur_ecran
+                EXECUTION CREER_COLONNE_MATRIX effet_matrix, position_x
+                
+                // Modifier la vitesse de la dernière colonne créée
+                MUNITION index = effet_matrix.nb_colonnes - 1
+                effet_matrix.colonnes[index].vitesse = EXECUTION NOMBRE_ALEATOIRE vitesse_min, vitesse_max
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // MISE À JOUR DES EFFETS
+    //----------------------------------------------
+    
+    MISSION METTRE_A_JOUR_EFFETS_SPECIAUX
+        PARAMETRE effets POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour l'effet de glitch
+            SI CIBLE effets.glitch.est_actif
+                EXECUTION METTRE_A_JOUR_GLITCH effets.glitch, delta_temps
+            FIN SI
+            
+            // Mettre à jour l'effet de bruitage
+            SI CIBLE effets.bruitage.est_actif
+                EXECUTION METTRE_A_JOUR_BRUITAGE effets.bruitage, delta_temps
+            FIN SI
+            
+            // Mettre à jour l'effet de code binaire
+            SI CIBLE effets.code_binaire.est_actif
+                EXECUTION METTRE_A_JOUR_CODE_BINAIRE effets.code_binaire, delta_temps
+            FIN SI
+            
+            // Mettre à jour l'effet de pulsation
+            SI CIBLE effets.pulsation.est_actif
+                EXECUTION METTRE_A_JOUR_PULSATION effets.pulsation, effets.effet_matrix, delta_temps
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_GLITCH
+        PARAMETRE glitch POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour le temps écoulé
+            glitch.temps_ecoule = glitch.temps_ecoule + delta_temps
+            
+            // Vérifier si l'effet est terminé
+            SI CIBLE glitch.temps_ecoule >= glitch.duree
+                glitch.est_actif = FAUX
+                glitch.decalage_x = 0
+                glitch.decalage_y = 0
+                glitch.inversion_couleur = FAUX
+                glitch.distortion = 0
+                RETRAITE
+            FIN SI
+            
+            // Mettre à jour l'effet périodiquement
+            SI CIBLE glitch.temps_ecoule - glitch.temps_dernier_glitch >= glitch.intervalle
+                // Générer de nouveaux paramètres de glitch
+                glitch.decalage_x = EXECUTION NOMBRE_ALEATOIRE -15, 15
+                glitch.decalage_y = EXECUTION NOMBRE_ALEATOIRE -5, 5
+                glitch.inversion_couleur = EXECUTION NOMBRE_ALEATOIRE 0, 1 < 0.2  // 20% de chance
+                glitch.distortion = EXECUTION NOMBRE_ALEATOIRE_DECIMAL 0, glitch.intensite
+                
+                glitch.temps_dernier_glitch = glitch.temps_ecoule
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_BRUITAGE
+        PARAMETRE bruitage POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour le temps écoulé
+            bruitage.temps_ecoule = bruitage.temps_ecoule + delta_temps
+            
+            // Vérifier si l'effet est terminé
+            SI CIBLE bruitage.temps_ecoule >= bruitage.duree
+                bruitage.est_actif = FAUX
+                RETRAITE
+            FIN SI
+            
+            // Mettre à jour les positions de bruitage périodiquement (toutes les 0.1 secondes)
+            SI CIBLE (bruitage.temps_ecoule * 10) % 1 < delta_temps * 10
+                // Régénérer les positions et tailles de bruitage
+                MANOEUVRE POUR i DE 0 A bruitage.nb_points - 1
+                    // 50% de chance de changer chaque point
+                    SI CIBLE EXECUTION NOMBRE_ALEATOIRE_DECIMAL 0, 1 < 0.5
+                        bruitage.points[i].x = EXECUTION NOMBRE_ALEATOIRE 0, largeur
+                        bruitage.points[i].y = EXECUTION NOMBRE_ALEATOIRE 0, hauteur
+                        bruitage.tailles[i].largeur = EXECUTION NOMBRE_ALEATOIRE bruitage.taille_min, bruitage.taille_max
+                        bruitage.tailles[i].hauteur = EXECUTION NOMBRE_ALEATOIRE bruitage.taille_min, bruitage.taille_max
+                    FIN SI
+                FIN MANOEUVRE
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_CODE_BINAIRE
+        PARAMETRE code_binaire POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour le temps écoulé
+            code_binaire.temps_ecoule = code_binaire.temps_ecoule + delta_temps
+            
+            // Vérifier si l'effet est terminé
+            SI CIBLE code_binaire.temps_ecoule >= code_binaire.duree
+                code_binaire.est_actif = FAUX
+                RETRAITE
+            FIN SI
+            
+            // Changer les valeurs de code périodiquement
+            SI CIBLE code_binaire.temps_ecoule - code_binaire.temps_dernier_changement >= code_binaire.intervalle_changement
+                MANOEUVRE POUR i DE 0 A code_binaire.nb_positions - 1
+                    // 30% de chance de changer chaque valeur
+                    SI CIBLE EXECUTION NOMBRE_ALEATOIRE_DECIMAL 0, 1 < 0.3
+                        code_binaire.valeurs[i] = 1 - code_binaire.valeurs[i]  // Inverser 0/1
+                    FIN SI
+                FIN MANOEUVRE
+                
+                code_binaire.temps_dernier_changement = code_binaire.temps_ecoule
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION METTRE_A_JOUR_PULSATION
+        PARAMETRE pulsation POINTEUR
+        PARAMETRE effet_matrix POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            // Mettre à jour le temps écoulé
+            pulsation.temps_ecoule = pulsation.temps_ecoule + delta_temps
+            
+            // Vérifier si l'effet est terminé
+            SI CIBLE pulsation.temps_ecoule >= pulsation.duree
+                pulsation.est_actif = FAUX
+                // Restaurer la couleur d'origine
+                effet_matrix.couleur_principale = pulsation.couleur_base
+                RETRAITE
+            FIN SI
+            
+            // Calculer la valeur de pulsation (entre 0 et 1)
+            MUNITION valeur = (1 + sin(pulsation.temps_ecoule * pulsation.frequence * 6.28)) / 2
+            valeur = valeur * pulsation.amplitude
+            
+            // Interpoler entre la couleur de base et la couleur cible
+            MUNITION nouvelle_couleur COULEUR_TACTIQUE
+            nouvelle_couleur.rouge = pulsation.couleur_base.rouge + valeur * (pulsation.couleur_cible.rouge - pulsation.couleur_base.rouge)
+            nouvelle_couleur.vert = pulsation.couleur_base.vert + valeur * (pulsation.couleur_cible.vert - pulsation.couleur_base.vert)
+            nouvelle_couleur.bleu = pulsation.couleur_base.bleu + valeur * (pulsation.couleur_cible.bleu - pulsation.couleur_base.bleu)
+            nouvelle_couleur.alpha = pulsation.couleur_base.alpha
+            
+            // Appliquer la nouvelle couleur
+            effet_matrix.couleur_principale = nouvelle_couleur
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // RENDU DES EFFETS
+    //----------------------------------------------
+    
+    MISSION DESSINER_EFFETS_SPECIAUX
+        PARAMETRE effets POINTEUR
+        PARAMETRE contexte POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Appliquer l'effet de glitch avant le rendu
+            SI CIBLE effets.glitch.est_actif
+                EXECUTION APPLIQUER_EFFET_GLITCH contexte, effets.glitch
+            FIN SI
+            
+            // Dessiner l'effet de bruitage
+            SI CIBLE effets.bruitage.est_actif
+                EXECUTION DESSINER_BRUITAGE contexte, effets.bruitage
+            FIN SI
+            
+            // Dessiner l'effet de code binaire
+            SI CIBLE effets.code_binaire.est_actif
+                EXECUTION DESSINER_CODE_BINAIRE contexte, effets.code_binaire
+            FIN SI
+            
+            // L'effet de pulsation est appliqué directement sur la couleur principale
+            // et ne nécessite pas de rendu spécifique ici
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION APPLIQUER_EFFET_GLITCH
+        PARAMETRE contexte POINTEUR
+        PARAMETRE glitch POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Sauvegarder l'état actuel du contexte
+            EXECUTION SAUVEGARDER_CONTEXTE contexte
+            
+            // Appliquer les décalages
+            EXECUTION DECALER_CONTEXTE contexte, glitch.decalage_x, glitch.decalage_y
+            
+            // Appliquer la distortion (par exemple, échelle ou cisaillement)
+            SI CIBLE glitch.distortion > 0
+                EXECUTION CISAILLER_CONTEXTE contexte, glitch.distortion * 0.1, 0
+            FIN SI
+            
+            // L'inversion de couleur sera appliquée après le rendu principal
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION DESSINER_BRUITAGE
+        PARAMETRE contexte POINTEUR
+        PARAMETRE bruitage POINTEUR
+        
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A bruitage.nb_points - 1
+                // Calculer une couleur aléatoire pour chaque rectangle de bruit
+                MUNITION couleur COULEUR_TACTIQUE
+                couleur.rouge = EXECUTION NOMBRE_ALEATOIRE 0, 255
+                couleur.vert = EXECUTION NOMBRE_ALEATOIRE 0, 255
+                couleur.bleu = EXECUTION NOMBRE_ALEATOIRE 0, 255
+                couleur.alpha = bruitage.intensite * 255
+                
+                // Dessiner le rectangle de bruit
+                EXECUTION DESSINER_RECTANGLE contexte, 
+                                          bruitage.points[i].x, 
+                                          bruitage.points[i].y, 
+                                          bruitage.tailles[i].largeur, 
+                                          bruitage.tailles[i].hauteur, 
+                                          couleur
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION DESSINER_CODE_BINAIRE
+        PARAMETRE contexte POINTEUR
+        PARAMETRE code_binaire POINTEUR
+        
+        ORDRE DE BATAILLE
+            MANOEUVRE POUR i DE 0 A code_binaire.nb_positions - 1
+                // Dessiner le caractère (0 ou 1)
+                EXECUTION DESSINER_CARACTERE contexte, 
+                                          TEXTE(code_binaire.valeurs[i]), 
+                                          code_binaire.positions[i].x, 
+                                          code_binaire.positions[i].y, 
+                                          code_binaire.taille_police, 
+                                          code_binaire.couleur, 
+                                          1.0
+            FIN MANOEUVRE
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // EFFETS COMBINÉS PRÉDÉFINIS
+    //----------------------------------------------
+    
+    MISSION ACTIVER_SCENE_REVEIL
+        PARAMETRE effets POINTEUR
+        PARAMETRE effet_matrix POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Effet dramatique de "réveil" dans la Matrice
+            
+            // Augmenter progressivement la densité des colonnes
+            effet_matrix.probabilite_nouvelle_colonne = 0.1  // Augmenter la densité
+            
+            // Activer une pulsation verte
+            EXECUTION ACTIVER_EFFET_PULSATION effets, 10.0, 1.0, 0.5
+            
+            // Ajouter un peu de glitch
+            EXECUTION ACTIVER_EFFET_GLITCH effets, EFFET_GLITCH_MOYEN, 0.7
+            
+            // Ajouter du code binaire en arrière-plan
+            EXECUTION ACTIVER_EFFET_CODE_BINAIRE effets, 15.0, 150
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_SCENE_CORRUPTION
+        PARAMETRE effets POINTEUR
+        PARAMETRE effet_matrix POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Effet de corruption progressive de la Matrice
+            
+            // Ralentir les colonnes
+            MANOEUVRE POUR i DE 0 A effet_matrix.nb_colonnes - 1
+                SI CIBLE effet_matrix.colonnes[i].est_active
+                    effet_matrix.colonnes[i].vitesse = effet_matrix.colonnes[i].vitesse * 0.5
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Activer un fort effet de glitch
+            EXECUTION ACTIVER_EFFET_GLITCH effets, EFFET_GLITCH_LONG, 0.9
+            
+            // Ajouter beaucoup de bruit
+            EXECUTION ACTIVER_EFFET_BRUITAGE effets, 8.0, 0.6, 0.05
+            
+            // Changer la couleur vers le rouge
+            MUNITION nouvelle_couleur COULEUR_TACTIQUE
+            nouvelle_couleur.rouge = 200
+            nouvelle_couleur.vert = 50
+            nouvelle_couleur.bleu = 50
+            nouvelle_couleur.alpha = 255
+            
+            effets.pulsation.couleur_base = effet_matrix.couleur_principale
+            EXECUTION CHANGER_COULEUR_PRINCIPALE effet_matrix, nouvelle_couleur
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ACTIVER_SCENE_PLUIE
+        PARAMETRE effets POINTEUR
+        PARAMETRE effet_matrix POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Effet de "pluie digitale" intense
+            
+            // Activer l'ondulation pour simuler des gouttes de pluie qui tombent
+            EXECUTION ACTIVER_EFFET_ONDULATION effet_matrix, VRAI, 5, 2.0
+            
+            // Activer l'effet de Raindrops pour une meilleure visibilité des têtes de colonnes
+            EXECUTION ACTIVER_EFFET_RAINDROPS effet_matrix, VRAI
+            
+            // Ajouter beaucoup de colonnes avec l'effet pluie
+            EXECUTION ACTIVER_EFFET_PLUIE effets, effet_matrix, EFFET_PLUIE_INTENSE
+            
+            // Légère pulsation bleue pour donner une ambiance pluvieuse
+            MUNITION couleur_bleue COULEUR_TACTIQUE
+            couleur_bleue.rouge = 0
+            couleur_bleue.vert = 180
+            couleur_bleue.bleu = 220
+            couleur_bleue.alpha = 255
+            
+            effets.pulsation.couleur_base = effet_matrix.couleur_principale
+            EXECUTION CHANGER_COULEUR_PRINCIPALE effet_matrix, couleur_bleue
+            
+            // Légère pulsation
+            EXECUTION ACTIVER_EFFET_PULSATION effets, 20.0, 0.5, 0.2
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

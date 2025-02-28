@@ -1,0 +1,79 @@
+BASE MEMOIRE_PARTAGEE
+
+STRATEGIE ConfigurationMemoire {
+    MUNITION taille_segment = 1024 * 1024  # 1MB
+    MUNITION nb_segments = 16
+    FORMATION segments_actifs = []
+    STRATEGIE verrous = {
+        lecture: [],
+        ecriture: []
+    }
+}
+
+MISSION CreerSegment {
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE taille > ConfigurationMemoire.taille_segment {
+            RAPPORT "ERREUR: Taille segment trop grande"
+            RETRAITE VIDE
+        }
+        
+        STRATEGIE nouveau_segment = {
+            id: GENERER_ID,
+            taille: taille,
+            adresse: ALLOUER_MEMOIRE taille,
+            processus: [],
+            verrous: {
+                lecture: 0,
+                ecriture: 0
+            }
+        }
+        
+        ConfigurationMemoire.segments_actifs = DEPLOIEMENT 
+            ConfigurationMemoire.segments_actifs 
+            nouveau_segment
+            
+        RETRAITE nouveau_segment
+    }
+}
+
+MISSION AttacherProcessus {
+    PARAMETRE segment
+    PARAMETRE processus
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE ProcessusAutorise processus segment {
+            segment.processus = DEPLOIEMENT segment.processus processus
+            RETRAITE VRAI
+        }
+        
+        RAPPORT "ERREUR: Accès refusé au segment"
+        RETRAITE FAUX
+    }
+}
+
+MISSION SynchroniserAcces {
+    PARAMETRE segment
+    PARAMETRE type_acces
+    
+    ORDRE DE BATAILLE {
+        SELON type_acces {
+            CAS "LECTURE":
+                SI CIBLE segment.verrous.ecriture == 0 {
+                    segment.verrous.lecture = segment.verrous.lecture ASSAUT 1
+                    RETRAITE VRAI
+                }
+            CAS "ECRITURE":
+                SI CIBLE segment.verrous.lecture == 0 ET segment.verrous.ecriture == 0 {
+                    segment.verrous.ecriture = 1
+                    RETRAITE VRAI
+                }
+        }
+        
+        RAPPORT "ERREUR: Conflit d'accès"
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

@@ -1,0 +1,44 @@
+BASE GUIDE_COMPILATION
+
+STRATEGIE EtapesCompilation {
+    FORMATION étapes = [
+        {nom: "Analyse Lexicale", statut: "REQUIS"},
+        {nom: "Analyse Syntaxique", statut: "REQUIS"},
+        {nom: "Analyse Sémantique", statut: "REQUIS"},
+        {nom: "Optimisation", statut: "OPTIONNEL"},
+        {nom: "Génération Code", statut: "REQUIS"}
+    ]
+}
+
+MISSION ProcessusCompilation {
+    ORDRE DE BATAILLE {
+        # Configuration du compilateur
+        STRATEGIE Config {
+            MUNITION niveau_optimisation = 2
+            MUNITION debug_actif = VRAI
+            MUNITION taille_max_code = 1024 * 1024
+        }
+        
+        # Validation du code source
+        MISSION ValidationCode {
+            PARAMETRE code_source
+            
+            POUR étape DANS EtapesCompilation.étapes {
+                SI CIBLE étape.statut VERIFICATION "REQUIS" {
+                    EXECUTION ValiderEtape code_source étape.nom
+                }
+            }
+        }
+        
+        # Génération du code final
+        MISSION GenererCodeFinal {
+            SI CIBLE Config.debug_actif {
+                AJOUTER_SYMBOLES_DEBUG
+            }
+            
+            OPTIMISER_CODE Config.niveau_optimisation
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,401 @@
+BASE ALLOCATEUR_MEMOIRE_TACTIQUE
+    // Module de gestion mémoire physique et virtuelle
+    // Fournit des capacités d'allocation précise pour le développement de système d'exploitation
+
+    //----------------------------------------------
+    // CONSTANTES ET STRUCTURES
+    //----------------------------------------------
+    
+    MUNITION PAGE_TAILLE = 4096           // 4KB standard
+    MUNITION TABLE_NIVEAU_MAX = 4         // Pour pagination à 4 niveaux (comme x86_64)
+    MUNITION MEMOIRE_ALIGNEMENT = 8       // Alignement par défaut
+    
+    STRATEGIE BLOC_MEMOIRE
+        MUNITION signature ENTIER         // Signature pour validation
+        MUNITION taille ENTIER            // Taille du bloc
+        MUNITION est_libre BOOLEEN        // État d'allocation
+        MUNITION suivant POINTEUR         // Pointeur vers le bloc suivant
+        MUNITION precedent POINTEUR       // Pointeur vers le bloc précédent
+        MUNITION alignement ENTIER        // Informations d'alignement
+    FIN STRATEGIE
+    
+    STRATEGIE ZONE_MEMOIRE
+        MUNITION debut POINTEUR           // Adresse de début
+        MUNITION taille ENTIER            // Taille totale
+        MUNITION utilise ENTIER           // Espace utilisé
+        MUNITION premier_bloc POINTEUR    // Premier bloc libre
+        MUNITION type ENTIER              // Type de zone (0=kernel, 1=user)
+    FIN STRATEGIE
+    
+    STRATEGIE TABLE_PAGES
+        MUNITION adresse_physique ENTIER   // Adresse physique de la table
+        MUNITION entrees FORMATION[1024]   // Entrées de la table
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // VARIABLES GLOBALES
+    //----------------------------------------------
+    
+    MUNITION zone_kernel ZONE_MEMOIRE
+    MUNITION zones FORMATION[16]           // Maximum 16 zones mémoire
+    MUNITION nb_zones = 0
+    MUNITION signature_bloc = 0xABCD1234   // Signature pour validation des blocs
+    
+    //----------------------------------------------
+    // ALLOCATION PHYSIQUE
+    //----------------------------------------------
+    
+    MISSION INITIALISER_ALLOCATEUR
+        PARAMETRE debut_physique POINTEUR
+        PARAMETRE taille_physique ENTIER
+        
+        ORDRE DE BATAILLE
+            // Configurer la zone mémoire du kernel
+            zone_kernel.debut = debut_physique
+            zone_kernel.taille = taille_physique
+            zone_kernel.utilise = 0
+            zone_kernel.type = 0  // Kernel
+            
+            // Créer le premier bloc
+            MUNITION premier = debut_physique
+            premier.signature = signature_bloc
+            premier.taille = taille_physique - TAILLE(BLOC_MEMOIRE)
+            premier.est_libre = VRAI
+            premier.suivant = 0
+            premier.precedent = 0
+            premier.alignement = 0
+            
+            zone_kernel.premier_bloc = premier
+            
+            // Enregistrer la zone
+            EXECUTION AJOUTER_ZONE zone_kernel
+            
+            RAPPORT "Allocateur mémoire initialisé: " + TEXTE(taille_physique) + " octets"
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION AJOUTER_ZONE
+        PARAMETRE zone ZONE_MEMOIRE
+        
+        ORDRE DE BATAILLE
+            SI CIBLE nb_zones >= 16
+                RAPPORT "ERREUR: Nombre maximum de zones atteint"
+                RETRAITE FAUX
+            FIN SI
+            
+            zones[nb_zones] = zone
+            nb_zones = nb_zones + 1
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ALLOUER
+        PARAMETRE taille ENTIER
+        PARAMETRE alignement ENTIER = MEMOIRE_ALIGNEMENT
+        
+        ORDRE DE BATAILLE
+            // Taille minimale et alignement
+            SI CIBLE taille <= 0
+                RETRAITE 0
+            FIN SI
+            
+            // Aligner la taille
+            MUNITION taille_alignee = (taille + alignement - 1) & ~(alignement - 1)
+            
+            // Parcourir toutes les zones
+            MANOEUVRE POUR i DE 0 A nb_zones - 1
+                MUNITION zone = zones[i]
+                MUNITION resultat = EXECUTION ALLOUER_DANS_ZONE zone, taille_alignee, alignement
+                
+                SI CIBLE resultat != 0
+                    RETRAITE resultat
+                FIN SI
+            FIN MANOEUVRE
+            
+            RAPPORT "ERREUR: Pas assez de mémoire disponible"
+            RETRAITE 0
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ALLOUER_DANS_ZONE
+        PARAMETRE zone ZONE_MEMOIRE
+        PARAMETRE taille ENTIER
+        PARAMETRE alignement ENTIER
+        
+        ORDRE DE BATAILLE
+            MUNITION courant = zone.premier_bloc
+            
+            MANOEUVRE TANT QUE courant != 0
+                SI CIBLE courant.est_libre && courant.taille >= taille
+                    // Vérifier l'alignement
+                    MUNITION adresse_donnees = courant + TAILLE(BLOC_MEMOIRE)
+                    MUNITION offset_alignement = 0
+                    
+                    SI CIBLE (adresse_donnees % alignement) != 0
+                        offset_alignement = alignement - (adresse_donnees % alignement)
+                    FIN SI
+                    
+                    SI CIBLE courant.taille >= (taille + offset_alignement)
+                        // Ajuster le bloc pour l'alignement si nécessaire
+                        SI CIBLE offset_alignement > 0
+                            // Gérer l'alignement (implémentation simplifiée)
+                            courant.alignement = offset_alignement
+                        FIN SI
+                        
+                        // Si le bloc est significativement plus grand, le diviser
+                        SI CIBLE courant.taille > taille + offset_alignement + TAILLE(BLOC_MEMOIRE) + MEMOIRE_ALIGNEMENT
+                            MUNITION nouveau_bloc = courant + TAILLE(BLOC_MEMOIRE) + taille + offset_alignement
+                            nouveau_bloc.signature = signature_bloc
+                            nouveau_bloc.taille = courant.taille - taille - offset_alignement - TAILLE(BLOC_MEMOIRE)
+                            nouveau_bloc.est_libre = VRAI
+                            nouveau_bloc.suivant = courant.suivant
+                            nouveau_bloc.precedent = courant
+                            
+                            SI CIBLE courant.suivant != 0
+                                courant.suivant.precedent = nouveau_bloc
+                            FIN SI
+                            
+                            courant.taille = taille + offset_alignement
+                            courant.suivant = nouveau_bloc
+                        FIN SI
+                        
+                        // Marquer comme utilisé
+                        courant.est_libre = FAUX
+                        zone.utilise = zone.utilise + courant.taille
+                        
+                        // Retourner l'adresse alignée
+                        RETRAITE adresse_donnees + offset_alignement
+                    FIN SI
+                FIN SI
+                
+                courant = courant.suivant
+            FIN MANOEUVRE
+            
+            RETRAITE 0  // Pas de mémoire disponible
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION LIBERER
+        PARAMETRE adresse POINTEUR
+        
+        ORDRE DE BATAILLE
+            SI CIBLE adresse == 0
+                RETRAITE
+            FIN SI
+            
+            // Trouver le bloc à partir de l'adresse
+            MUNITION bloc = EXECUTION TROUVER_BLOC adresse
+            
+            SI CIBLE bloc == 0
+                RAPPORT "ERREUR: Tentative de libération d'adresse invalide"
+                RETRAITE
+            FIN SI
+            
+            // Vérifier que le bloc est valide
+            SI CIBLE bloc.signature != signature_bloc
+                RAPPORT "ERREUR: Corruption de mémoire détectée"
+                RETRAITE
+            FIN SI
+            
+            // Libérer le bloc
+            bloc.est_libre = VRAI
+            
+            // Mettre à jour l'utilisation
+            MANOEUVRE POUR i DE 0 A nb_zones - 1
+                SI CIBLE adresse >= zones[i].debut && adresse < zones[i].debut + zones[i].taille
+                    zones[i].utilise = zones[i].utilise - bloc.taille
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Fusion avec les blocs adjacents si possible
+            EXECUTION FUSIONNER_BLOCS bloc
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION TROUVER_BLOC
+        PARAMETRE adresse POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Parcourir les zones
+            MANOEUVRE POUR i DE 0 A nb_zones - 1
+                MUNITION zone = zones[i]
+                MUNITION courant = zone.premier_bloc
+                
+                MANOEUVRE TANT QUE courant != 0
+                    MUNITION debut_donnees = courant + TAILLE(BLOC_MEMOIRE)
+                    MUNITION fin_donnees = debut_donnees + courant.taille
+                    
+                    // Vérifier si l'adresse est dans ce bloc
+                    SI CIBLE adresse >= debut_donnees && adresse < fin_donnees
+                        RETRAITE courant
+                    FIN SI
+                    
+                    courant = courant.suivant
+                FIN MANOEUVRE
+            FIN MANOEUVRE
+            
+            RETRAITE 0  // Bloc non trouvé
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION FUSIONNER_BLOCS
+        PARAMETRE bloc POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Fusion avec le bloc suivant
+            SI CIBLE bloc.suivant != 0 && bloc.suivant.est_libre
+                bloc.taille = bloc.taille + TAILLE(BLOC_MEMOIRE) + bloc.suivant.taille
+                
+                SI CIBLE bloc.suivant.suivant != 0
+                    bloc.suivant.suivant.precedent = bloc
+                FIN SI
+                
+                bloc.suivant = bloc.suivant.suivant
+            FIN SI
+            
+            // Fusion avec le bloc précédent
+            SI CIBLE bloc.precedent != 0 && bloc.precedent.est_libre
+                bloc.precedent.taille = bloc.precedent.taille + TAILLE(BLOC_MEMOIRE) + bloc.taille
+                
+                SI CIBLE bloc.suivant != 0
+                    bloc.suivant.precedent = bloc.precedent
+                FIN SI
+                
+                bloc.precedent.suivant = bloc.suivant
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // PAGINATION ET MÉMOIRE VIRTUELLE
+    //----------------------------------------------
+    
+    MISSION INITIALISER_PAGINATION
+        ORDRE DE BATAILLE
+            // Allouer la table de pages de niveau 4 (PML4)
+            MUNITION pml4 = EXECUTION ALLOUER PAGE_TAILLE, PAGE_TAILLE
+            
+            SI CIBLE pml4 == 0
+                RAPPORT "ERREUR: Impossible d'allouer la table PML4"
+                RETRAITE FAUX
+            FIN SI
+            
+            // Effacer la table
+            MANOEUVRE POUR i DE 0 A PAGE_TAILLE - 1
+                ((OCTET*)pml4)[i] = 0
+            FIN MANOEUVRE
+            
+            // Obtenir l'adresse physique de la table
+            MUNITION pml4_physique = EXECUTION VIRTUEL_VERS_PHYSIQUE pml4
+            
+            // Charger le registre CR3
+            ASM {
+                mov eax, [pml4_physique]
+                mov cr3, eax
+            }
+            
+            RAPPORT "Pagination initialisée"
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION MAPPER_PAGE
+        PARAMETRE virtuel POINTEUR
+        PARAMETRE physique POINTEUR
+        PARAMETRE drapeaux ENTIER
+        
+        ORDRE DE BATAILLE
+            // Adresses alignées sur les frontières de page
+            MUNITION virt_aligne = virtuel & ~(PAGE_TAILLE - 1)
+            MUNITION phys_aligne = physique & ~(PAGE_TAILLE - 1)
+            
+            // Indices pour chaque niveau de table
+            MUNITION pml4_index = (virt_aligne >> 39) & 0x1FF
+            MUNITION pdpt_index = (virt_aligne >> 30) & 0x1FF
+            MUNITION pd_index = (virt_aligne >> 21) & 0x1FF
+            MUNITION pt_index = (virt_aligne >> 12) & 0x1FF
+            
+            // Obtenir la table PML4 actuelle
+            MUNITION cr3 = 0
+            ASM {
+                mov eax, cr3
+                mov [cr3], eax
+            }
+            
+            MUNITION pml4 = EXECUTION PHYSIQUE_VERS_VIRTUEL cr3
+            
+            // Vérifier/créer les entrées de table à chaque niveau
+            // Niveau 4 (PML4)
+            SI CIBLE pml4[pml4_index] == 0
+                MUNITION nouvelle_table = EXECUTION ALLOUER PAGE_TAILLE, PAGE_TAILLE
+                SI CIBLE nouvelle_table == 0
+                    RETRAITE FAUX
+                FIN SI
+                
+                // Effacer la nouvelle table
+                MANOEUVRE POUR i DE 0 A PAGE_TAILLE / 4 - 1
+                    ((ENTIER*)nouvelle_table)[i] = 0
+                FIN MANOEUVRE
+                
+                MUNITION table_physique = EXECUTION VIRTUEL_VERS_PHYSIQUE nouvelle_table
+                pml4[pml4_index] = table_physique | 0x3  // Présent + R/W
+            FIN SI
+            
+            // Continuer avec les autres niveaux (PDPT, PD, PT)
+            // [Code similaire pour les autres niveaux]
+            
+            // Dernière étape: mapper la page dans la table PT
+            MUNITION pt = EXECUTION PHYSIQUE_VERS_VIRTUEL (pml4[pml4_index] & ~0xFFF) 
+            pt[pt_index] = phys_aligne | drapeaux
+            
+            // Invalider la TLB pour cette adresse
+            ASM {
+                mov eax, [virt_aligne]
+                invlpg [eax]
+            }
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION DEMAPPER_PAGE
+        PARAMETRE virtuel POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Code de démappage
+            // [À implémenter]
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION VIRTUEL_VERS_PHYSIQUE
+        PARAMETRE virtuel POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Cette fonction est une simplification pour l'exemple
+            // Dans un vrai OS, il faudrait traverser les tables de pages
+            
+            // Pour l'exemple, supposons un mappage direct
+            RETRAITE virtuel - 0xC0000000  // Offset typique pour le mappage direct du noyau
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION PHYSIQUE_VERS_VIRTUEL
+        PARAMETRE physique POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Inverse de virtuel_vers_physique
+            RETRAITE physique + 0xC0000000
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

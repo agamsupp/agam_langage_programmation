@@ -1,0 +1,68 @@
+BASE PASSES_OPTIMISATION
+
+STRATEGIE ConfigurationOptimisation {
+    FORMATION passes = [
+        {
+            nom: "ELIMINATION_CODE_MORT",
+            niveau: 1,
+            actif: VRAI
+        },
+        {
+            nom: "PROPAGATION_CONSTANTES",
+            niveau: 2,
+            actif: VRAI
+        },
+        {
+            nom: "DEROULAGE_BOUCLES",
+            niveau: 3,
+            actif: VRAI
+        }
+    ]
+    
+    MUNITION niveau_optimisation = 2
+}
+
+MISSION ExecuterPasses {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        FORMATION resultats = []
+        
+        # Exécution des passes selon le niveau
+        POUR passe DANS ConfigurationOptimisation.passes {
+            SI CIBLE passe.niveau <= ConfigurationOptimisation.niveau_optimisation {
+                SI CIBLE passe.actif {
+                    STRATEGIE resultat = {
+                        passe: passe.nom,
+                        code_initial: code_source,
+                        code_optimise: VIDE,
+                        metriques: {}
+                    }
+                    
+                    SELON passe.nom {
+                        CAS "ELIMINATION_CODE_MORT":
+                            resultat.code_optimise = EXECUTION OptimiserCodeMort code_source
+                        CAS "PROPAGATION_CONSTANTES":
+                            resultat.code_optimise = EXECUTION PropagerConstantes code_source
+                        CAS "DEROULAGE_BOUCLES":
+                            resultat.code_optimise = EXECUTION DeroulerBoucles code_source
+                    }
+                    
+                    resultat.metriques = EXECUTION CalculerMetriques 
+                        resultat.code_initial 
+                        resultat.code_optimise
+                        
+                    resultats = DEPLOIEMENT resultats resultat
+                    code_source = resultat.code_optimise
+                }
+            }
+        }
+        
+        RETRAITE {
+            code_final: code_source,
+            passes_executees: resultats
+        }
+    }
+}
+
+FIN BASE

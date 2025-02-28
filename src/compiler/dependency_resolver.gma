@@ -1,0 +1,82 @@
+BASE RESOLVEUR_DEPENDANCES
+
+STRATEGIE ConfigurationDependances {
+    FORMATION types_dependances = [
+        {
+            type: "DIRECTE",
+            resolution: "IMMEDIATE",
+            priorite: 1
+        },
+        {
+            type: "INDIRECTE",
+            resolution: "DIFFEREE",
+            priorite: 2
+        },
+        {
+            type: "OPTIONNELLE",
+            resolution: "CONDITIONNELLE",
+            priorite: 3
+        }
+    ]
+
+    STRATEGIE politique = {
+        resolution_circulaire: "INTERDIRE",
+        cache_resolution: VRAI,
+        verification_version: VRAI
+    }
+}
+
+MISSION ResoudreDependances {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE graphe = {
+            noeuds: [],
+            arcs: [],
+            resolu: FAUX
+        }
+        
+        # Construction du graphe de dépendances
+        EXECUTION ConstruireGrapheDependances module graphe
+        
+        # Détection des cycles
+        SI CIBLE DetecterCycles graphe {
+            SI CIBLE ConfigurationDependances.politique.resolution_circulaire 
+                VERIFICATION "INTERDIRE" {
+                RETRAITE ERREUR_DEPENDANCE_CIRCULAIRE
+            }
+        }
+        
+        # Résolution des dépendances
+        FORMATION ordre_resolution = []
+        
+        POUR type DANS ConfigurationDependances.types_dependances {
+            EXECUTION ResoudreDependancesType type graphe ordre_resolution
+        }
+        
+        # Validation des versions
+        SI CIBLE ConfigurationDependances.politique.verification_version {
+            EXECUTION VerifierVersions ordre_resolution
+        }
+        
+        graphe.resolu = VRAI
+        RETRAITE ordre_resolution
+    }
+}
+
+MISSION VerifierVersions {
+    PARAMETRE dependances
+    
+    ORDRE DE BATAILLE {
+        POUR dependance DANS dependances {
+            SI CIBLE NON VersionCompatible dependance {
+                RAPPORT "Incompatibilité de version: " + dependance.nom
+                RETRAITE FAUX
+            }
+        }
+        
+        RETRAITE VRAI
+    }
+}
+
+FIN BASE

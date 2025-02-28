@@ -1,0 +1,99 @@
+BASE SYSTEME_BENCHMARK
+
+STRATEGIE ConfigurationBenchmark {
+    FORMATION metriques = [
+        {
+            nom: "TEMPS_COMPILATION",
+            unite: "millisecondes",
+            iterations: 100
+        },
+        {
+            nom: "UTILISATION_MEMOIRE",
+            unite: "megaoctets",
+            seuil_max: 1024
+        },
+        {
+            nom: "PERFORMANCE_EXECUTION",
+            unite: "instructions_par_seconde",
+            echantillonnage: 1000
+        }
+    ]
+
+    STRATEGIE environnement = {
+        isolation: VRAI,
+        nettoyage_cache: VRAI,
+        warmup: 5  # itérations
+    }
+}
+
+MISSION ExecuterBenchmark {
+    PARAMETRE code_test
+    
+    ORDRE DE BATAILLE {
+        # Préparation de l'environnement
+        SI CIBLE ConfigurationBenchmark.environnement.isolation {
+            EXECUTION IsolerEnvironnement
+        }
+        
+        STRATEGIE resultats = {
+            metriques: [],
+            statistiques: {},
+            graphiques: []
+        }
+        
+        # Phase de warmup
+        MANOEUVRE WARMUP {
+            POUR i DANS SEQUENCE 0 À ConfigurationBenchmark.environnement.warmup {
+                EXECUTION ExecuterTest code_test
+            }
+        }
+        
+        # Collecte des métriques
+        POUR metrique DANS ConfigurationBenchmark.metriques {
+            FORMATION mesures = []
+            
+            POUR i DANS SEQUENCE 0 À metrique.iterations {
+                SI CIBLE ConfigurationBenchmark.environnement.nettoyage_cache {
+                    EXECUTION NettoyerCache
+                }
+                
+                MUNITION resultat = EXECUTION MesurerMetrique metrique code_test
+                mesures = DEPLOIEMENT mesures resultat
+            }
+            
+            # Analyse statistique
+            resultats.metriques = DEPLOIEMENT resultats.metriques {
+                nom: metrique.nom,
+                moyenne: CALCULER_MOYENNE mesures,
+                ecart_type: CALCULER_ECART_TYPE mesures,
+                min: MINIMUM mesures,
+                max: MAXIMUM mesures
+            }
+        }
+        
+        # Génération des graphiques
+        EXECUTION GenererGraphiques resultats
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION ComparerPerformances {
+    PARAMETRE tests
+    
+    ORDRE DE BATAILLE {
+        FORMATION comparaisons = []
+        
+        POUR test DANS tests {
+            STRATEGIE resultat = EXECUTION ExecuterBenchmark test
+            comparaisons = DEPLOIEMENT comparaisons resultat
+        }
+        
+        # Analyse comparative
+        EXECUTION AnalyserComparaisons comparaisons
+        
+        RETRAITE comparaisons
+    }
+}
+
+FIN BASE

@@ -1,0 +1,89 @@
+BASE VERIFICATEUR_TYPES
+
+STRATEGIE SystemeTypes {
+    FORMATION types_base = [
+        "MUNITION",   # Entiers
+        "ORDRE",      # Booléens
+        "RAPPORT",    # Chaînes
+        "FORMATION",  # Tableaux
+        "STRATEGIE"   # Structures
+    ]
+    
+    FORMATION conversions_valides = [
+        {
+            de: "MUNITION",
+            vers: ["RAPPORT"],
+            methode: "ConversionExplicite"
+        },
+        {
+            de: "ORDRE",
+            vers: ["MUNITION", "RAPPORT"],
+            methode: "ConversionImplicite"
+        }
+    ]
+}
+
+MISSION VerifierType {
+    PARAMETRE expression
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = {
+            type: "",
+            erreurs: []
+        }
+
+        SELON expression.categorie {
+            CAS "LITTERAL":
+                resultat.type = InfererTypeLitteral expression
+            
+            CAS "OPERATION":
+                resultat.type = VerifierTypeOperation expression
+            
+            CAS "VARIABLE":
+                resultat.type = RechercherTypeVariable expression
+            
+            DEFAUT:
+                AJOUTER_ERREUR resultat "Type non reconnu"
+        }
+
+        RETRAITE resultat
+    }
+}
+
+MISSION VerifierCompatibilite {
+    PARAMETRE type1
+    PARAMETRE type2
+    PARAMETRE operation
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE type1 VERIFICATION type2 {
+            RETRAITE VRAI
+        }
+
+        POUR conversion DANS SystemeTypes.conversions_valides {
+            SI CIBLE conversion.de VERIFICATION type1 {
+                SI CIBLE type2 DANS conversion.vers {
+                    RETRAITE VRAI
+                }
+            }
+        }
+
+        RETRAITE FAUX
+    }
+}
+
+MISSION InfererType {
+    PARAMETRE expression
+    
+    ORDRE DE BATAILLE {
+        # Implémentation de l'inférence de types
+        STRATEGIE type_infere = {
+            type: "",
+            contraintes: []
+        }
+        
+        RETRAITE type_infere
+    }
+}
+
+FIN BASE

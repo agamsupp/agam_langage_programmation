@@ -1,0 +1,22 @@
+// Bibliothèque RESEAU - Communication et connectivité
+// Inclusion : INCLURE "RESEAU"
+
+MISSION TRANSMISSION message destination
+    // Envoie 'message' à 'destination'
+    [logique réseau standard]
+FIN MISSION
+
+MISSION INTERCEPTION source
+    // Récupère données depuis 'source'
+    RETRAITE [logique réseau standard]
+FIN MISSION
+
+MISSION CRYPTAGE donnees cle
+    // Chiffre 'donnees' avec 'cle'
+    RETRAITE [logique de chiffrement standard]
+FIN MISSION
+
+MISSION DECRYPTAGE donnees cle
+    // Déchiffre 'donnees' avec 'cle'
+    RETRAITE [logique de déchiffrement standard]
+FIN MISSION

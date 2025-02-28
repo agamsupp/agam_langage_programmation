@@ -1,0 +1,35 @@
+BASE TEST_KERNEL_AVANCE
+    EXECUTION Kernel-AGAM.InitialiserKernel
+    
+    # Allocation mémoire
+    MUNITION mem = Kernel-AGAM.Allouer 256
+    
+    # Création d’un processus avec thread
+    STRATEGIE params_processus
+        DEPLOIEMENT params_processus "priorite" 1
+        DEPLOIEMENT params_processus "code" RAPPORT "Processus principal"
+    MUNITION pid = Kernel-AGAM.CreerProcessus params_processus
+    
+    STRATEGIE params_thread
+        DEPLOIEMENT params_thread "pid" pid
+        DEPLOIEMENT params_thread "code" RAPPORT "Thread secondaire"
+    MUNITION tid = Kernel-AGAM.CreerThread params_thread
+    
+    # Verrou pour synchronisation
+    MUNITION verrou = Kernel-AGAM.CreerVerrou "ressource1"
+    Kernel-AGAM.AcquérirVerrou verrou
+    RAPPORT "Ressource protégée acquise"
+    Kernel-AGAM.LibererVerrou verrou
+    
+    # Driver matériel (simulation)
+    STRATEGIE params_driver
+        DEPLOIEMENT params_driver "id" "DISQUE1"
+        DEPLOIEMENT params_driver "type" "DISQUE"
+        DEPLOIEMENT params_driver "handler" RAPPORT "Disque accédé"
+    Kernel-AGAM.EnregistrerPeripherique params_driver
+    Kernel-AGAM.EcrirePeripherique "id" "DISQUE1" "donnees" "Test écriture"
+    
+    # Ordonnancement
+    Kernel-AGAM.AjouterProcessus pid
+    EXECUTION Kernel-AGAM.ExecuterSuivant
+FIN BASE

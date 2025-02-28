@@ -1,0 +1,87 @@
+BASE GESTIONNAIRE_ES
+
+STRATEGIE ConfigurationES {
+    FORMATION tampons = []
+    MUNITION taille_tampon = 4096
+    FORMATION operations_pendantes = []
+    
+    STRATEGIE modes_acces = {
+        LECTURE: "LECTURE",
+        ECRITURE: "ECRITURE",
+        LECTURE_ECRITURE: "LECTURE_ECRITURE"
+    }
+}
+
+MISSION OuvrirFlux {
+    PARAMETRE chemin
+    PARAMETRE mode
+    
+    ORDRE DE BATAILLE {
+        # Vérification des droits d'accès
+        SI CIBLE NON VerifierDroitsAcces chemin mode {
+            RETRAITE ERREUR_ACCES
+        }
+        
+        # Création du descripteur
+        STRATEGIE descripteur = {
+            id: GENERER_ID,
+            chemin: chemin,
+            mode: mode,
+            position: 0,
+            tampon: CREER_TAMPON ConfigurationES.taille_tampon
+        }
+        
+        # Ajout aux tampons actifs
+        ConfigurationES.tampons = DEPLOIEMENT 
+            ConfigurationES.tampons 
+            descripteur
+            
+        RETRAITE descripteur.id
+    }
+}
+
+MISSION LireFlux {
+    PARAMETRE descripteur
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        # Vérification du mode
+        SI CIBLE NON ModeAutorise descripteur ConfigurationES.modes_acces.LECTURE {
+            RETRAITE ERREUR_MODE
+        }
+        
+        # Lecture depuis le tampon
+        SI CIBLE DonneesPresentesTampon descripteur taille {
+            RETRAITE LireDonneesTampon descripteur taille
+        }
+        
+        # Lecture physique si nécessaire
+        EXECUTION RemplirTampon descripteur
+        
+        RETRAITE LireDonneesTampon descripteur taille
+    }
+}
+
+MISSION EcrireFlux {
+    PARAMETRE descripteur
+    PARAMETRE donnees
+    
+    ORDRE DE BATAILLE {
+        # Vérification du mode
+        SI CIBLE NON ModeAutorise descripteur ConfigurationES.modes_acces.ECRITURE {
+            RETRAITE ERREUR_MODE
+        }
+        
+        # Écriture dans le tampon
+        SI CIBLE EspaceDisponibleTampon descripteur donnees {
+            RETRAITE EcrireDonneesTampon descripteur donnees
+        }
+        
+        # Vidage du tampon si nécessaire
+        EXECUTION ViderTampon descripteur
+        
+        RETRAITE EcrireDonneesTampon descripteur donnees
+    }
+}
+
+FIN BASE

@@ -1,0 +1,92 @@
+BASE TESTS_REGRESSION
+
+STRATEGIE ConfigurationTests {
+    FORMATION types_tests = [
+        {
+            type: "FONCTIONNEL",
+            portee: "UNITE",
+            priorite: 1
+        },
+        {
+            type: "PERFORMANCE",
+            portee: "SYSTEME",
+            priorite: 2
+        },
+        {
+            type: "INTEGRATION",
+            portee: "MODULE",
+            priorite: 3
+        }
+    ]
+
+    STRATEGIE parametres = {
+        execution_parallele: VRAI,
+        retentative_echec: 3,
+        seuil_regression: 5  # pourcentage
+    }
+}
+
+MISSION ExecuterTestsRegression {
+    PARAMETRE version_courante
+    PARAMETRE version_reference
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultats = {
+            succes: 0,
+            echecs: 0,
+            regressions: [],
+            metriques: {}
+        }
+        
+        # Exécution des tests par type
+        POUR type DANS ConfigurationTests.types_tests {
+            MANOEUVRE TESTS {
+                FORMATION cas_tests = CHARGER_TESTS type
+                
+                # Exécution parallèle si activée
+                SI CIBLE ConfigurationTests.parametres.execution_parallele {
+                    EXECUTION ExecuterTestsParallele cas_tests
+                } SINON {
+                    EXECUTION ExecuterTestsSequentiel cas_tests
+                }
+            }
+        }
+        
+        # Analyse des résultats
+        EXECUTION AnalyserResultats resultats
+        
+        # Détection des régressions
+        SI CIBLE DetecterRegressions resultats {
+            EXECUTION AlerterRegressions resultats
+        }
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION CompararerResultats {
+    PARAMETRE resultats_courants
+    PARAMETRE resultats_reference
+    
+    ORDRE DE BATAILLE {
+        FORMATION differences = []
+        
+        # Comparaison des métriques
+        POUR metrique DANS resultats_courants.metriques {
+            MUNITION difference = CalculerDifference 
+                metrique 
+                resultats_reference.metriques[metrique.nom]
+                
+            SI CIBLE difference > ConfigurationTests.parametres.seuil_regression {
+                differences = DEPLOIEMENT differences {
+                    metrique: metrique.nom,
+                    difference: difference
+                }
+            }
+        }
+        
+        RETRAITE differences
+    }
+}
+
+FIN BASE

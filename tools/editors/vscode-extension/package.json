@@ -1,0 +1,29 @@
+{
+  "name": "agam-language",
+  "displayName": "AGAM Language",
+  "description": "Support du langage de programmation AGAM basé sur la terminologie militaire",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "agam",
+      "aliases": ["AGAM", "agam"],
+      "extensions": [".agam"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "agam",
+      "scopeName": "source.agam",
+      "path": "./syntaxes/agam.tmLanguage.json"
+    }],
+    "snippets": [{
+      "language": "agam",
+      "path": "./snippets/agam.json"
+    }]
+  }
+}

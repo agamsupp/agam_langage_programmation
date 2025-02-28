@@ -1,0 +1,462 @@
+BASE SPRITES_TACTIQUES
+    // Module de gestion des sprites pour les animations
+    // Fournit des objets visuels animables
+
+    INCORPORATION "animation/animation_core.gma"
+    
+    //----------------------------------------------
+    // TYPES DE SPRITES
+    //----------------------------------------------
+    
+    MUNITION TYPE_SPRITE_RECTANGLE = 0
+    MUNITION TYPE_SPRITE_CERCLE = 1
+    MUNITION TYPE_SPRITE_IMAGE = 2
+    MUNITION TYPE_SPRITE_TEXTE = 3
+    
+    STRATEGIE SPRITE_BASE
+        MUNITION id ENTIER
+        MUNITION type ENTIER
+        MUNITION est_visible BOOLEEN
+        MUNITION position POINT_TACTIQUE
+        MUNITION dimension DIMENSION_TACTIQUE
+        MUNITION couleur COULEUR_TACTIQUE
+        MUNITION transformation TRANSFORMATION_TACTIQUE
+        MUNITION couche ENTIER  // Pour l'ordre de dessin (z-order)
+        MUNITION opacite FLOTTANT  // 0.0 - 1.0
+    FIN STRATEGIE
+    
+    STRATEGIE SPRITE_RECTANGLE
+        INCORPORATION SPRITE_BASE
+        MUNITION rayon_coins FLOTTANT  // Pour les coins arrondis
+    FIN STRATEGIE
+    
+    STRATEGIE SPRITE_CERCLE
+        INCORPORATION SPRITE_BASE
+        // Pas de propriétés supplémentaires spécifiques au cercle
+    FIN STRATEGIE
+    
+    STRATEGIE SPRITE_IMAGE
+        INCORPORATION SPRITE_BASE
+        MUNITION image_source TEXTE
+        MUNITION est_chargee BOOLEEN
+        MUNITION rect_source RECTANGLE_TACTIQUE  // Pour le découpage de l'image
+    FIN STRATEGIE
+    
+    STRATEGIE SPRITE_TEXTE
+        INCORPORATION SPRITE_BASE
+        MUNITION texte TEXTE
+        MUNITION police TEXTE
+        MUNITION taille_police ENTIER
+        MUNITION alignement ENTIER  // 0=gauche, 1=centre, 2=droite
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // CREATION DE SPRITES
+    //----------------------------------------------
+    
+    MUNITION compteur_sprite_id = 0
+    
+    MISSION CREER_SPRITE_RECTANGLE
+        PARAMETRE x FLOTTANT
+        PARAMETRE y FLOTTANT
+        PARAMETRE largeur FLOTTANT
+        PARAMETRE hauteur FLOTTANT
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            MUNITION sprite SPRITE_RECTANGLE
+            
+            // Initialiser le sprite de base
+            sprite.id = compteur_sprite_id
+            compteur_sprite_id = compteur_sprite_id + 1
+            
+            sprite.type = TYPE_SPRITE_RECTANGLE
+            sprite.est_visible = VRAI
+            sprite.couche = 0
+            sprite.opacite = 1.0
+            
+            // Position et dimension
+            sprite.position.x = x
+            sprite.position.y = y
+            sprite.dimension.largeur = largeur
+            sprite.dimension.hauteur = hauteur
+            
+            // Couleur
+            sprite.couleur = couleur
+            
+            // Transformation par défaut
+            sprite.transformation.translation.x = 0
+            sprite.transformation.translation.y = 0
+            sprite.transformation.echelle.x = 1.0
+            sprite.transformation.echelle.y = 1.0
+            sprite.transformation.rotation = 0
+            sprite.transformation.point_pivot.x = x + largeur / 2
+            sprite.transformation.point_pivot.y = y + hauteur / 2
+            
+            // Propriétés spécifiques
+            sprite.rayon_coins = 0  // Coins carrés par défaut
+            
+            RETRAITE sprite
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_SPRITE_CERCLE
+        PARAMETRE x FLOTTANT
+        PARAMETRE y FLOTTANT
+        PARAMETRE rayon FLOTTANT
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            MUNITION sprite SPRITE_CERCLE
+            
+            // Initialiser le sprite de base
+            sprite.id = compteur_sprite_id
+            compteur_sprite_id = compteur_sprite_id + 1
+            
+            sprite.type = TYPE_SPRITE_CERCLE
+            sprite.est_visible = VRAI
+            sprite.couche = 0
+            sprite.opacite = 1.0
+            
+            // Position et dimension (pour un cercle, largeur = hauteur = diamètre)
+            sprite.position.x = x - rayon
+            sprite.position.y = y - rayon
+            sprite.dimension.largeur = rayon * 2
+            sprite.dimension.hauteur = rayon * 2
+            
+            // Couleur
+            sprite.couleur = couleur
+            
+            // Transformation par défaut
+            sprite.transformation.translation.x = 0
+            sprite.transformation.translation.y = 0
+            sprite.transformation.echelle.x = 1.0
+            sprite.transformation.echelle.y = 1.0
+            sprite.transformation.rotation = 0
+            sprite.transformation.point_pivot.x = x
+            sprite.transformation.point_pivot.y = y
+            
+            RETRAITE sprite
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_SPRITE_IMAGE
+        PARAMETRE x FLOTTANT
+        PARAMETRE y FLOTTANT
+        PARAMETRE largeur FLOTTANT
+        PARAMETRE hauteur FLOTTANT
+        PARAMETRE image_source TEXTE
+        
+        ORDRE DE BATAILLE
+            MUNITION sprite SPRITE_IMAGE
+            
+            // Initialiser le sprite de base
+            sprite.id = compteur_sprite_id
+            compteur_sprite_id = compteur_sprite_id + 1
+            
+            sprite.type = TYPE_SPRITE_IMAGE
+            sprite.est_visible = VRAI
+            sprite.couche = 0
+            sprite.opacite = 1.0
+            
+            // Position et dimension
+            sprite.position.x = x
+            sprite.position.y = y
+            sprite.dimension.largeur = largeur
+            sprite.dimension.hauteur = hauteur
+            
+            // Couleur (blanc par défaut pour ne pas teinter l'image)
+            sprite.couleur.rouge = 255
+            sprite.couleur.vert = 255
+            sprite.couleur.bleu = 255
+            sprite.couleur.alpha = 255
+            
+            // Transformation par défaut
+            sprite.transformation.translation.x = 0
+            sprite.transformation.translation.y = 0
+            sprite.transformation.echelle.x = 1.0
+            sprite.transformation.echelle.y = 1.0
+            sprite.transformation.rotation = 0
+            sprite.transformation.point_pivot.x = x + largeur / 2
+            sprite.transformation.point_pivot.y = y + hauteur / 2
+            
+            // Propriétés spécifiques
+            sprite.image_source = image_source
+            sprite.est_chargee = FAUX
+            sprite.rect_source.x = 0
+            sprite.rect_source.y = 0
+            sprite.rect_source.largeur = 0  // 0 = utiliser toute la largeur de l'image
+            sprite.rect_source.hauteur = 0  // 0 = utiliser toute la hauteur de l'image
+            
+            // Charger l'image
+            EXECUTION CHARGER_IMAGE sprite
+            
+            RETRAITE sprite
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CREER_SPRITE_TEXTE
+        PARAMETRE x FLOTTANT
+        PARAMETRE y FLOTTANT
+        PARAMETRE texte TEXTE
+        PARAMETRE police TEXTE
+        PARAMETRE taille_police ENTIER
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            MUNITION sprite SPRITE_TEXTE
+            
+            // Initialiser le sprite de base
+            sprite.id = compteur_sprite_id
+            compteur_sprite_id = compteur_sprite_id + 1
+            
+            sprite.type = TYPE_SPRITE_TEXTE
+            sprite.est_visible = VRAI
+            sprite.couche = 0
+            sprite.opacite = 1.0
+            
+            // Position (dimension sera calculée en fonction du texte)
+            sprite.position.x = x
+            sprite.position.y = y
+            
+            // La dimension sera calculée lors du rendu en fonction du texte
+            sprite.dimension.largeur = 0
+            sprite.dimension.hauteur = 0
+            
+            // Couleur
+            sprite.couleur = couleur
+            
+            // Transformation par défaut
+            sprite.transformation.translation.x = 0
+            sprite.transformation.translation.y = 0
+            sprite.transformation.echelle.x = 1.0
+            sprite.transformation.echelle.y = 1.0
+            sprite.transformation.rotation = 0
+            sprite.transformation.point_pivot.x = x
+            sprite.transformation.point_pivot.y = y
+            
+            // Propriétés spécifiques
+            sprite.texte = texte
+            sprite.police = police
+            sprite.taille_police = taille_police
+            sprite.alignement = 0  // Aligné à gauche par défaut
+            
+            RETRAITE sprite
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // MANIPULATION DE SPRITES
+    //----------------------------------------------
+    
+    MISSION CHARGER_IMAGE
+        PARAMETRE sprite POINTEUR
+        
+        ORDRE DE BATAILLE
+            SI CIBLE sprite.type != TYPE_SPRITE_IMAGE
+                RETRAITE FAUX
+            FIN SI
+            
+            // Simulation du chargement d'image (dépend de l'implémentation réelle)
+            // Dans une implémentation réelle, on chargerait l'image depuis le système de fichiers
+            sprite.est_chargee = VRAI
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION SPRITE_DEPLACER
+        PARAMETRE sprite POINTEUR
+        PARAMETRE x FLOTTANT
+        PARAMETRE y FLOTTANT
+        
+        ORDRE DE BATAILLE
+            sprite.position.x = x
+            sprite.position.y = y
+            
+            // Mettre à jour le point de pivot également
+            SI CIBLE sprite.type == TYPE_SPRITE_CERCLE
+                sprite.transformation.point_pivot.x = x + sprite.dimension.largeur / 2
+                sprite.transformation.point_pivot.y = y + sprite.dimension.hauteur / 2
+            SINON
+                SI CIBLE sprite.type == TYPE_SPRITE_RECTANGLE || sprite.type == TYPE_SPRITE_IMAGE
+                    sprite.transformation.point_pivot.x = x + sprite.dimension.largeur / 2
+                    sprite.transformation.point_pivot.y = y + sprite.dimension.hauteur / 2
+                SINON
+                    sprite.transformation.point_pivot.x = x
+                    sprite.transformation.point_pivot.y = y
+                FIN SI
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION SPRITE_REDIMENSIONNER
+        PARAMETRE sprite POINTEUR
+        PARAMETRE largeur FLOTTANT
+        PARAMETRE hauteur FLOTTANT
+        
+        ORDRE DE BATAILLE
+            sprite.dimension.largeur = largeur
+            sprite.dimension.hauteur = hauteur
+            
+            // Mettre à jour le point de pivot
+            SI CIBLE sprite.type == TYPE_SPRITE_CERCLE
+                // Pour un cercle, maintenir le point de pivot au centre
+                MUNITION centre_x = sprite.position.x + sprite.dimension.largeur / 2
+                MUNITION centre_y = sprite.position.y + sprite.dimension.hauteur / 2
+                sprite.position.x = centre_x - largeur / 2
+                sprite.position.y = centre_y - hauteur / 2
+                sprite.transformation.point_pivot.x = centre_x
+                sprite.transformation.point_pivot.y = centre_y
+            SINON
+                // Pour les autres types, mettre à jour selon la nouvelle taille
+                SI CIBLE sprite.type != TYPE_SPRITE_TEXTE
+                    sprite.transformation.point_pivot.x = sprite.position.x + largeur / 2
+                    sprite.transformation.point_pivot.y = sprite.position.y + hauteur / 2
+                FIN SI
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION SPRITE_CHANGER_COULEUR
+        PARAMETRE sprite POINTEUR
+        PARAMETRE couleur COULEUR_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            sprite.couleur = couleur
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION SPRITE_ROTATION
+        PARAMETRE sprite POINTEUR
+        PARAMETRE angle_degres FLOTTANT
+        
+        ORDRE DE BATAILLE
+            sprite.transformation.rotation = angle_degres
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // RENDU DES SPRITES
+    //----------------------------------------------
+    
+    MISSION SPRITE_DESSINER
+        PARAMETRE sprite POINTEUR
+        PARAMETRE contexte POINTEUR
+        
+        ORDRE DE BATAILLE
+            SI CIBLE !sprite.est_visible || sprite.opacite <= 0
+                RETRAITE
+            FIN SI
+            
+            // Application des transformations
+            EXECUTION APPLIQUER_TRANSFORMATION contexte, sprite.transformation
+            
+            // Définir l'opacité
+            EXECUTION DEFINIR_OPACITE contexte, sprite.opacite
+            
+            // Dessiner selon le type de sprite
+            SELON sprite.type
+                CAS TYPE_SPRITE_RECTANGLE:
+                    EXECUTION DESSINER_RECTANGLE contexte, 
+                                            sprite.position.x, 
+                                            sprite.position.y, 
+                                            sprite.dimension.largeur, 
+                                            sprite.dimension.hauteur, 
+                                            sprite.couleur,
+                                            ((SPRITE_RECTANGLE*)sprite).rayon_coins
+                    PAUSE
+                
+                CAS TYPE_SPRITE_CERCLE:
+                    MUNITION centre_x = sprite.position.x + sprite.dimension.largeur / 2
+                    MUNITION centre_y = sprite.position.y + sprite.dimension.hauteur / 2
+                    MUNITION rayon = sprite.dimension.largeur / 2
+                    
+                    EXECUTION DESSINER_CERCLE contexte, 
+                                        centre_x, 
+                                        centre_y, 
+                                        rayon, 
+                                        sprite.couleur
+                    PAUSE
+                
+                CAS TYPE_SPRITE_IMAGE:
+                    SI CIBLE ((SPRITE_IMAGE*)sprite).est_chargee
+                        EXECUTION DESSINER_IMAGE contexte, 
+                                            sprite.position.x, 
+                                            sprite.position.y, 
+                                            sprite.dimension.largeur, 
+                                            sprite.dimension.hauteur, 
+                                            ((SPRITE_IMAGE*)sprite).image_source,
+                                            ((SPRITE_IMAGE*)sprite).rect_source,
+                                            sprite.couleur
+                    FIN SI
+                    PAUSE
+                
+                CAS TYPE_SPRITE_TEXTE:
+                    EXECUTION DESSINER_TEXTE contexte, 
+                                        sprite.position.x, 
+                                        sprite.position.y, 
+                                        ((SPRITE_TEXTE*)sprite).texte, 
+                                        ((SPRITE_TEXTE*)sprite).police, 
+                                        ((SPRITE_TEXTE*)sprite).taille_police, 
+                                        sprite.couleur,
+                                        ((SPRITE_TEXTE*)sprite).alignement
+                    PAUSE
+            FIN SELON
+            
+            // Restaurer les transformations
+            EXECUTION RESTAURER_TRANSFORMATION contexte
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    // Note: Ces fonctions de dessin sont des abstractions et dépendront
+    // de l'implémentation réelle du système de rendu
+    MISSION APPLIQUER_TRANSFORMATION
+        PARAMETRE contexte POINTEUR
+        PARAMETRE transformation TRANSFORMATION_TACTIQUE
+        
+        ORDRE DE BATAILLE
+            // Sauvegarder l'état actuel du contexte
+            EXECUTION SAUVEGARDER_CONTEXTE contexte
+            
+            // Appliquer les transformations dans l'ordre: translation, rotation, échelle
+            // Le point de pivot est utilisé comme centre de rotation et d'échelle
+            
+            // Déplacer l'origine au point de pivot
+            EXECUTION CONTEXTE_TRANSLATION contexte, 
+                                    transformation.point_pivot.x, 
+                                    transformation.point_pivot.y
+            
+            // Appliquer la rotation
+            EXECUTION CONTEXTE_ROTATION contexte, transformation.rotation
+            
+            // Appliquer l'échelle
+            EXECUTION CONTEXTE_ECHELLE contexte, 
+                                 transformation.echelle.x, 
+                                 transformation.echelle.y
+            
+            // Retourner à la position originale
+            EXECUTION CONTEXTE_TRANSLATION contexte, 
+                                    -transformation.point_pivot.x, 
+                                    -transformation.point_pivot.y
+            
+            // Appliquer la translation
+            EXECUTION CONTEXTE_TRANSLATION contexte, 
+                                    transformation.translation.x, 
+                                    transformation.translation.y
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE

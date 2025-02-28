@@ -1,0 +1,41 @@
+BASE EXEMPLES_BASIQUES
+
+# Exemple 1: Calcul simple
+MISSION CalculForce {
+    ORDRE DE BATAILLE {
+        MUNITION force_initiale = 100
+        MUNITION bonus = 20
+        
+        MUNITION force_totale = force_initiale ASSAUT bonus
+        RAPPORT "Force totale: " + force_totale
+    }
+}
+
+# Exemple 2: Boucle et conditions
+MISSION PatrouillePérimètre {
+    ORDRE DE BATAILLE {
+        FORMATION points_controle = [1, 2, 3, 4]
+        
+        MANOEUVRE PATROUILLE {
+            POUR point DANS points_controle {
+                SI CIBLE point > 2 {
+                    RAPPORT "Point critique trouvé: " + point
+                }
+            }
+        }
+    }
+}
+
+# Exemple 3: Structures de données
+STRATEGIE Arsenal {
+    MUNITION munitions = 1000
+    FORMATION armes = ["fusil", "pistolet"]
+    
+    MISSION VerifierStock {
+        SI CIBLE munitions < 100 {
+            RAPPORT "Réapprovisionnement nécessaire"
+        }
+    }
+}
+
+FIN BASE

@@ -1,0 +1,92 @@
+BASE SYSTEME_BUILD_AVANCE
+
+STRATEGIE ConfigurationBuild {
+    FORMATION etapes = [
+        {
+            nom: "PREPARATION",
+            actions: [
+                "NETTOYAGE",
+                "VERIFICATION_DEPS",
+                "CONFIG_ENV"
+            ],
+            obligatoire: VRAI
+        },
+        {
+            nom: "COMPILATION",
+            actions: [
+                "ANALYSE_STATIQUE",
+                "COMPILATION",
+                "OPTIMISATION"
+            ],
+            obligatoire: VRAI
+        },
+        {
+            nom: "TESTS",
+            actions: [
+                "UNITAIRES",
+                "INTEGRATION",
+                "PERFORMANCE"
+            ],
+            obligatoire: FAUX
+        }
+    ]
+
+    STRATEGIE parametres = {
+        parallele: VRAI,
+        cache: VRAI,
+        rapport_detaille: VRAI
+    }
+}
+
+MISSION ExecuterBuild {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        # Initialisation de l'environnement
+        EXECUTION PreparerEnvironnementBuild
+        
+        # Execution des étapes
+        POUR etape DANS ConfigurationBuild.etapes {
+            SI CIBLE etape.obligatoire OU EtapeActivee etape {
+                MANOEUVRE BUILD {
+                    # Exécution des actions de l'étape
+                    POUR action DANS etape.actions {
+                        SI CIBLE ConfigurationBuild.parametres.parallele {
+                            EXECUTION ExecuterActionParallele action
+                        } SINON {
+                            EXECUTION ExecuterAction action
+                        }
+                    }
+                    
+                    # Vérification des résultats
+                    SI CIBLE NON VerifierResultatsEtape etape {
+                        SI CIBLE etape.obligatoire {
+                            RETRAITE ECHEC_BUILD
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Génération du rapport
+        EXECUTION GenererRapportBuild
+    }
+}
+
+MISSION GererCache {
+    PARAMETRE action
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE ConfigurationBuild.parametres.cache {
+            SI CIBLE ResultatEnCache action {
+                RETRAITE OBTENIR_CACHE action
+            } SINON {
+                MUNITION resultat = EXECUTION ExecuterAction action
+                EXECUTION MettreEnCache action resultat
+                RETRAITE resultat
+            }
+        }
+    }
+}
+
+FIN BASE

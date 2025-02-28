@@ -1,0 +1,10 @@
+BASE TEST_BIBLIOTHEQUES
+    INCLURE "ARMEMENT"
+    INCLURE "LOGISTIQUE"
+    
+    MUNITION resultat = PUISSANCE DE FEU 2 3
+    RAPPORT "2^3 = " FUSION resultat
+    
+    RAVITAILLEMENT "resultat.txt" resultat
+    RAPPORT "Résultat sauvegardé"
+FIN BASE

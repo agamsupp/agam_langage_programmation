@@ -1,0 +1,60 @@
+BASE GESTIONNAIRE_METADONNEES
+
+STRATEGIE MetadonneesCompilation {
+    FORMATION informations = [
+        {type: "VERSION", valeur: "1.0.0"},
+        {type: "ARCHITECTURE", valeur: "x86_64"},
+        {type: "OPTIMISATION", valeur: "NIVEAU_2"}
+    ]
+    
+    FORMATION annotations = []
+}
+
+MISSION AjouterMetadonnees {
+    PARAMETRE element
+    PARAMETRE meta
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE nouvelle_meta = {
+            element_id: element.id,
+            type: meta.type,
+            valeur: meta.valeur,
+            timestamp: TEMPS_ACTUEL
+        }
+        
+        MetadonneesCompilation.annotations = DEPLOIEMENT 
+            MetadonneesCompilation.annotations 
+            nouvelle_meta
+    }
+}
+
+MISSION ExtraireMetadonnees {
+    PARAMETRE element_id
+    
+    ORDRE DE BATAILLE {
+        FORMATION metas = []
+        
+        POUR annotation DANS MetadonneesCompilation.annotations {
+            SI CIBLE annotation.element_id VERIFICATION element_id {
+                metas = DEPLOIEMENT metas annotation
+            }
+        }
+        
+        RETRAITE metas
+    }
+}
+
+MISSION GenererManifeste {
+    ORDRE DE BATAILLE {
+        STRATEGIE manifeste = {
+            informations_base: COPIER MetadonneesCompilation.informations,
+            annotations: EXTRAIRE_ANNOTATIONS_IMPORTANTES,
+            dependencies: EXTRAIRE_DEPENDANCES
+        }
+        
+        # Génération du fichier manifeste
+        EXECUTION EcrireManifeste manifeste
+    }
+}
+
+FIN BASE

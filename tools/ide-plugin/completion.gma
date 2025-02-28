@@ -1,0 +1,76 @@
+BASE AUTOCOMPLETION
+
+STRATEGIE PropositionsBase {
+    FORMATION mots_clés = [
+        {
+            mot: "MISSION",
+            template: "MISSION NomMission {\n    ORDRE DE BATAILLE {\n        \n    }\n}"
+        },
+        {
+            mot: "STRATEGIE",
+            template: "STRATEGIE NomStrategie {\n    \n}"
+        },
+        {
+            mot: "FORMATION",
+            template: "FORMATION nom_formation = []"
+        }
+    ]
+    
+    FORMATION commandes = [
+        {
+            mot: "POUR",
+            template: "POUR élément DANS collection"
+        },
+        {
+            mot: "SI CIBLE",
+            template: "SI CIBLE condition {\n    \n}"
+        }
+    ]
+}
+
+MISSION CompléterCode {
+    PARAMETRE contexte
+    PARAMETRE préfixe
+    
+    ORDRE DE BATAILLE {
+        FORMATION suggestions = []
+        
+        # Recherche dans les mots-clés
+        POUR mot DANS PropositionsBase.mots_clés {
+            SI CIBLE CommencePar mot.mot préfixe {
+                suggestions = DÉPLOIEMENT suggestions mot
+            }
+        }
+        
+        # Recherche dans les commandes
+        POUR cmd DANS PropositionsBase.commandes {
+            SI CIBLE CommencePar cmd.mot préfixe {
+                suggestions = DÉPLOIEMENT suggestions cmd
+            }
+        }
+        
+        # Recherche dans le contexte local
+        EXECUTION RechercherVariablesLocales contexte préfixe suggestions
+        
+        RETRAITE suggestions
+    }
+}
+
+MISSION RechercherVariablesLocales {
+    PARAMETRE contexte
+    PARAMETRE préfixe
+    PARAMETRE suggestions
+    
+    ORDRE DE BATAILLE {
+        POUR variable DANS contexte.variables {
+            SI CIBLE CommencePar variable.nom préfixe {
+                suggestions = DÉPLOIEMENT suggestions {
+                    mot: variable.nom,
+                    type: variable.type
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

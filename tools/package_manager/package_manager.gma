@@ -1,0 +1,76 @@
+BASE GESTIONNAIRE_PAQUETS
+
+STRATEGIE Configuration {
+    STRATEGIE depot = {
+        url: "https://depot.agam-lang.org",
+        version: "1.0.0"
+    }
+    
+    FORMATION paquets_installes = []
+    FORMATION dependances = []
+}
+
+MISSION InstallerPaquet {
+    PARAMETRE nom_paquet
+    PARAMETRE version
+    
+    ORDRE DE BATAILLE {
+        # Vérification des dépendances
+        STRATEGIE info_paquet = EXECUTION ObtenirInfoPaquet nom_paquet
+        
+        SI CIBLE NON PaquetInstalle nom_paquet {
+            # Installation des dépendances
+            POUR dep DANS info_paquet.dependances {
+                EXECUTION InstallerPaquet dep.nom dep.version
+            }
+            
+            # Téléchargement et installation
+            EXECUTION TelechargerPaquet nom_paquet version
+            EXECUTION VerifierIntegrite nom_paquet
+            EXECUTION ConfigurerPaquet nom_paquet
+            
+            # Enregistrement
+            Configuration.paquets_installes = DEPLOIEMENT Configuration.paquets_installes {
+                nom: nom_paquet,
+                version: version,
+                date_installation: DATE_ACTUELLE
+            }
+        }
+    }
+}
+
+MISSION MettreAJourPaquet {
+    PARAMETRE nom_paquet
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE PaquetInstalle nom_paquet {
+            STRATEGIE version_actuelle = ObtenirVersionPaquet nom_paquet
+            STRATEGIE derniere_version = ObtenirDerniereVersion nom_paquet
+            
+            SI CIBLE version_actuelle NON VERIFICATION derniere_version {
+                EXECUTION DesinstallerPaquet nom_paquet
+                EXECUTION InstallerPaquet nom_paquet derniere_version
+            }
+        }
+    }
+}
+
+MISSION GererDependances {
+    PARAMETRE paquet
+    
+    ORDRE DE BATAILLE {
+        FORMATION deps = []
+        
+        POUR dep DANS paquet.dependances {
+            SI CIBLE VerifierCompatibilite dep {
+                deps = DEPLOIEMENT deps dep
+            } SINON {
+                RAPPORT "ERREUR: Conflit de dépendance: " + dep.nom
+            }
+        }
+        
+        RETRAITE deps
+    }
+}
+
+FIN BASE

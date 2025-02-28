@@ -1,0 +1,88 @@
+BASE SYSTEME_JOURNALISATION
+
+STRATEGIE ConfigurationJournal {
+    FORMATION niveaux = [
+        {
+            niveau: "DEBUG",
+            priorite: 0,
+            destinations: ["CONSOLE", "FICHIER"]
+        },
+        {
+            niveau: "INFO",
+            priorite: 1,
+            destinations: ["FICHIER"]
+        },
+        {
+            niveau: "ERREUR",
+            priorite: 2,
+            destinations: ["CONSOLE", "FICHIER", "ALERTE"]
+        }
+    ]
+
+    STRATEGIE parametres = {
+        rotation_fichiers: VRAI,
+        taille_max_fichier: 10 * 1024 * 1024,  # 10MB
+        compression: VRAI,
+        retention: 30  # jours
+    }
+}
+
+MISSION EnregistrerJournal {
+    PARAMETRE message
+    PARAMETRE niveau
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Construction de l'entrée
+        STRATEGIE entree = {
+            timestamp: TEMPS_ACTUEL,
+            niveau: niveau,
+            message: message,
+            contexte: contexte,
+            thread: THREAD_COURANT,
+            trace: OBTENIR_TRACE
+        }
+        
+        # Formatage du message
+        POUR destination DANS niveau.destinations {
+            SELON destination {
+                CAS "CONSOLE":
+                    EXECUTION EcrireConsole 
+                        FORMATER_CONSOLE entree
+                CAS "FICHIER":
+                    EXECUTION EcrireFichier 
+                        FORMATER_FICHIER entree
+                CAS "ALERTE":
+                    EXECUTION EnvoyerAlerte 
+                        FORMATER_ALERTE entree
+            }
+        }
+        
+        # Rotation des fichiers si nécessaire
+        SI CIBLE TAILLE_FICHIER_JOURNAL > ConfigurationJournal.parametres.taille_max_fichier {
+            EXECUTION RotationJournal
+        }
+    }
+}
+
+MISSION RotationJournal {
+    ORDRE DE BATAILLE {
+        # Archivage du fichier courant
+        MUNITION nom_archive = GENERER_NOM_ARCHIVE
+        
+        SI CIBLE ConfigurationJournal.parametres.compression {
+            EXECUTION CompresserJournal FICHIER_COURANT nom_archive
+        } SINON {
+            EXECUTION DeplacerJournal FICHIER_COURANT nom_archive
+        }
+        
+        # Nettoyage des anciens journaux
+        EXECUTION NettoyerAnciensJournaux 
+            ConfigurationJournal.parametres.retention
+            
+        # Création d'un nouveau fichier
+        EXECUTION CreerNouveauJournal
+    }
+}
+
+FIN BASE

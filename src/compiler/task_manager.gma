@@ -1,0 +1,85 @@
+BASE GESTIONNAIRE_TACHES
+
+STRATEGIE ConfigurationTaches {
+    FORMATION priorites = [
+        {
+            niveau: "CRITIQUE",
+            valeur: 0,
+            preemption: VRAI
+        },
+        {
+            niveau: "HAUTE",
+            valeur: 1,
+            preemption: VRAI
+        },
+        {
+            niveau: "NORMALE",
+            valeur: 2,
+            preemption: FAUX
+        }
+    ]
+
+    STRATEGIE ordonnancement = {
+        politique: "PRIORITE_DYNAMIQUE",
+        quantum: 100,              # ms
+        reequilibrage: 1000        # ms
+    }
+}
+
+MISSION GererTaches {
+    ORDRE DE BATAILLE {
+        FORMATION taches_actives = []
+        FORMATION taches_en_attente = []
+        
+        # Boucle principale d'ordonnancement
+        MANOEUVRE ORDONNANCEMENT {
+            TANT_QUE SYSTEME_ACTIF {
+                # Traitement des nouvelles tâches
+                TANT_QUE RECONNAISSANCE taches_en_attente > 0 {
+                    EXECUTION PlanifierNouvelleTache
+                }
+                
+                # Exécution des tâches actives
+                POUR tache DANS taches_actives {
+                    SI CIBLE VerifierPreemption tache {
+                        EXECUTION SuspendreTache tache
+                    } SINON {
+                        EXECUTION ExecuterTache tache
+                    }
+                }
+                
+                # Rééquilibrage périodique
+                SI CIBLE TEMPS_ECOULE > ConfigurationTaches.ordonnancement.reequilibrage {
+                    EXECUTION ReequilibrerCharge
+                }
+                
+                ATTENDRE ConfigurationTaches.ordonnancement.quantum
+            }
+        }
+    }
+}
+
+MISSION PlanifierNouvelleTache {
+    PARAMETRE tache
+    
+    ORDRE DE BATAILLE {
+        # Analyse des dépendances
+        SI CIBLE VerifierDependances tache {
+            # Détermination de la priorité
+            MUNITION priorite = CalculerPrioriteTache tache
+            
+            # Insertion dans la file appropriée
+            SI CIBLE priorite.preemption {
+                EXECUTION InsererTachePrioritaire tache
+            } SINON {
+                EXECUTION InsererTacheNormale tache
+            }
+            
+            RETRAITE VRAI
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

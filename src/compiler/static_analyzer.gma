@@ -1,0 +1,82 @@
+BASE ANALYSEUR_STATIQUE
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION regles = [
+        {
+            type: "SEMANTIQUE",
+            verifications: [
+                "PORTEE_VARIABLE",
+                "TYPAGE",
+                "INITIALISATION"
+            ]
+        },
+        {
+            type: "CONTROLE",
+            verifications: [
+                "BOUCLES_INFINIES",
+                "CODE_MORT",
+                "CHEMINS_INACCESSIBLES"
+            ]
+        },
+        {
+            type: "PERFORMANCE",
+            verifications: [
+                "COMPLEXITE_CYCLOMATIQUE",
+                "PROFONDEUR_IMBRICATION",
+                "DUPLICATION_CODE"
+            ]
+        }
+    ]
+}
+
+MISSION AnalyserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            problemes: [],
+            avertissements: [],
+            suggestions: []
+        }
+        
+        # Construction de l'AST
+        STRATEGIE ast = EXECUTION ConstruireAST code_source
+        
+        # Application des règles d'analyse
+        POUR regle DANS ConfigurationAnalyse.regles {
+            SELON regle.type {
+                CAS "SEMANTIQUE":
+                    EXECUTION AnalyserSemantique ast rapport
+                CAS "CONTROLE":
+                    EXECUTION AnalyserControle ast rapport
+                CAS "PERFORMANCE":
+                    EXECUTION AnalyserPerformance ast rapport
+            }
+        }
+        
+        # Génération des suggestions d'amélioration
+        SI CIBLE RECONNAISSANCE rapport.problemes > 0 {
+            EXECUTION GenererSuggestions rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION AnalyserSemantique {
+    PARAMETRE ast
+    PARAMETRE rapport
+    
+    ORDRE DE BATAILLE {
+        # Analyse des variables
+        EXECUTION AnalyserPorteeVariables ast rapport
+        
+        # Analyse du typage
+        EXECUTION AnalyserTypage ast rapport
+        
+        # Vérification des initialisations
+        EXECUTION VerifierInitialisations ast rapport
+    }
+}
+
+FIN BASE

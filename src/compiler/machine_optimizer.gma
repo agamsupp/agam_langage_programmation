@@ -1,0 +1,107 @@
+BASE OPTIMISEUR_MACHINE
+
+STRATEGIE ReglesOptimisation {
+    FORMATION optimisations = [
+        {
+            type: "PIPELINE",
+            niveau: 1,
+            operations: [
+                "REORDONNANCEMENT",
+                "FUSION_INSTRUCTIONS",
+                "ELIMINATION_NOP"
+            ]
+        },
+        {
+            type: "REGISTRES",
+            niveau: 2,
+            operations: [
+                "ALLOCATION_OPTIMALE",
+                "REDUCTION_COPIES",
+                "COLORIAGE_GRAPHE"
+            ]
+        },
+        {
+            type: "MEMOIRE",
+            niveau: 3,
+            operations: [
+                "ALIGNEMENT",
+                "CACHE_LOCALITE",
+                "PREFETCHING"
+            ]
+        }
+    ]
+}
+
+MISSION OptimiserCodeMachine {
+    PARAMETRE code
+    PARAMETRE architecture
+    
+    ORDRE DE BATAILLE {
+        # Analyse des dépendances
+        STRATEGIE deps = AnalyserDependancesInstructions code
+        
+        # Application des optimisations par niveau
+        POUR niveau DANS SEQUENCE 1 À 3 {
+            POUR opt DANS ReglesOptimisation.optimisations {
+                SI CIBLE opt.niveau == niveau {
+                    SELON opt.type {
+                        CAS "PIPELINE":
+                            code = EXECUTION OptimiserPipeline code deps
+                        CAS "REGISTRES":
+                            code = EXECUTION OptimiserRegistres code architecture
+                        CAS "MEMOIRE":
+                            code = EXECUTION OptimiserMemoire code architecture
+                    }
+                }
+            }
+        }
+        
+        # Validation du code optimisé
+        SI CIBLE NON ValiderCodeMachine code architecture {
+            RAPPORT "Erreur: Code machine invalide après optimisation"
+            RETRAITE ERREUR_OPTIMISATION
+        }
+        
+        RETRAITE code
+    }
+}
+
+MISSION OptimiserPipeline {
+    PARAMETRE code
+    PARAMETRE deps
+    
+    ORDRE DE BATAILLE {
+        # Réordonnancement des instructions
+        FORMATION blocs = DIVISER_EN_BLOCS code
+        
+        POUR bloc DANS blocs {
+            # Détection des opportunités de fusion
+            EXECUTION DetecterFusionInstructions bloc
+            
+            # Élimination des NOPs
+            EXECUTION EliminerNOP bloc
+            
+            # Réordonnancement selon les dépendances
+            EXECUTION ReordonnancerInstructions bloc deps
+        }
+        
+        RETRAITE FUSIONNER_BLOCS blocs
+    }
+}
+
+MISSION AllouerRegistres {
+    PARAMETRE code
+    
+    ORDRE DE BATAILLE {
+        # Construction du graphe d'interférence
+        STRATEGIE graphe = ConstruireGrapheInterference code
+        
+        # Coloration du graphe
+        EXECUTION ColorierGraphe graphe
+        
+        # Application de l'allocation
+        EXECUTION AppliquerAllocation code graphe
+    }
+}
+
+FIN BASE

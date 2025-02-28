@@ -1,0 +1,84 @@
+BASE ANALYSEUR_FLUX_DONNEES
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION variables_suivies = []
+    FORMATION points_analyse = []
+    
+    STRATEGIE analyse_types = {
+        DEFINITION: "DEF",
+        UTILISATION: "USE",
+        MODIFICATION: "MOD"
+    }
+}
+
+MISSION AnalyserFluxDonnees {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        # Construction du graphe de flux
+        STRATEGIE graphe = EXECUTION ConstruireGrapheFlux code_source
+        
+        # Analyse des définitions
+        FORMATION definitions_entree = []
+        FORMATION definitions_sortie = []
+        
+        POUR bloc DANS graphe.blocs {
+            # Analyse des définitions dans le bloc
+            EXECUTION AnalyserDefinitions bloc
+            
+            # Analyse des utilisations
+            EXECUTION AnalyserUtilisations bloc
+            
+            # Propagation des définitions
+            EXECUTION PropagerDefinitions bloc
+        }
+        
+        # Détection des anomalies
+        EXECUTION DetecterAnomalies graphe
+    }
+}
+
+MISSION AnalyserDefinitions {
+    PARAMETRE bloc
+    
+    ORDRE DE BATAILLE {
+        FORMATION definitions = []
+        
+        POUR instruction DANS bloc.instructions {
+            SI CIBLE EstDefinitionVariable instruction {
+                STRATEGIE definition = {
+                    variable: instruction.cible,
+                    valeur: instruction.valeur,
+                    point: instruction.position
+                }
+                
+                definitions = DEPLOIEMENT definitions definition
+            }
+        }
+        
+        bloc.definitions = definitions
+    }
+}
+
+MISSION PropagerDefinitions {
+    PARAMETRE bloc
+    
+    ORDRE DE BATAILLE {
+        # Calcul des définitions atteignant le bloc
+        FORMATION definitions_predecesseurs = []
+        
+        POUR pred DANS bloc.predecesseurs {
+            definitions_predecesseurs = UNION 
+                definitions_predecesseurs 
+                pred.definitions_sortie
+        }
+        
+        # Mise à jour des définitions
+        bloc.definitions_entree = definitions_predecesseurs
+        bloc.definitions_sortie = UNION 
+            bloc.definitions 
+            (DIFFERENCE definitions_predecesseurs bloc.tuees)
+    }
+}
+
+FIN BASE

@@ -1,0 +1,76 @@
+{
+  "Base Program": {
+    "prefix": "base",
+    "body": [
+      "BASE ${1:NOM_PROGRAMME}",
+      "\t$0",
+      "FIN BASE"
+    ],
+    "description": "Structure de base d'un programme AGAM"
+  },
+  "Manoeuvre": {
+    "prefix": "manoeuvre",
+    "body": [
+      "MANOEUVRE",
+      "\t$0",
+      "FIN MANOEUVRE"
+    ],
+    "description": "Bloc de code MANOEUVRE (boucle principale)"
+  },
+  "Condition": {
+    "prefix": "si",
+    "body": [
+      "SI CIBLE ${1:condition}",
+      "\t$0",
+      "FIN CIBLE"
+    ],
+    "description": "Structure conditionnelle"
+  },
+  "Switch Case": {
+    "prefix": "chain",
+    "body": [
+      "CHAIN DE COMMANDE ${1:variable}",
+      "\tCAS ${2:1}: ",
+      "\t\t$0",
+      "\tDEFAUT: ",
+      "\t\t",
+      "FIN COMMANDE"
+    ],
+    "description": "Structure de choix multiple"
+  },
+  "Input": {
+    "prefix": "surveillance",
+    "body": [
+      "SURVEILLANCE ${1:variable} \"${2:message}\""
+    ],
+    "description": "Lire une entrée utilisateur"
+  },
+  "Output": {
+    "prefix": "rapport",
+    "body": [
+      "RAPPORT \"${1:message}\""
+    ],
+    "description": "Afficher un message"
+  },
+  "Addition": {
+    "prefix": "assaut",
+    "body": [
+      "ASSAUT ${1:a} ${2:b}"
+    ],
+    "description": "Addition de deux valeurs"
+  },
+  "Subtraction": {
+    "prefix": "repli",
+    "body": [
+      "REPLI ${1:a} ${2:b}"
+    ],
+    "description": "Soustraction de deux valeurs"
+  },
+  "Power": {
+    "prefix": "puissance",
+    "body": [
+      "PUISSANCE DE FEU ${1:base} ${2:exposant}"
+    ],
+    "description": "Élévation à la puissance"
+  }
+}

@@ -1,0 +1,84 @@
+BASE SYSTEME_MODULES
+
+STRATEGIE GestionnaireModules {
+    FORMATION modules_charges = []
+    FORMATION dependances = []
+    STRATEGIE cache = {}
+}
+
+MISSION ImporterModule {
+    PARAMETRE chemin_module
+    
+    ORDRE DE BATAILLE {
+        # Vérification si le module est déjà chargé
+        SI CIBLE ModuleExiste chemin_module {
+            RETRAITE ObtenirModuleCache chemin_module
+        }
+
+        # Chargement du module
+        STRATEGIE nouveau_module = {
+            chemin: chemin_module,
+            contenu: LIRE_FICHIER chemin_module,
+            exports: [],
+            imports: []
+        }
+
+        # Analyse des dépendances
+        MISSION AnalyserDependances {
+            FORMATION deps = EXTRAIRE_DEPENDANCES nouveau_module.contenu
+            POUR dep DANS deps {
+                SI CIBLE NON ModuleExiste dep {
+                    EXECUTION ImporterModule dep
+                }
+            }
+            nouveau_module.imports = deps
+        }
+
+        # Compilation du module
+        MISSION CompilerModule {
+            nouveau_module.code_compile = EXECUTION CompilerCode nouveau_module.contenu
+            EXECUTION VerifierExports nouveau_module
+        }
+
+        GestionnaireModules.modules_charges = DEPLOIEMENT GestionnaireModules.modules_charges nouveau_module
+        RETRAITE nouveau_module
+    }
+}
+
+MISSION ExporterSymbole {
+    PARAMETRE module
+    PARAMETRE symbole
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE SymboleValide symbole {
+            module.exports = DEPLOIEMENT module.exports symbole
+        } SINON {
+            RAPPORT "ERREUR: Symbole invalide pour export: " + symbole
+        }
+    }
+}
+
+MISSION ResoudreDependances {
+    PARAMETRE module
+    
+    ORDRE DE BATAILLE {
+        FORMATION deps_resolues = []
+        
+        MANOEUVRE RESOLUTION {
+            POUR dep DANS module.imports {
+                SI CIBLE ModuleExiste dep {
+                    deps_resolues = DEPLOIEMENT deps_resolues {
+                        module: dep,
+                        statut: "RESOLU"
+                    }
+                } SINON {
+                    RAPPORT "ERREUR: Dépendance non trouvée: " + dep
+                }
+            }
+        }
+        
+        RETRAITE deps_resolues
+    }
+}
+
+FIN BASE

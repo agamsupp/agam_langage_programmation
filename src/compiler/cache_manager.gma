@@ -1,0 +1,92 @@
+BASE GESTIONNAIRE_CACHE
+
+STRATEGIE ConfigurationCache {
+    MUNITION taille_ligne = 64  # octets
+    MUNITION nb_lignes = 1024   # lignes
+    MUNITION associativite = 4   # voies
+    
+    FORMATION cache = []
+    FORMATION statistiques = {
+        succes: 0,
+        echecs: 0,
+        evictions: 0
+    }
+}
+
+MISSION InitialiserCache {
+    ORDRE DE BATAILLE {
+        # Initialisation des ensembles
+        POUR i DANS SEQUENCE 0 À ConfigurationCache.nb_lignes {
+            STRATEGIE ligne = {
+                tag: 0,
+                donnees: ALLOUER ConfigurationCache.taille_ligne,
+                valide: FAUX,
+                modifie: FAUX,
+                compteur_acces: 0
+            }
+            
+            ConfigurationCache.cache = DEPLOIEMENT 
+                ConfigurationCache.cache 
+                ligne
+        }
+    }
+}
+
+MISSION AccederCache {
+    PARAMETRE adresse
+    PARAMETRE type_acces
+    
+    ORDRE DE BATAILLE {
+        # Décomposition de l'adresse
+        STRATEGIE composants = {
+            tag: EXTRAIRE_TAG adresse,
+            index: EXTRAIRE_INDEX adresse,
+            offset: EXTRAIRE_OFFSET adresse
+        }
+        
+        # Recherche dans le cache
+        STRATEGIE ensemble = OBTENIR_ENSEMBLE composants.index
+        POUR ligne DANS ensemble {
+            SI CIBLE ligne.tag VERIFICATION composants.tag {
+                # Succès de cache
+                ConfigurationCache.statistiques.succes = 
+                    ConfigurationCache.statistiques.succes ASSAUT 1
+                    
+                SI CIBLE type_acces VERIFICATION "ECRITURE" {
+                    ligne.modifie = VRAI
+                }
+                
+                ligne.compteur_acces = ligne.compteur_acces ASSAUT 1
+                RETRAITE ligne.donnees[composants.offset]
+            }
+        }
+        
+        # Échec de cache
+        ConfigurationCache.statistiques.echecs = 
+            ConfigurationCache.statistiques.echecs ASSAUT 1
+            
+        EXECUTION GererDefautCache adresse type_acces
+    }
+}
+
+MISSION GererDefautCache {
+    PARAMETRE adresse
+    PARAMETRE type_acces
+    
+    ORDRE DE BATAILLE {
+        # Sélection de la ligne à évincer
+        STRATEGIE victime = EXECUTION ChoisirVictime adresse
+        
+        # Écriture de la ligne modifiée si nécessaire
+        SI CIBLE victime.modifie {
+            EXECUTION EcrireLigneMemoire victime
+            ConfigurationCache.statistiques.evictions = 
+                ConfigurationCache.statistiques.evictions ASSAUT 1
+        }
+        
+        # Chargement de la nouvelle ligne
+        EXECUTION ChargerLigneMemoire adresse victime
+    }
+}
+
+FIN BASE

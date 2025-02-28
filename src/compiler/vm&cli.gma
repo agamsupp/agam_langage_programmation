@@ -1,0 +1,446 @@
+BASE BibliothèqueGraphique
+
+STRATEGIE Couleurs {
+    MUNITION ROUGE = 1
+    MUNITION VERT = 2
+    MUNITION NOIR = 3
+    MUNITION ROUGE_ORANGE = 4
+    MUNITION ROUGE_ROSE = 5
+    MUNITION ROUGE_FONCE = 6
+}
+
+MISSION InitialiserÉcran {
+    PARAMETRE largeur
+    PARAMETRE hauteur
+    ORDRE DE BATAILLE {
+        RETRAITE true
+    }
+}
+
+MISSION EffacerÉcran {
+    ORDRE DE BATAILLE {}
+}
+
+MISSION DessinerTexte {
+    PARAMETRE x
+    PARAMETRE y
+    PARAMETRE texte
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {}
+}
+
+MISSION DessinerRectangle {
+    PARAMETRE x
+    PARAMETRE y
+    PARAMETRE largeur
+    PARAMETRE hauteur
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {}
+}
+
+MISSION DessinerCercle {
+    PARAMETRE x
+    PARAMETRE y
+    PARAMETRE rayon
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {}
+}
+
+MISSION DessinerLigne {
+    PARAMETRE x1
+    PARAMETRE y1
+    PARAMETRE x2
+    PARAMETRE y2
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {}
+}
+
+MISSION ObtenirEntréeUtilisateur {
+    ORDRE DE BATAILLE {
+        RETRAITE entrée
+    }
+}
+
+MISSION Attendre {
+    PARAMETRE millisecondes
+    ORDRE DE BATAILLE {}
+}
+
+FIN BASE
+
+BASE TerminalAGAM
+
+STRATEGIE ConfigurationTerminal {
+    MUNITION LARGEUR = 80
+    MUNITION HAUTEUR = 25
+    MUNITION COULEUR_SORTIE = BibliothèqueGraphique.Couleurs.ROUGE
+    MUNITION COULEUR_ENTRÉE = BibliothèqueGraphique.Couleurs.VERT
+}
+
+MISSION InitialiserTerminal {
+    ORDRE DE BATAILLE {
+        EXECUTION BibliothèqueGraphique.InitialiserÉcran ConfigurationTerminal.LARGEUR ConfigurationTerminal.HAUTEUR
+        EXECUTION BibliothèqueGraphique.EffacerÉcran
+    }
+}
+
+MISSION AfficherTexteTerminal {
+    PARAMETRE texte
+    PARAMETRE couleur
+    ORDRE DE BATAILLE {
+        EXECUTION BibliothèqueGraphique.DessinerTexte 0 positionY texte couleur
+    }
+}
+
+MISSION AfficherPrompt {
+    ORDRE DE BATAILLE {
+        EXECUTION AfficherTexteTerminal ">" ConfigurationTerminal.COULEUR_ENTRÉE
+    }
+}
+
+MISSION LireCommande {
+    ORDRE DE BATAILLE {
+        MUNITION commande = EXECUTION BibliothèqueGraphique.ObtenirEntréeUtilisateur
+        RETRAITE commande
+    }
+}
+
+FIN BASE
+
+BASE AnimationsAGAM
+
+MISSION EffetMatrix {
+    PARAMETRE durée
+    ORDRE DE BATAILLE {
+        MUNITION tempsDébut = tempsActuel
+        MANOEUVRE tempsActuel - tempsDébut < durée {
+            POUR i DE 0 À ConfigurationTerminal.LARGEUR {
+                POUR j DE 0 À ConfigurationTerminal.HAUTEUR {
+                    SI CIBLE aléatoire < 0.1 {
+                        EXECUTION BibliothèqueGraphique.DessinerTexte i j caractèreAléatoire BibliothèqueGraphique.Couleurs.VERT
+                    }
+                }
+            }
+            EXECUTION BibliothèqueGraphique.Attendre 50
+        }
+    }
+}
+
+MISSION BalayageRadar {
+    ORDRE DE BATAILLE {
+        MUNITION centreX = ConfigurationTerminal.LARGEUR / 2
+        MUNITION centreY = ConfigurationTerminal.HAUTEUR / 2
+        MUNITION rayon = min(ConfigurationTerminal.LARGEUR, ConfigurationTerminal.HAUTEUR) / 3
+        MUNITION angle = 0
+        MANOEUVRE true {
+            EXECUTION BibliothèqueGraphique.EffacerÉcran
+            EXECUTION BibliothèqueGraphique.DessinerCercle centreX centreY rayon BibliothèqueGraphique.Couleurs.ROUGE
+            MUNITION xFin = centreX + cos(angle) * rayon
+            MUNITION yFin = centreY + sin(angle) * rayon
+            EXECUTION BibliothèqueGraphique.DessinerLigne centreX centreY xFin yFin BibliothèqueGraphique.Couleurs.ROUGE_ORANGE
+            angle = angle + 0.1
+            SI CIBLE angle > 2 * PI {
+                angle = angle - 2 * PI
+            }
+            EXECUTION BibliothèqueGraphique.Attendre 16
+        }
+    }
+}
+
+FIN BASE
+
+BASE MACHINE_VIRTUELLE
+
+STRATEGIE EtatMachine {
+    FORMATION registres = [0, 0, 0, 0]  # R0 à R3
+    MUNITION compteur_programme = 0
+    FORMATION pile = []
+    FORMATION memoire = []
+    MUNITION drapeau_zero = FAUX
+    MUNITION drapeau_negatif = FAUX
+    MUNITION taille_memoire = 1024
+    MUNITION taille_registres = 4
+}
+
+MISSION InitialiserVM {
+    ORDRE DE BATAILLE {
+        POUR i DANS SEQUENCE 0 À EtatMachine.taille_registres {
+            EtatMachine.registres[i] = 0
+        }
+        EtatMachine.compteur_programme = 0
+        EtatMachine.pile = []
+        
+        POUR i DANS SEQUENCE 0 À EtatMachine.taille_memoire {
+            EtatMachine.memoire = DEPLOIEMENT EtatMachine.memoire 0
+        }
+    }
+}
+
+MISSION ChargerProgramme {
+    PARAMETRE programme
+    ORDRE DE BATAILLE {
+        EtatMachine.programme = programme
+    }
+}
+
+MISSION ExecuterInstruction {
+    PARAMETRE instruction
+    
+    ORDRE DE BATAILLE {
+        SELON instruction.opcode {
+            CAS "0x01":  # CHARGER
+                EXECUTION InstructionCharger instruction
+            CAS "0x02":  # STOCKER
+                EXECUTION InstructionStocker instruction
+            CAS "0x03":  # ADDITIONNER
+                EXECUTION InstructionAdditionner instruction
+            CAS "0x04":  # SOUSTRAIRE
+                EXECUTION InstructionSoustraire instruction
+            CAS "0x05":  # COMPARER
+                EXECUTION InstructionComparer instruction
+            CAS "0x06":  # SAUTER
+                EXECUTION InstructionSauter instruction
+            CAS "0x07":  # SAUTER_SI_ZERO
+                EXECUTION InstructionSauterSiZero instruction
+            CAS "0x08":  # SAUTER_SI_NEGATIF
+                EXECUTION InstructionSauterSiNegatif instruction
+            CAS "0x09":  # PUSH
+                EXECUTION InstructionPush instruction
+            CAS "0x0A":  # POP
+                EXECUTION InstructionPop instruction
+            DEFAUT:
+                RAPPORT "ERREUR: Opcode invalide"
+                RETRAITE
+        }
+        
+        SI CIBLE NON instruction.type_saut {
+            EtatMachine.compteur_programme = EtatMachine.compteur_programme ASSAUT 1
+        }
+    }
+}
+
+MISSION ExecuterProgramme {
+    PARAMETRE programme
+    
+    ORDRE DE BATAILLE {
+        EXECUTION InitialiserVM
+        EXECUTION ChargerProgramme programme
+        
+        TANT_QUE EtatMachine.compteur_programme < RECONNAISSANCE EtatMachine.programme {
+            MUNITION instruction = EtatMachine.programme[EtatMachine.compteur_programme]
+            EXECUTION ExecuterInstruction instruction
+        }
+    }
+}
+
+MISSION InstructionCharger {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        MUNITION valeur = instruction.valeur
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            EtatMachine.registres[registre] = valeur
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide"
+        }
+    }
+}
+
+MISSION InstructionStocker {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        MUNITION adresse = instruction.adresse
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres ET adresse >= 0 ET adresse < EtatMachine.taille_memoire {
+            EtatMachine.memoire[adresse] = EtatMachine.registres[registre]
+        } SINON {
+            RAPPORT "ERREUR: Registre ou adresse mémoire invalide"
+        }
+    }
+}
+
+MISSION InstructionAdditionner {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        MUNITION regDest = instruction.regDest
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres ET regDest >= 0 ET regDest < EtatMachine.taille_registres {
+            EtatMachine.registres[regDest] = EtatMachine.registres[reg1] ASSAUT EtatMachine.registres[reg2]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour l'addition"
+        }
+    }
+}
+
+MISSION InstructionSoustraire {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        MUNITION regDest = instruction.regDest
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres ET regDest >= 0 ET regDest < EtatMachine.taille_registres {
+            EtatMachine.registres[regDest] = EtatMachine.registres[reg1] REPLI EtatMachine.registres[reg2]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour la soustraction"
+        }
+    }
+}
+
+MISSION InstructionComparer {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION reg1 = instruction.reg1
+        MUNITION reg2 = instruction.reg2
+        SI CIBLE VERIFICATION reg1 >= 0 ET reg1 < EtatMachine.taille_registres ET reg2 >= 0 ET reg2 < EtatMachine.taille_registres {
+            MUNITION resultat = EtatMachine.registres[reg1] - EtatMachine.registres[reg2]
+            EtatMachine.drapeau_zero = VERIFICATION resultat == 0
+            EtatMachine.drapeau_negatif = VERIFICATION resultat < 0
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour la comparaison"
+        }
+    }
+}
+
+MISSION InstructionSauter {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION adresse = instruction.adresse
+        SI CIBLE VERIFICATION adresse >= 0 ET adresse < RECONNAISSANCE EtatMachine.programme {
+            EtatMachine.compteur_programme = adresse
+            instruction.type_saut = VRAI
+        } SINON {
+            RAPPORT "ERREUR: Adresse de saut invalide"
+        }
+    }
+}
+
+MISSION InstructionSauterSiZero {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        SI CIBLE EtatMachine.drapeau_zero {
+            EXECUTION InstructionSauter instruction
+        }
+    }
+}
+
+MISSION InstructionSauterSiNegatif {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        SI CIBLE EtatMachine.drapeau_negatif {
+            EXECUTION InstructionSauter instruction
+        }
+    }
+}
+
+MISSION InstructionPush {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            EtatMachine.pile = DEPLOIEMENT EtatMachine.pile EtatMachine.registres[registre]
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour PUSH"
+        }
+    }
+}
+
+MISSION InstructionPop {
+    PARAMETRE instruction
+    ORDRE DE BATAILLE {
+        MUNITION registre = instruction.registre
+        SI CIBLE VERIFICATION registre >= 0 ET registre < EtatMachine.taille_registres {
+            SI CIBLE RECONNAISSANCE EtatMachine.pile > 0 {
+                EtatMachine.registres[registre] = EtatMachine.pile[RECONNAISSANCE EtatMachine.pile - 1]
+                EtatMachine.pile = RETRAIT EtatMachine.pile (RECONNAISSANCE EtatMachine.pile - 1)
+            } SINON {
+                RAPPORT "ERREUR: Pile vide pour POP"
+            }
+        } SINON {
+            RAPPORT "ERREUR: Registre invalide pour POP"
+        }
+    }
+}
+
+MISSION AfficherEtat {
+    ORDRE DE BATAILLE {
+        RAPPORT "Registres : " FUSION EtatMachine.registres
+        RAPPORT "Pile : " FUSION EtatMachine.pile
+        RAPPORT "Drapeau zéro : " FUSION EtatMachine.drapeau_zero
+        RAPPORT "Drapeau négatif : " FUSION EtatMachine.drapeau_negatif
+        RAPPORT "Compteur programme : " FUSION EtatMachine.compteur_programme
+    }
+}
+
+FIN BASE
+
+BASE GuerreLangCLI
+
+INCLURE "BibliothèqueGraphique"
+INCLURE "TerminalAGAM"
+INCLURE "AnimationsAGAM"
+INCLURE "MACHINE_VIRTUELLE"
+
+STRATEGIE ConfigurationCLI {
+    MUNITION VERSION = "1.0"
+    MUNITION PROMPT = ">"
+}
+
+MISSION Initialisation {
+    ORDRE DE BATAILLE {
+        EXECUTION TerminalAGAM.InitialiserTerminal
+        EXECUTION AnimationsAGAM.EffetMatrix 3000
+        EXECUTION TerminalAGAM.AfficherTexteTerminal "SYSTÈME DE COMMANDEMENT TACTIQUE v" + ConfigurationCLI.VERSION BibliothèqueGraphique.Couleurs.ROUGE
+        EXECUTION TerminalAGAM.AfficherTexteTerminal "Initialisation..." BibliothèqueGraphique.Couleurs.ROUGE
+        EXECUTION BibliothèqueGraphique.Attendre 1000
+        EXECUTION TerminalAGAM.AfficherTexteTerminal "Prêt. Tapez 'help' pour la liste des commandes." BibliothèqueGraphique.Couleurs.ROUGE
+        EXECUTION TerminalAGAM.AfficherPrompt
+    }
+}
+
+MISSION BouclePrincipale {
+    ORDRE DE BATAILLE {
+        MANOEUVRE true {
+            MUNITION commande = EXECUTION TerminalAGAM.LireCommande
+            EXECUTION TraiterCommande commande
+            EXECUTION TerminalAGAM.AfficherPrompt
+        }
+    }
+}
+
+MISSION TraiterCommande {
+    PARAMETRE commande
+    ORDRE DE BATAILLE {
+        SELON commande {
+            CAS "help":
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Commandes : help, deploy, attack, run_vm" BibliothèqueGraphique.Couleurs.ROUGE
+            CAS "deploy":
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Déploiement en cours..." BibliothèqueGraphique.Couleurs.ROUGE
+                EXECUTION BibliothèqueGraphique.Attendre 2000
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Déploiement terminé." BibliothèqueGraphique.Couleurs.ROUGE
+            CAS "attack":
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Attaque lancée..." BibliothèqueGraphique.Couleurs.ROUGE
+                EXECUTION BibliothèqueGraphique.Attendre 2000
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Cible neutralisée." BibliothèqueGraphique.Couleurs.ROUGE
+            CAS "run_vm":
+                FORMATION programme_test = [
+                    STRATEGIE DEPLOIEMENT "opcode" "0x01" DEPLOIEMENT "registre" 0 DEPLOIEMENT "valeur" 5 FIN STRATEGIE,
+                    STRATEGIE DEPLOIEMENT "opcode" "0x01" DEPLOIEMENT "registre" 1 DEPLOIEMENT "valeur" 3 FIN STRATEGIE,
+                    STRATEGIE DEPLOIEMENT "opcode" "0x03" DEPLOIEMENT "reg1" 0 DEPLOIEMENT "reg2" 1 DEPLOIEMENT "regDest" 2 FIN STRATEGIE,
+                    STRATEGIE DEPLOIEMENT "opcode" "0x02" DEPLOIEMENT "registre" 2 DEPLOIEMENT "adresse" 100 FIN STRATEGIE
+                ]
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Exécution du programme de test..." BibliothèqueGraphique.Couleurs.ROUGE
+                EXECUTION MACHINE_VIRTUELLE.ExecuterProgramme programme_test
+                EXECUTION MACHINE_VIRTUELLE.AfficherEtat
+            DEFAUT:
+                EXECUTION TerminalAGAM.AfficherTexteTerminal "Commande inconnue." BibliothèqueGraphique.Couleurs.ROUGE
+        }
+    }
+}
+
+ORDRE DE BATAILLE {
+    EXECUTION Initialisation
+    EXECUTION BouclePrincipale
+}
+
+FIN BASE

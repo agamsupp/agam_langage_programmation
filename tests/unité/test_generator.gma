@@ -1,0 +1,40 @@
+BASE TESTS_GENERATEUR
+
+MISSION TestGénérationCode {
+    ORDRE DE BATAILLE {
+        # Test 1: Génération de code simple
+        STRATEGIE test_simple = {
+            entrée: "RAPPORT 'Test'",
+            sortie_attendue: "MOV EAX, str_1\nCALL print"
+        }
+        
+        EXÉCUTER_TEST "GénérationSimple" test_simple
+        
+        # Test 2: Opérations arithmétiques
+        STRATEGIE test_calcul = {
+            entrée: "MUNITION x = 5 ASSAUT 3",
+            sortie_attendue: "MOV EAX, 5\nADD EAX, 3\nMOV [x], EAX"
+        }
+        
+        EXÉCUTER_TEST "GénérationCalcul" test_calcul
+    }
+}
+
+MISSION EXÉCUTER_TEST {
+    PARAMETRE nom
+    PARAMETRE données
+    
+    ORDRE DE BATAILLE {
+        MUNITION résultat = GénérerCode données.entrée
+        
+        SI CIBLE résultat VERIFICATION données.sortie_attendue {
+            RAPPORT "Test " + nom + ": SUCCÈS"
+        } SINON {
+            RAPPORT "Test " + nom + ": ÉCHEC"
+            RAPPORT "Attendu: " + données.sortie_attendue
+            RAPPORT "Obtenu: " + résultat
+        }
+    }
+}
+
+FIN BASE

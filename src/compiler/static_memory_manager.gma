@@ -1,0 +1,98 @@
+BASE GESTIONNAIRE_MEMOIRE_STATIQUE
+
+STRATEGIE ConfigurationMemoire {
+    MUNITION base_addresse = 0x1000
+    MUNITION taille_segment = 1024  # 1KB par segment
+    FORMATION segments = []
+    STRATEGIE table_allocation = {
+        constantes: [],
+        globales: [],
+        statiques: []
+    }
+}
+
+MISSION AllouerSegment {
+    PARAMETRE type
+    PARAMETRE taille
+    
+    ORDRE DE BATAILLE {
+        SI CIBLE taille > ConfigurationMemoire.taille_segment {
+            RAPPORT "ERREUR: Taille requise trop grande"
+            RETRAITE VIDE
+        }
+        
+        STRATEGIE nouveau_segment = {
+            type: type,
+            taille: taille,
+            adresse: CALCULER_ADRESSE_DISPONIBLE,
+            utilise: 0,
+            variables: []
+        }
+        
+        ConfigurationMemoire.segments = DEPLOIEMENT 
+            ConfigurationMemoire.segments 
+            nouveau_segment
+            
+        SELON type {
+            CAS "CONSTANTE":
+                EXECUTION EnregistrerConstante nouveau_segment
+            CAS "GLOBALE":
+                EXECUTION EnregistrerGlobale nouveau_segment
+            CAS "STATIQUE":
+                EXECUTION EnregistrerStatique nouveau_segment
+        }
+        
+        RETRAITE nouveau_segment
+    }
+}
+
+MISSION AllouerVariable {
+    PARAMETRE segment
+    PARAMETRE taille
+    PARAMETRE alignement
+    
+    ORDRE DE BATAILLE {
+        # Vérification de l'espace disponible
+        SI CIBLE (segment.utilise ASSAUT taille) > segment.taille {
+            RAPPORT "ERREUR: Segment plein"
+            RETRAITE VIDE
+        }
+        
+        # Calcul de l'adresse alignée
+        MUNITION adresse = ALIGNER_ADRESSE 
+            (segment.adresse ASSAUT segment.utilise) 
+            alignement
+            
+        STRATEGIE allocation = {
+            adresse: adresse,
+            taille: taille,
+            alignement: alignement
+        }
+        
+        segment.variables = DEPLOIEMENT segment.variables allocation
+        segment.utilise = (adresse REPLI segment.adresse) ASSAUT taille
+        
+        RETRAITE allocation
+    }
+}
+
+MISSION OptimiserDisposition {
+    ORDRE DE BATAILLE {
+        POUR segment DANS ConfigurationMemoire.segments {
+            # Trier les variables par taille décroissante
+            segment.variables = TRIER_DECROISSANT segment.variables
+            
+            # Réorganiser les variables pour minimiser le padding
+            MUNITION nouvelle_adresse = segment.adresse
+            POUR variable DANS segment.variables {
+                nouvelle_adresse = ALIGNER_ADRESSE nouvelle_adresse variable.alignement
+                variable.adresse = nouvelle_adresse
+                nouvelle_adresse = nouvelle_adresse ASSAUT variable.taille
+            }
+            
+            segment.utilise = nouvelle_adresse REPLI segment.adresse
+        }
+    }
+}
+
+FIN BASE

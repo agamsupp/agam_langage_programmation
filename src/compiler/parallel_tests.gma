@@ -1,0 +1,95 @@
+BASE TESTS_PARALLELES
+
+STRATEGIE ConfigurationTests {
+    FORMATION types_tests = [
+        {
+            type: "UNITAIRE",
+            parallele: VRAI,
+            isolation: VRAI,
+            threads_max: 8
+        },
+        {
+            type: "INTEGRATION",
+            parallele: VRAI,
+            isolation: VRAI,
+            threads_max: 4
+        },
+        {
+            type: "SYSTEME",
+            parallele: FAUX,
+            isolation: VRAI,
+            threads_max: 1
+        }
+    ]
+
+    STRATEGIE execution = {
+        mode: "ADAPTATIF",
+        retry_echecs: VRAI,
+        timeout: 300  # secondes
+    }
+}
+
+MISSION ExecuterTestsParalleles {
+    PARAMETRE suite_tests
+    
+    ORDRE DE BATAILLE {
+        # Initialisation de l'environnement
+        STRATEGIE environnement = {
+            pool_threads: [],
+            resultats: [],
+            metriques: []
+        }
+        
+        # Préparation des threads
+        POUR type DANS ConfigurationTests.types_tests {
+            SI CIBLE type.parallele {
+                EXECUTION InitialiserPoolThreads type
+            }
+        }
+        
+        # Distribution et exécution des tests
+        MANOEUVRE EXECUTION_PARALLELE {
+            # Répartition des tests
+            POUR test DANS suite_tests {
+                SI CIBLE TypeTestParallele test {
+                    EXECUTION AssignerTestThread test
+                } SINON {
+                    EXECUTION ExecuterTestSequentiel test
+                }
+            }
+            
+            # Attente des résultats
+            EXECUTION AttendreResultatsTests
+            
+            # Analyse des résultats
+            EXECUTION AnalyserResultats environnement.resultats
+        }
+        
+        RETRAITE environnement.resultats
+    }
+}
+
+MISSION GererTestFailure {
+    PARAMETRE test
+    PARAMETRE erreur
+    
+    ORDRE DE BATAILLE {
+        # Enregistrement de l'échec
+        EXECUTION JournaliserEchec test erreur
+        
+        # Tentative de réexécution si configuré
+        SI CIBLE ConfigurationTests.execution.retry_echecs {
+            MUNITION tentatives = 0
+            TANT_QUE tentatives < 3 {
+                tentatives = tentatives ASSAUT 1
+                SI CIBLE ExecuterTest test {
+                    RETRAITE SUCCES
+                }
+            }
+        }
+        
+        RETRAITE ECHEC
+    }
+}
+
+FIN BASE

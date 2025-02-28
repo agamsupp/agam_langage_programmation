@@ -1,0 +1,99 @@
+BASE OPTIMISEUR_JIT
+
+STRATEGIE ConfigurationJIT {
+    FORMATION strategies = [
+        {
+            type: "POINTS_CHAUDS",
+            seuil: 1000,     # exécutions
+            action: "RECOMPILER"
+        },
+        {
+            type: "SPECIALISATION",
+            conditions: ["TYPES", "VALEURS"],
+            mode: "AGRESSIF"
+        },
+        {
+            type: "INLINING",
+            taille_max: 500,  # instructions
+            profondeur: 3
+        }
+    ]
+
+    STRATEGIE cache = {
+        taille_max: 1024 * 1024,  # 1MB
+        politique: "LRU",
+        compression: VRAI
+    }
+}
+
+MISSION OptimiserVolee {
+    PARAMETRE segment
+    
+    ORDRE DE BATAILLE {
+        # Analyse du segment
+        STRATEGIE analyse = {
+            frequence: OBTENIR_FREQUENCE segment,
+            performance: MESURER_PERFORMANCE segment,
+            optimisations: []
+        }
+        
+        # Détection des opportunités
+        POUR strategie DANS ConfigurationJIT.strategies {
+            SI CIBLE OptimisationApplicable strategie segment {
+                EXECUTION AppliquerOptimisation strategie segment
+                
+                # Validation des gains
+                SI CIBLE ValiderOptimisation segment {
+                    EXECUTION InstallerCodeOptimise segment
+                } SINON {
+                    EXECUTION RestaurerCodeOriginal segment
+                }
+            }
+        }
+        
+        # Gestion du cache
+        EXECUTION GererCacheJIT segment
+    }
+}
+
+MISSION DetecterPointsChauds {
+    ORDRE DE BATAILLE {
+        FORMATION points_chauds = []
+        
+        # Analyse des compteurs d'exécution
+        POUR segment DANS SEGMENTS_CODE {
+            SI CIBLE segment.compteur > ConfigurationJIT.strategies[0].seuil {
+                points_chauds = DEPLOIEMENT points_chauds segment
+            }
+        }
+        
+        # Planification des optimisations
+        POUR segment DANS points_chauds {
+            EXECUTION PlanifierOptimisation segment
+        }
+    }
+}
+
+MISSION SpecialiserCode {
+    PARAMETRE segment
+    PARAMETRE contexte
+    
+    ORDRE DE BATAILLE {
+        # Analyse des types et valeurs
+        FORMATION specialisations = []
+        
+        POUR parametre DANS segment.parametres {
+            SI CIBLE EstConstant parametre contexte {
+                specialisations = DEPLOIEMENT specialisations {
+                    parametre: parametre,
+                    valeur: OBTENIR_VALEUR parametre contexte
+                }
+            }
+        }
+        
+        # Génération du code spécialisé
+        RETRAITE GenererCodeSpecialise segment specialisations
+    }
+}
+
+FIN BASE

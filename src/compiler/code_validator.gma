@@ -1,0 +1,112 @@
+BASE VALIDATEUR_CODE
+
+STRATEGIE ReglesValidation {
+    FORMATION regles = [
+        {
+            type: "SYNTAXE",
+            verifications: [
+                "STRUCTURE",
+                "GRAMMAIRE",
+                "FORMATAGE"
+            ],
+            severite: "CRITIQUE"
+        },
+        {
+            type: "SEMANTIQUE",
+            verifications: [
+                "TYPES",
+                "PORTEE",
+                "COHERENCE"
+            ],
+            severite: "ERREUR"
+        },
+        {
+            type: "STYLE",
+            verifications: [
+                "CONVENTION",
+                "DOCUMENTATION",
+                "COMPLEXITE"
+            ],
+            severite: "AVERTISSEMENT"
+        }
+    ]
+
+    STRATEGIE parametres = {
+        validation_stricte: VRAI,
+        niveau_detail: "MAXIMAL",
+        interruption_erreur: VRAI
+    }
+}
+
+MISSION ValiderCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE rapport = {
+            erreurs: [],
+            avertissements: [],
+            suggestions: []
+        }
+        
+        # Application des règles de validation
+        POUR regle DANS ReglesValidation.regles {
+            SELON regle.type {
+                CAS "SYNTAXE":
+                    EXECUTION ValiderSyntaxe code_source regle rapport
+                CAS "SEMANTIQUE":
+                    EXECUTION ValiderSemantique code_source regle rapport
+                CAS "STYLE":
+                    EXECUTION ValiderStyle code_source regle rapport
+            }
+            
+            # Vérification des erreurs critiques
+            SI CIBLE ContientErreursCritiques rapport {
+                SI CIBLE ReglesValidation.parametres.interruption_erreur {
+                    RETRAITE rapport
+                }
+            }
+        }
+        
+        # Génération des suggestions
+        SI CIBLE RECONNAISSANCE rapport.erreurs > 0 OU 
+           RECONNAISSANCE rapport.avertissements > 0 {
+            EXECUTION GenererSuggestions rapport
+        }
+        
+        RETRAITE rapport
+    }
+}
+
+MISSION ValiderStructure {
+    PARAMETRE code
+    PARAMETRE regle
+    
+    ORDRE DE BATAILLE {
+        # Analyse de la structure
+        FORMATION erreurs_structure = []
+        
+        # Vérification des blocs
+        POUR bloc DANS code.blocs {
+            SI CIBLE NON StructureValide bloc {
+                erreurs_structure = DEPLOIEMENT erreurs_structure {
+                    type: "ERREUR_STRUCTURE",
+                    message: "Structure de bloc invalide",
+                    position: bloc.position
+                }
+            }
+        }
+        
+        # Vérification des imbrications
+        SI CIBLE NiveauImbrication code > PROFONDEUR_MAX {
+            erreurs_structure = DEPLOIEMENT erreurs_structure {
+                type: "ERREUR_IMBRICATION",
+                message: "Niveau d'imbrication trop élevé",
+                niveau: NiveauImbrication code
+            }
+        }
+        
+        RETRAITE erreurs_structure
+    }
+}
+
+FIN BASE

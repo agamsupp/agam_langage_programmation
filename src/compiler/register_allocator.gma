@@ -1,0 +1,95 @@
+BASE ALLOCATEUR_REGISTRES
+
+STRATEGIE EtatRegistres {
+    FORMATION registres_generaux = [
+        {nom: "R0", etat: "LIBRE", priorite: 0},
+        {nom: "R1", etat: "LIBRE", priorite: 0},
+        {nom: "R2", etat: "LIBRE", priorite: 0},
+        {nom: "R3", etat: "LIBRE", priorite: 0}
+    ]
+    
+    FORMATION registres_systeme = [
+        {nom: "SP", etat: "RESERVE", role: "POINTEUR_PILE"},
+        {nom: "BP", etat: "RESERVE", role: "BASE_PILE"},
+        {nom: "PC", etat: "RESERVE", role: "COMPTEUR_PROGRAMME"}
+    ]
+}
+
+MISSION AllouerRegistre {
+    PARAMETRE operation
+    
+    ORDRE DE BATAILLE {
+        # Analyse de durée de vie
+        STRATEGIE duree_vie = EXECUTION CalculerDureeVie operation
+        
+        # Recherche du meilleur registre
+        MUNITION meilleur_registre = VIDE
+        MUNITION meilleure_priorite = 999
+        
+        POUR registre DANS EtatRegistres.registres_generaux {
+            SI CIBLE registre.etat VERIFICATION "LIBRE" {
+                SI CIBLE registre.priorite < meilleure_priorite {
+                    meilleur_registre = registre
+                    meilleure_priorite = registre.priorite
+                }
+            }
+        }
+        
+        # Si aucun registre libre, libérer un registre
+        SI CIBLE meilleur_registre EST VIDE {
+            meilleur_registre = EXECUTION LibererRegistre
+        }
+        
+        # Allocation du registre
+        meilleur_registre.etat = "OCCUPE"
+        meilleur_registre.priorite = duree_vie
+        
+        RETRAITE meilleur_registre
+    }
+}
+
+MISSION LibererRegistre {
+    ORDRE DE BATAILLE {
+        STRATEGIE registre_victime = VIDE
+        MUNITION priorite_max = 0
+        
+        # Recherche du registre le moins prioritaire
+        POUR registre DANS EtatRegistres.registres_generaux {
+            SI CIBLE registre.priorite > priorite_max {
+                priorite_max = registre.priorite
+                registre_victime = registre
+            }
+        }
+        
+        # Sauvegarde du contenu si nécessaire
+        SI CIBLE registre_victime.etat VERIFICATION "OCCUPE" {
+            EXECUTION SauvegarderContenuRegistre registre_victime
+        }
+        
+        registre_victime.etat = "LIBRE"
+        registre_victime.priorite = 0
+        
+        RETRAITE registre_victime
+    }
+}
+
+MISSION CalculerDureeVie {
+    PARAMETRE operation
+    
+    ORDRE DE BATAILLE {
+        MUNITION duree = 1
+        
+        # Analyse des utilisations futures
+        MANOEUVRE ANALYSE {
+            POUR instruction DANS operation.instructions_suivantes {
+                SI CIBLE UtiliseOperande instruction operation.resultat {
+                    duree = duree ASSAUT 1
+                }
+            }
+        }
+        
+        RETRAITE duree
+    }
+}
+
+FIN BASE

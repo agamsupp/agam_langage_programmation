@@ -1,0 +1,56 @@
+BASE ALGORITHMES_BASE
+
+# Tri tactique
+MISSION TriTactique {
+    PARAMETRE formation
+    
+    ORDRE DE BATAILLE {
+        MUNITION longueur = RECONNAISSANCE formation
+        
+        MANOEUVRE EXTERNE {
+            POUR i DANS SEQUENCE 0 À longueur {
+                MANOEUVRE INTERNE {
+                    POUR j DANS SEQUENCE 0 À longueur-i-1 {
+                        SI CIBLE formation[j] > formation[j+1] {
+                            # Échange tactique
+                            MUNITION temp = formation[j]
+                            formation[j] = formation[j+1]
+                            formation[j+1] = temp
+                        }
+                    }
+                }
+            }
+        }
+        
+        RETRAITE formation
+    }
+}
+
+# Recherche stratégique
+MISSION RechercheStratégique {
+    PARAMETRE formation
+    PARAMETRE cible
+    
+    ORDRE DE BATAILLE {
+        MUNITION début = 0
+        MUNITION fin = RECONNAISSANCE formation - 1
+        
+        MANOEUVRE RECHERCHE {
+            TANT_QUE début <= fin {
+                MUNITION milieu = (début ASSAUT fin) DIVISION 2
+                
+                SI CIBLE formation[milieu] VERIFICATION cible {
+                    RETRAITE milieu
+                } SINON SI CIBLE formation[milieu] < cible {
+                    début = milieu ASSAUT 1
+                } SINON {
+                    fin = milieu REPLI 1
+                }
+            }
+        }
+        
+        RETRAITE ÉCHEC
+    }
+}
+
+FIN BASE

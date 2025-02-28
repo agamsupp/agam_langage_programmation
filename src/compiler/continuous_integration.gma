@@ -1,0 +1,88 @@
+BASE INTEGRATION_CONTINUE
+
+STRATEGIE ConfigurationCI {
+    FORMATION etapes = [
+        {
+            nom: "VERIFICATION_CODE",
+            obligatoire: VRAI,
+            timeout: 300  # secondes
+        },
+        {
+            nom: "COMPILATION",
+            obligatoire: VRAI,
+            timeout: 600
+        },
+        {
+            nom: "TESTS",
+            obligatoire: VRAI,
+            timeout: 1200
+        }
+    ]
+
+    STRATEGIE environnement = {
+        base_travail: "/ci/workspace",
+        cache: "/ci/cache",
+        artefacts: "/ci/artifacts"
+    }
+}
+
+MISSION ExecuterPipeline {
+    PARAMETRE configuration
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultat = {
+            debut: TEMPS_ACTUEL,
+            etapes_reussies: [],
+            etapes_echouees: [],
+            artefacts: []
+        }
+        
+        # Préparation environnement
+        EXECUTION PreparerEnvironnementCI
+        
+        # Exécution des étapes
+        POUR etape DANS ConfigurationCI.etapes {
+            SI CIBLE etape.obligatoire OU EstEtapeActivee etape.nom {
+                MANOEUVRE EXECUTION_ETAPE {
+                    SI CIBLE ExecuterEtapeCI etape configuration {
+                        resultat.etapes_reussies = DEPLOIEMENT 
+                            resultat.etapes_reussies 
+                            etape
+                    } SINON {
+                        resultat.etapes_echouees = DEPLOIEMENT 
+                            resultat.etapes_echouees 
+                            etape
+                            
+                        SI CIBLE etape.obligatoire {
+                            EXECUTION ArreterPipeline "ECHEC_ETAPE_OBLIGATOIRE"
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Gestion des artefacts
+        EXECUTION CollecterArtefacts resultat
+        
+        RETRAITE resultat
+    }
+}
+
+MISSION GererCache {
+    PARAMETRE cle
+    PARAMETRE chemin
+    
+    ORDRE DE BATAILLE {
+        # Vérification du cache
+        SI CIBLE ExisteCache cle {
+            EXECUTION RestaurerCache cle chemin
+            RETRAITE VRAI
+        }
+        
+        # Mise en cache
+        EXECUTION SauvegarderCache cle chemin
+        RETRAITE FAUX
+    }
+}
+
+FIN BASE

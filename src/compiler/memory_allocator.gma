@@ -1,0 +1,97 @@
+BASE ALLOCATEUR_MEMOIRE
+
+STRATEGIE ConfigurationAllocateur {
+    MUNITION taille_page = 4096  # 4KB
+    MUNITION nb_pages_max = 1024 # 4MB total
+    
+    FORMATION blocs_libres = []
+    FORMATION blocs_alloues = []
+    
+    STRATEGIE politique = {
+        min_taille_bloc: 16,
+        seuil_fusion: 128,
+        seuil_division: 256
+    }
+}
+
+MISSION AllouerMemoire {
+    PARAMETRE taille
+    PARAMETRE alignement
+    
+    ORDRE DE BATAILLE {
+        # Ajustement de la taille selon l'alignement
+        MUNITION taille_ajustee = ALIGNER_TAILLE taille alignement
+        
+        # Recherche du meilleur bloc libre
+        MUNITION meilleur_bloc = VIDE
+        MUNITION meilleure_taille = INFINI
+        
+        POUR bloc DANS ConfigurationAllocateur.blocs_libres {
+            SI CIBLE bloc.taille >= taille_ajustee {
+                SI CIBLE bloc.taille < meilleure_taille {
+                    meilleur_bloc = bloc
+                    meilleure_taille = bloc.taille
+                }
+            }
+        }
+        
+        # Allocation du bloc
+        SI CIBLE meilleur_bloc NON VIDE {
+            # Division du bloc si nécessaire
+            SI CIBLE (meilleur_bloc.taille - taille_ajustee) > 
+                ConfigurationAllocateur.politique.seuil_division {
+                EXECUTION DiviserBloc meilleur_bloc taille_ajustee
+            }
+            
+            RETIRER_BLOC_LIBRE meilleur_bloc
+            AJOUTER_BLOC_ALLOUE meilleur_bloc
+            
+            RETRAITE meilleur_bloc.adresse
+        }
+        
+        # Allocation d'une nouvelle page si nécessaire
+        RETRAITE EXECUTION AllouerNouvellePage taille_ajustee
+    }
+}
+
+MISSION LibererMemoire {
+    PARAMETRE adresse
+    
+    ORDRE DE BATAILLE {
+        POUR bloc DANS ConfigurationAllocateur.blocs_alloues {
+            SI CIBLE bloc.adresse VERIFICATION adresse {
+                RETIRER_BLOC_ALLOUE bloc
+                AJOUTER_BLOC_LIBRE bloc
+                
+                # Fusion des blocs adjacents
+                EXECUTION FusionnerBlocsAdjacents bloc
+                
+                RETRAITE VRAI
+            }
+        }
+        
+        RETRAITE FAUX
+    }
+}
+
+MISSION FusionnerBlocsAdjacents {
+    PARAMETRE bloc
+    
+    ORDRE DE BATAILLE {
+        MUNITION fusion_effectuee = VRAI
+        
+        TANT_QUE fusion_effectuee {
+            fusion_effectuee = FAUX
+            
+            POUR autre_bloc DANS ConfigurationAllocateur.blocs_libres {
+                SI CIBLE BlocsAdjacents bloc autre_bloc {
+                    EXECUTION FusionnerBlocs bloc autre_bloc
+                    fusion_effectuee = VRAI
+                    PAUSE
+                }
+            }
+        }
+    }
+}
+
+FIN BASE

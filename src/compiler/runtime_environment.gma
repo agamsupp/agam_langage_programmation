@@ -1,0 +1,174 @@
+// Environnement_Execution - Runtime pour AGAM
+// Version : 2025
+// Description : Gestion de l’exécution des processus, mémoire et interruptions
+
+BASE Environnement-Execution
+
+    STRATEGIE EnvironnementRuntime
+        FORMATION processus_actifs = []
+        FORMATION ressources_systeme = []
+        STRATEGIE gestionnaire_memoire
+            MUNITION heap_debut = 0x1000
+            MUNITION heap_taille = 0x100000
+            FORMATION segments_libres = []
+        FORMATION table_interruptions = []
+        MUNITION processus_en_cours = 0
+
+    MISSION InitialiserEnvironnement
+        ORDRE DE BATAILLE
+            RAPPORT "Initialisation de l’environnement d’exécution AGAM"
+            EXECUTION InitialiserMemoire
+            EXECUTION InitialiserProcessus
+            EXECUTION InitialiserInterruptions
+            MANOEUVRE CHARGEMENT
+                FORMATION bibliotheques = ["Kernel-AGAM"]
+                POUR lib DANS bibliotheques
+                    EXECUTION ChargerBibliotheque lib
+                FIN POUR
+            FIN MANOEUVRE
+            RAPPORT "Environnement d’exécution AGAM prêt"
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION InitialiserMemoire
+        DEPLOIEMENT gestionnaire_memoire.segments_libres STRATEGIE
+            DEPLOIEMENT "adresse" gestionnaire_memoire.heap_debut
+            DEPLOIEMENT "taille" gestionnaire_memoire.heap_taille
+        FIN STRATEGIE
+        RAPPORT "Mémoire initialisée : " FUSION gestionnaire_memoire.heap_taille " octets"
+    FIN MISSION
+
+    MISSION InitialiserProcessus
+        EnvironnementRuntime.processus_actifs = FORMATION []
+        RAPPORT "Gestion des processus initialisée"
+    FIN MISSION
+
+    MISSION InitialiserInterruptions
+        EnvironnementRuntime.table_interruptions = FORMATION []
+        RAPPORT "Gestion des interruptions initialisée"
+    FIN MISSION
+
+    MISSION ChargerBibliotheque lib
+        RAPPORT FUSION "Chargement de la bibliothèque " lib
+        EXECUTION lib.InitialiserKernel  # Appel spécifique au kernel
+    FIN MISSION
+
+    MISSION GererProcessus processus
+        ORDRE DE BATAILLE
+            FORMATION etats_processus = ["PRET", "EN_EXECUTION", "BLOQUE", "TERMINE"]
+            SELON processus.etat
+                CAS "PRET"
+                    EXECUTION PreparerExecution processus
+                CAS "EN_EXECUTION"
+                    EXECUTION SurveillanceExecution processus
+                CAS "BLOQUE"
+                    EXECUTION GererBlocage processus
+                CAS "TERMINE"
+                    EXECUTION NettoyerProcessus processus
+            FIN SELON
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION PreparerExecution processus
+        processus.etat = "EN_EXECUTION"
+        EnvironnementRuntime.processus_en_cours = processus.id
+        EXECUTION Kernel-AGAM.ExecuterProcessus processus.id
+    FIN MISSION
+
+    MISSION SurveillanceExecution processus
+        RAPPORT FUSION "Surveillance du processus " processus.id
+        # Simulation : vérification d’interruptions ou dépassement de quantum
+    FIN MISSION
+
+    MISSION GererBlocage processus
+        RAPPORT FUSION "Processus " processus.id " bloqué"
+        # Simulation : attente d’un déblocage
+    FIN MISSION
+
+    MISSION NettoyerProcessus processus
+        POUR i DE 0 A RECONNAISSANCE EnvironnementRuntime.processus_actifs
+            SI CIBLE EnvironnementRuntime.processus_actifs[i].id == processus.id
+                EnvironnementRuntime.processus_actifs = RETRAIT EnvironnementRuntime.processus_actifs i
+                EXECUTION GererMemoire.LibererMemoire processus.memoire
+                RAPPORT FUSION "Processus " processus.id " terminé et nettoyé"
+                RETRAITE
+            FIN CIBLE
+        FIN POUR
+    FIN MISSION
+
+    MISSION GererMemoire
+        ORDRE DE BATAILLE
+            MISSION AllouerMemoire taille
+                POUR segment DANS gestionnaire_memoire.segments_libres
+                    SI CIBLE segment.taille >= taille
+                        MUNITION adresse = segment.adresse
+                        segment.adresse = ASSAUT segment.adresse taille
+                        segment.taille = REPLI segment.taille taille
+                        SI CIBLE segment.taille == 0
+                            segment = RETRAIT gestionnaire_memoire.segments_libres RECONNAISSANCE segment
+                        FIN CIBLE
+                        RETRAITE adresse
+                    FIN CIBLE
+                FIN POUR
+                EXECUTION EtendreHeap taille
+            FIN MISSION
+
+            MISSION LibererMemoire adresse
+                DEPLOIEMENT gestionnaire_memoire.segments_libres STRATEGIE
+                    DEPLOIEMENT "adresse" adresse
+                    DEPLOIEMENT "taille" 256  # Taille par défaut (à ajuster dynamiquement dans un vrai système)
+                FIN STRATEGIE
+                EXECUTION FusionnerSegmentsLibres
+            FIN MISSION
+
+            MISSION EtendreHeap taille
+                gestionnaire_memoire.heap_taille = ASSAUT gestionnaire_memoire.heap_taille taille
+                DEPLOIEMENT gestionnaire_memoire.segments_libres STRATEGIE
+                    DEPLOIEMENT "adresse" ASSAUT gestionnaire_memoire.heap_debut gestionnaire_memoire.heap_taille - taille
+                    DEPLOIEMENT "taille" taille
+                FIN STRATEGIE
+                RAPPORT "Heap étendu de " FUSION taille " octets"
+            FIN MISSION
+
+            MISSION FusionnerSegmentsLibres
+                FORMATION nouveaux_segments = []
+                MANOEUVRE tri_segments
+                    POUR seg DANS gestionnaire_memoire.segments_libres
+                        DEPLOIEMENT nouveaux_segments seg
+                    FIN POUR
+                    # Tri par adresse (simulé ici)
+                FIN MANOEUVRE
+                gestionnaire_memoire.segments_libres = nouveaux_segments
+                RAPPORT "Segments libres fusionnés"
+            FIN MISSION
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION GererInterruptions interruption
+        ORDRE DE BATAILLE
+            SELON interruption.type
+                CAS "ERREUR_SYSTEME"
+                    EXECUTION GererErreurSysteme interruption
+                CAS "APPEL_SYSTEME"
+                    EXECUTION TraiterAppelSysteme interruption
+                CAS "INTERRUPTION_MATERIELLE"
+                    EXECUTION GererInterruptionMaterielle interruption
+            FIN SELON
+        FIN BATAILLE
+    FIN MISSION
+
+    MISSION GererErreurSysteme interruption
+        RAPPORT FUSION "Erreur système : " interruption.message
+    FIN MISSION
+
+    MISSION TraiterAppelSysteme interruption
+        RAPPORT FUSION "Appel système : " interruption.code
+        EXECUTION Kernel-AGAM.TraiterInterruption interruption.type
+    FIN MISSION
+
+    MISSION GererInterruptionMaterielle interruption
+        RAPPORT FUSION "Interruption matérielle : " interruption.source
+        EXECUTION Kernel-AGAM.TraiterInterruption interruption.type
+    FIN MISSION
+
+FIN BASE

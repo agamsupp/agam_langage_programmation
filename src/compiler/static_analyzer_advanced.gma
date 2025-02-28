@@ -1,0 +1,91 @@
+BASE ANALYSEUR_STATIQUE_AVANCE
+
+STRATEGIE ConfigurationAnalyse {
+    FORMATION regles_analyse = [
+        {
+            type: "FLUX_DONNEES",
+            verifications: [
+                "UTILISATION_VARIABLES",
+                "FLUX_CONTROLE",
+                "DEPENDANCES"
+            ]
+        },
+        {
+            type: "SECURITE",
+            verifications: [
+                "INJECTION",
+                "DEBORDEMENT",
+                "ACCES_MEMOIRE"
+            ]
+        },
+        {
+            type: "PERFORMANCE",
+            verifications: [
+                "COMPLEXITE",
+                "ALLOCATION",
+                "OPTIMISATION"
+            ]
+        }
+    ]
+
+    STRATEGIE niveaux_analyse = {
+        profondeur: 5,
+        iterations: 3,
+        precision: "HAUTE"
+    }
+}
+
+MISSION AnalyserCode {
+    PARAMETRE code_source
+    
+    ORDRE DE BATAILLE {
+        STRATEGIE resultats = {
+            problemes: [],
+            avertissements: [],
+            suggestions: []
+        }
+        
+        # Construction de l'AST
+        STRATEGIE ast = EXECUTION ConstruireAST code_source
+        
+        # Analyse approfondie
+        POUR regle DANS ConfigurationAnalyse.regles_analyse {
+            SELON regle.type {
+                CAS "FLUX_DONNEES":
+                    EXECUTION AnalyserFluxDonnees ast resultats
+                CAS "SECURITE":
+                    EXECUTION AnalyserSecurite ast resultats
+                CAS "PERFORMANCE":
+                    EXECUTION AnalyserPerformance ast resultats
+            }
+        }
+        
+        # Analyse des dépendances
+        EXECUTION AnalyserDependances ast resultats
+        
+        # Génération des recommandations
+        EXECUTION GenererRecommandations resultats
+        
+        RETRAITE resultats
+    }
+}
+
+MISSION AnalyserFluxDonnees {
+    PARAMETRE ast
+    PARAMETRE resultats
+    
+    ORDRE DE BATAILLE {
+        # Construction du graphe de flux
+        STRATEGIE graphe = EXECUTION ConstruireGrapheFlux ast
+        
+        # Analyse des utilisations
+        POUR variable DANS ast.variables {
+            EXECUTION AnalyserUtilisationVariable variable graphe resultats
+        }
+        
+        # Détection des anomalies
+        EXECUTION DetecterAnomaliesFlux graphe resultats
+    }
+}
+
+FIN BASE

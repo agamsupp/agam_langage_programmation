@@ -1,0 +1,359 @@
+BASE ANIMATION_TACTIQUE
+    // Module core de la bibliothèque d'animation
+    // Fournit le cadre principal pour la gestion des animations
+
+    //----------------------------------------------
+    // CONSTANTES ET TYPES
+    //----------------------------------------------
+    
+    MUNITION FPS_STANDARD = 60
+    MUNITION INTERPOLATION_LINEAIRE = 0
+    MUNITION INTERPOLATION_EASE_IN = 1
+    MUNITION INTERPOLATION_EASE_OUT = 2
+    MUNITION INTERPOLATION_EASE_IN_OUT = 3
+    MUNITION INTERPOLATION_REBOND = 4
+    MUNITION INTERPOLATION_ELASTIQUE = 5
+    
+    STRATEGIE POINT_TACTIQUE
+        MUNITION x FLOTTANT
+        MUNITION y FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE DIMENSION_TACTIQUE
+        MUNITION largeur FLOTTANT
+        MUNITION hauteur FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE RECTANGLE_TACTIQUE
+        MUNITION x FLOTTANT
+        MUNITION y FLOTTANT
+        MUNITION largeur FLOTTANT
+        MUNITION hauteur FLOTTANT
+    FIN STRATEGIE
+    
+    STRATEGIE COULEUR_TACTIQUE
+        MUNITION rouge ENTIER  // 0-255
+        MUNITION vert ENTIER   // 0-255
+        MUNITION bleu ENTIER   // 0-255
+        MUNITION alpha ENTIER  // 0-255 (transparence)
+    FIN STRATEGIE
+    
+    STRATEGIE TRANSFORMATION_TACTIQUE
+        MUNITION translation POINT_TACTIQUE
+        MUNITION echelle POINT_TACTIQUE
+        MUNITION rotation FLOTTANT  // En degrés
+        MUNITION point_pivot POINT_TACTIQUE
+    FIN STRATEGIE
+    
+    //----------------------------------------------
+    // TEMPORISATION ET CONTROLEUR D'ANIMATION
+    //----------------------------------------------
+    
+    STRATEGIE CONTROLEUR_ANIMATION
+        MUNITION temps_debut FLOTTANT
+        MUNITION temps_actuel FLOTTANT
+        MUNITION temps_delta FLOTTANT
+        MUNITION fps ENTIER
+        MUNITION est_actif BOOLEEN
+        MUNITION animations_actives FORMATION[100]
+        MUNITION nombre_animations ENTIER
+    FIN STRATEGIE
+    
+    MISSION CONTROLEUR_INITIALISER
+        PARAMETRE fps ENTIER = FPS_STANDARD
+        
+        ORDRE DE BATAILLE
+            MUNITION controleur CONTROLEUR_ANIMATION
+            
+            controleur.temps_debut = EXECUTION OBTENIR_TEMPS
+            controleur.temps_actuel = controleur.temps_debut
+            controleur.temps_delta = 0
+            controleur.fps = fps
+            controleur.est_actif = VRAI
+            controleur.nombre_animations = 0
+            
+            RETRAITE controleur
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTROLEUR_METTRE_A_JOUR
+        PARAMETRE controleur POINTEUR
+        
+        ORDRE DE BATAILLE
+            MUNITION temps_nouveau = EXECUTION OBTENIR_TEMPS
+            controleur.temps_delta = temps_nouveau - controleur.temps_actuel
+            controleur.temps_actuel = temps_nouveau
+            
+            // Mettre à jour toutes les animations actives
+            MANOEUVRE POUR i DE 0 A controleur.nombre_animations - 1
+                MUNITION animation = controleur.animations_actives[i]
+                
+                SI CIBLE animation != 0 && animation.est_active
+                    EXECUTION ANIMATION_METTRE_A_JOUR animation, controleur.temps_delta
+                    
+                    // Vérifier si l'animation est terminée
+                    SI CIBLE !animation.est_active
+                        controleur.animations_actives[i] = 0  // Libérer l'emplacement
+                    FIN SI
+                FIN SI
+            FIN MANOEUVRE
+            
+            // Nettoyer le tableau des animations (compression)
+            SI CIBLE controleur.nombre_animations > 20  // Seuil arbitraire
+                EXECUTION CONTROLEUR_COMPACTER controleur
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTROLEUR_COMPACTER
+        PARAMETRE controleur POINTEUR
+        
+        ORDRE DE BATAILLE
+            MUNITION index = 0
+            
+            // Déplacer toutes les animations actives au début du tableau
+            MANOEUVRE POUR i DE 0 A controleur.nombre_animations - 1
+                SI CIBLE controleur.animations_actives[i] != 0
+                    SI CIBLE i != index
+                        controleur.animations_actives[index] = controleur.animations_actives[i]
+                        controleur.animations_actives[i] = 0
+                    FIN SI
+                    
+                    index = index + 1
+                FIN SI
+            FIN MANOEUVRE
+            
+            controleur.nombre_animations = index
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION CONTROLEUR_AJOUTER_ANIMATION
+        PARAMETRE controleur POINTEUR
+        PARAMETRE animation POINTEUR
+        
+        ORDRE DE BATAILLE
+            // Trouver un emplacement libre
+            MUNITION index = -1
+            
+            MANOEUVRE POUR i DE 0 A controleur.nombre_animations - 1
+                SI CIBLE controleur.animations_actives[i] == 0
+                    index = i
+                    INTERROMPRE
+                FIN SI
+            FIN MANOEUVRE
+            
+            SI CIBLE index == -1
+                // Pas d'emplacement libre, ajouter à la fin
+                SI CIBLE controleur.nombre_animations >= 100
+                    RAPPORT "ERREUR: Nombre maximum d'animations atteint"
+                    RETRAITE FAUX
+                FIN SI
+                
+                index = controleur.nombre_animations
+                controleur.nombre_animations = controleur.nombre_animations + 1
+            FIN SI
+            
+            controleur.animations_actives[index] = animation
+            animation.est_active = VRAI
+            
+            RETRAITE VRAI
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION OBTENIR_TEMPS
+        ORDRE DE BATAILLE
+            // Retourne le temps actuel en secondes (dépend de l'implémentation)
+            // Pour cet exemple, nous supposons qu'une fonction système existe
+            MUNITION temps = APPEL_SYSTEME("obtenir_temps_ms") / 1000.0
+            
+            RETRAITE temps
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // FONCTIONS D'INTERPOLATION
+    //----------------------------------------------
+    
+    MISSION INTERPOLER
+        PARAMETRE debut FLOTTANT
+        PARAMETRE fin FLOTTANT
+        PARAMETRE progression FLOTTANT  // 0.0 à 1.0
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        
+        ORDRE DE BATAILLE
+            SI CIBLE progression <= 0
+                RETRAITE debut
+            SINON SI CIBLE progression >= 1
+                RETRAITE fin
+            FIN SI
+            
+            MUNITION resultat = 0
+            
+            SELON type_interpolation
+                CAS INTERPOLATION_LINEAIRE:
+                    resultat = debut + (fin - debut) * progression
+                    PAUSE
+                
+                CAS INTERPOLATION_EASE_IN:
+                    // Accélération progressive (fonction cubique)
+                    MUNITION t = progression * progression * progression
+                    resultat = debut + (fin - debut) * t
+                    PAUSE
+                
+                CAS INTERPOLATION_EASE_OUT:
+                    // Décélération progressive
+                    MUNITION t = 1 - (1 - progression) * (1 - progression) * (1 - progression)
+                    resultat = debut + (fin - debut) * t
+                    PAUSE
+                
+                CAS INTERPOLATION_EASE_IN_OUT:
+                    // Combinaison d'accélération et décélération
+                    MUNITION t = 0
+                    SI CIBLE progression < 0.5
+                        t = 4 * progression * progression * progression
+                    SINON
+                        MUNITION p = 2 * progression - 2
+                        t = 0.5 * p * p * p + 1
+                    FIN SI
+                    resultat = debut + (fin - debut) * t
+                    PAUSE
+                
+                CAS INTERPOLATION_REBOND:
+                    // Effet de rebond à la fin
+                    MUNITION t = progression
+                    t = t * t * (3.0 - 2.0 * t)  // Lissage
+                    
+                    SI CIBLE t < 0.85
+                        resultat = debut + (fin - debut) * t
+                    SINON
+                        // Créer un petit effet de rebond
+                        MUNITION r = (t - 0.85) / 0.15
+                        MUNITION bounce = sin(r * 3.14159 * 3) * 0.1 * (1 - r)
+                        resultat = debut + (fin - debut) * (t + bounce)
+                    FIN SI
+                    PAUSE
+                
+                CAS INTERPOLATION_ELASTIQUE:
+                    // Effet élastique (overshoot puis retour)
+                    MUNITION p = progression - 1
+                    resultat = debut + (fin - debut) * (1 + 2.5 * p * p * p + 2 * p * p * sin(progression * 3.14159 * 4.5))
+                    PAUSE
+                
+                DEFAUT:
+                    // Linéaire par défaut
+                    resultat = debut + (fin - debut) * progression
+            FIN SELON
+            
+            RETRAITE resultat
+        FIN ORDRE
+    FIN MISSION
+    
+    //----------------------------------------------
+    // ANIMATIONS DE BASE
+    //----------------------------------------------
+    
+    STRATEGIE ANIMATION_BASE
+        MUNITION est_active BOOLEEN
+        MUNITION temps_debut FLOTTANT
+        MUNITION duree FLOTTANT
+        MUNITION temps_ecoule FLOTTANT
+        MUNITION progression FLOTTANT
+        MUNITION repetition ENTIER       // 0 = infini, 1+ = nombre de fois
+        MUNITION compte_repetition ENTIER
+        MUNITION type_interpolation ENTIER
+        MUNITION callback_fin POINTEUR   // Fonction à appeler à la fin
+    FIN STRATEGIE
+
+    MISSION ANIMATION_INITIALISER
+        PARAMETRE animation POINTEUR
+        PARAMETRE duree FLOTTANT
+        PARAMETRE type_interpolation ENTIER = INTERPOLATION_LINEAIRE
+        PARAMETRE repetition ENTIER = 1
+        
+        ORDRE DE BATAILLE
+            animation.est_active = FAUX
+            animation.temps_debut = 0
+            animation.duree = duree
+            animation.temps_ecoule = 0
+            animation.progression = 0
+            animation.repetition = repetition
+            animation.compte_repetition = 0
+            animation.type_interpolation = type_interpolation
+            animation.callback_fin = 0
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ANIMATION_DEMARRER
+        PARAMETRE animation POINTEUR
+        PARAMETRE temps_actuel FLOTTANT
+        
+        ORDRE DE BATAILLE
+            animation.est_active = VRAI
+            animation.temps_debut = temps_actuel
+            animation.temps_ecoule = 0
+            animation.progression = 0
+            animation.compte_repetition = 0
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ANIMATION_METTRE_A_JOUR
+        PARAMETRE animation POINTEUR
+        PARAMETRE delta_temps FLOTTANT
+        
+        ORDRE DE BATAILLE
+            SI CIBLE !animation.est_active
+                RETRAITE
+            FIN SI
+            
+            animation.temps_ecoule = animation.temps_ecoule + delta_temps
+            
+            // Calculer la progression (0.0 à 1.0)
+            SI CIBLE animation.duree <= 0
+                animation.progression = 1.0
+            SINON
+                animation.progression = animation.temps_ecoule / animation.duree
+            FIN SI
+            
+            // Vérifier si une répétition est terminée
+            SI CIBLE animation.progression >= 1.0
+                animation.progression = 1.0
+                animation.compte_repetition = animation.compte_repetition + 1
+                
+                // Vérifier si toutes les répétitions sont terminées
+                SI CIBLE animation.repetition > 0 && animation.compte_repetition >= animation.repetition
+                    animation.est_active = FAUX
+                    
+                    // Appeler la fonction de callback si définie
+                    SI CIBLE animation.callback_fin != 0
+                        EXECUTION animation.callback_fin animation
+                    FIN SI
+                SINON
+                    // Réinitialiser pour la prochaine répétition
+                    animation.temps_ecoule = animation.temps_ecoule - animation.duree
+                    animation.progression = animation.temps_ecoule / animation.duree
+                FIN SI
+            FIN SI
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+    
+    MISSION ANIMATION_ARRETER
+        PARAMETRE animation POINTEUR
+        
+        ORDRE DE BATAILLE
+            animation.est_active = FAUX
+            
+            RETRAITE
+        FIN ORDRE
+    FIN MISSION
+
+FIN BASE
