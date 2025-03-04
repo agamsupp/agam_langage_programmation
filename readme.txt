@@ -1,6 +1,6 @@
 # AGAM - Langage de Programmation
 
-AGAM est un langage de programmation basé sur la terminologie militaire, conçu pour [objectif du langage].
+AGAM est un langage de programmation basé sur la terminologie militaire.
 
 ## Installation
 
